@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Historical Database</title>
+    
+    <!-- Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script> <!-- FAST CSV PARSER -->
+    <link href="https://fonts.googleapis.com/css2?family=Calibri:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app" class="h-full flex flex-col bg-gray-100" v-cloak>
+        
+        <!-- HEADER -->
+        <header class="bg-gray-950 text-white px-4 md:px-6 py-3 flex flex-col md:flex-row justify-between items-center shrink-0 shadow-lg z-20 border-b border-gray-800">
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <i data-lucide="database" class="w-7 h-7 text-emerald-500"></i>
+                <div>
+                    <h1 class="font-bold tracking-wide text-lg leading-tight text-white">Historical Data Warehouse</h1>
+                    <div class="text-[10px] uppercase font-bold tracking-widest flex items-center gap-2 text-amber-500">
+                        <span>Storage & Fetch Engine</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hidden md:flex items-center gap-3" v-if="isUnlocked">
+                <div class="flex items-center gap-2 bg-gray-900 px-3 py-1.5 rounded shadow-inner border border-gray-800 text-gray-300">
+                    <i data-lucide="user" class="w-4 h-4 text-emerald-500"></i> <span class="text-sm font-bold">{{ loggedInUser }}</span>
+                </div>
+                <button @click="forceLock" class="bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-amber-500 px-3 py-1.5 rounded flex items-center gap-1.5 text-sm font-bold shadow transition-colors"><i data-lucide="lock" class="w-4 h-4"></i> Lock</button>
+            </div>
+        </header>
+
+        <!-- LOGIN SCREEN -->
+        <main v-if="!isUnlocked" class="flex-1 flex flex-col items-center justify-center p-4">
+             <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center border border-gray-200">
+                 <div class="bg-gray-950 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                    <i data-lucide="shield" class="w-10 h-10 text-emerald-500"></i>
+                 </div>
+                 <h2 class="text-2xl font-extrabold text-gray-900 mb-6">Database Login</h2>
+                 <div class="flex flex-col gap-4 mb-6">
+                     <input type="email" v-model="emailInput" class="border-2 border-gray-300 p-3 w-full rounded-xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none text-center font-bold text-gray-900" placeholder="Email Address">
+                     <input type="password" v-model="passwordInput" @keyup.enter="handleLogin" class="border-2 border-gray-300 p-3 w-full rounded-xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none text-center font-bold text-gray-900" placeholder="Password">
+                 </div>
+                 <p v-if="authError" class="text-red-500 text-sm font-bold mb-4">{{ authError }}</p>
+                 <button @click="handleLogin" class="w-full py-3.5 bg-gray-950 hover:bg-gray-800 text-amber-500 rounded-xl font-bold text-lg shadow-md transition-colors">Access Warehouse</button>
+             </div>
+        </main>
+
+        <!-- TABS NAV -->
+        <div v-if="isUnlocked" class="bg-gray-950 px-4 md:px-6 pt-2 flex gap-2 shrink-0 z-10 shadow-sm overflow-x-auto no-scrollbar border-b border-gray-800">
+            <button @click="activeTab = 'Search'" :class="activeTab === 'Search' ? 'bg-gray-100 text-gray-900 font-extrabold border-t-4 border-emerald-500' : 'bg-gray-900/50 text-gray-400 hover:bg-gray-800 hover:text-white'" class="px-6 py-2 rounded-t-xl text-sm transition-colors tracking-wide">Search Archive</button>
+            <button @click="activeTab = 'Import'" :class="activeTab === 'Import' ? 'bg-gray-100 text-gray-900 font-extrabold border-t-4 border-emerald-500' : 'bg-gray-900/50 text-gray-400 hover:bg-gray-800 hover:text-white'" class="px-6 py-2 rounded-t-xl text-sm transition-colors tracking-wide">Upload & Map Raw File</button>
+        </div>
+
+        <!-- SEARCH TAB -->
+        <main v-if="isUnlocked && activeTab === 'Search'" class="flex-1 flex flex-col overflow-hidden">
+            <!-- Search Control Panel -->
+            <div class="bg-white p-4 border-b border-gray-200 shadow-sm shrink-0 flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Target Year/Month</label>
+                    <input type="month" v-model="searchMonth" class="border border-gray-300 p-2 rounded-lg font-bold text-sm outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">GL Code</label>
+                    <input type="text" v-model="searchGL" placeholder="e.g. 4000" class="border border-gray-300 p-2 rounded-lg font-bold text-sm w-32 outline-none focus:border-emerald-500">
+                </div>
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Keyword / Description</label>
+                    <input type="text" v-model="searchQuery" placeholder="Search line items..." class="border border-gray-300 p-2 rounded-lg font-bold text-sm w-full outline-none focus:border-emerald-500">
+                </div>
+                <button @click="runSearch" :disabled="isSearching" class="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg font-bold shadow-md transition-colors flex items-center gap-2 text-sm">
+                    <i data-lucide="search" class="w-4 h-4"></i> {{ isSearching ? 'Fetching...' : 'Run Query' }}
+                </button>
+            </div>
+
+            <!-- Results Summary -->
+            <div v-if="searchResults.length > 0" class="p-4 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center shrink-0">
+                <div class="font-bold text-emerald-900">Found {{ searchResults.length }} matching line items.</div>
+                <div class="text-xl font-extrabold text-gray-900">Total: {{ formatCurrency(searchTotal) }}</div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="flex-1 overflow-auto bg-gray-100 p-4">
+                <div class="bg-white rounded-xl shadow border border-gray-300 overflow-hidden h-full flex flex-col">
+                    <div class="overflow-auto flex-1">
+                        <table class="excel-table min-w-max w-full">
+                            <thead>
+                                <tr>
+                                    <th v-for="header in standardHeaders.filter(h => h !== '-- Ignore --')" :key="header">{{ header }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-if="searchResults.length === 0">
+                                    <td :colspan="standardHeaders.length - 1" class="text-center py-16 text-gray-500 bg-gray-50">
+                                        No results yet. Enter search criteria and run a query.
+                                    </td>
+                                </tr>
+                                <tr v-for="(row, idx) in searchResults" :key="idx">
+                                    <td v-for="col in standardHeaders.filter(h => h !== '-- Ignore --')" :key="col">
+                                        {{ col === 'Amount' ? formatCurrency(row[col]) : row[col] }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- UPLOAD & MAP TAB -->
+        <main v-if="isUnlocked && activeTab === 'Import'" class="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
+            <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl text-sm text-amber-500 mb-4 shadow-sm shrink-0 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div>
+                    <strong>Data Standardizer:</strong> Upload a raw GP Power CSV. Map the confusing columns to our standard format. <br>
+                    <span class="text-gray-400"><em>The system will rebuild the file cleanly and save it to Firebase Storage.</em></span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="month" v-model="uploadMonth" class="p-2 rounded font-bold text-gray-900 text-sm">
+                    <label class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold shadow cursor-pointer transition-colors flex items-center gap-2 text-sm whitespace-nowrap">
+                        <i data-lucide="upload" class="w-4 h-4"></i> Select Raw CSV
+                        <input type="file" @change="handleRawUpload" accept=".csv" class="hidden">
+                    </label>
+                </div>
+            </div>
+            
+            <div v-if="rawPastedGrid.length > 0" class="flex-1 overflow-auto rounded-xl border border-gray-300 bg-white flex flex-col">
+                <div class="overflow-auto flex-1">
+                    <table class="excel-table w-full relative">
+                        <thead class="sticky top-0 z-20 shadow-md bg-gray-50">
+                            <tr>
+                                <th v-for="(col, cIndex) in rawPastedGrid[0]" :key="'uhead-'+cIndex" class="bg-emerald-50 border-emerald-100 p-2 min-w-[150px]">
+                                    <div class="text-[10px] text-gray-500 mb-1">Raw: "{{ col }}"</div>
+                                    <select v-model="mappedHeaders[cIndex]" class="w-full text-xs font-bold text-emerald-900 bg-white border border-emerald-300 rounded p-1.5 cursor-pointer outline-none">
+                                        <option v-for="opt in standardHeaders" :key="opt" :value="opt">{{ opt }}</option>
+                                    </select>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, rIndex) in rawPastedGrid.slice(1, 20)" :key="'urow-'+rIndex">
+                                <td v-for="(cell, cIndex) in row" :key="'ucell-'+cIndex" class="text-xs truncate max-w-[200px]" :title="cell">{{ cell }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="bg-gray-50 p-4 border-t flex justify-between items-center shrink-0">
+                    <div class="text-xs text-gray-500 font-bold">Showing preview of first 20 rows. All {{ rawPastedGrid.length - 1 }} rows will be processed.</div>
+                    <button @click="processAndUploadToCloud" :disabled="isUploading" class="bg-gray-950 hover:bg-gray-800 disabled:bg-gray-400 text-amber-500 px-6 py-2 rounded-lg font-bold shadow-md transition-colors flex items-center gap-2">
+                        <i data-lucide="cloud-upload" class="w-4 h-4"></i> {{ isUploading ? 'Uploading...' : 'Standardize & Save to Cloud' }}
+                    </button>
+                </div>
+            </div>
+            
+            <div v-else class="flex-1 flex items-center justify-center bg-white border-2 border-dashed border-gray-300 rounded-xl text-gray-400 font-bold">
+                Select a raw CSV file above to begin mapping.
+            </div>
+        </main>
+
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
