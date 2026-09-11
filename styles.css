@@ -1,0 +1,44 @@
+/* styles.css */
+[v-cloak] { display: none !important; }
+
+body, html {
+    height: 100%;
+    margin: 0;
+    font-family: 'Calibri', sans-serif;
+    background-color: #f3f4f6;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.excel-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.excel-table th, .excel-table td {
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 13px;
+}
+
+.excel-table th {
+    background-color: #111827; /* Obsidian */
+    color: #f59e0b; /* Gold */
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.excel-table td {
+    background-color: #ffffff;
+    color: #374151;
+}
+
+.excel-table tr:hover td { background-color: #ecfdf5; /* Light Emerald */ }
