@@ -1,18 +1,19 @@
 // app.js
 
-// 1. FIREBASE IMPORTS (Added Storage module)
+// 1. FIREBASE IMPORTS
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import { getStorage, ref as fbRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 
-// 2. FIREBASE CONFIGURATION
+// 2. FIREBASE CONFIGURATION (Matches your Promo Tracker project)
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY", // Update these
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
+    authDomain: "rredco-database.firebaseapp.com",
+    projectId: "rredco-database",
+    storageBucket: "rredco-database.firebasestorage.app",
+    messagingSenderId: "968362680607",
+    appId: "1:968362680607:web:dea3fe719d8f8d619fbe8a",
+    measurementId: "G-PGY27N2N17"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -24,30 +25,43 @@ const { createApp, ref, computed, nextTick, onMounted } = window.Vue;
 
 createApp({
     setup() {
-        const isUnlocked = ref(false);
-        const loggedInUser = ref('');
+        // SET TO TRUE TO BYPASS LOGIN DURING LOCAL TESTING
+        const isUnlocked = ref(true); 
+        const loggedInUser = ref('Local Testing Mode');
         const emailInput = ref('');
         const passwordInput = ref('');
         const authError = ref('');
-        const activeTab = ref('Search');
+        const activeTab = ref('Import'); // Default to Import tab so you can load your sample CSV immediately
 
-        // Simple auth for now
+        const systemUsers = {
+            'lenay@rredco.com': { name: 'Lenay A.' },
+            'tricia@rredco.com': { name: 'Tricia K.' },
+            'whitney@rredco.com': { name: 'Whitney M.' },
+            'nicholas.grace@rredco.com': { name: 'Nicholas G.' } 
+        };
+
         const handleLogin = () => {
             authError.value = '';
             signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value)
                 .then(() => { emailInput.value = ''; passwordInput.value = ''; refreshIcons(); })
                 .catch(() => { authError.value = "Invalid email or password."; });
         };
-        const forceLock = () => { signOut(auth).then(() => { isUnlocked.value = false; loggedInUser.value = ''; }); };
+        
+        const forceLock = () => { 
+            signOut(auth).then(() => { 
+                isUnlocked.value = false; 
+                loggedInUser.value = ''; 
+            }); 
+        };
 
         onMounted(() => {
             refreshIcons();
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    loggedInUser.value = user.email.split('@')[0];
+                    const userEmail = user.email.toLowerCase();
+                    const managerData = systemUsers[userEmail] || { name: user.email.split('@')[0] };
+                    loggedInUser.value = managerData.name;
                     isUnlocked.value = true;
-                } else {
-                    isUnlocked.value = false;
                 }
             });
         });
@@ -59,87 +73,102 @@ createApp({
         const standardHeaders = ['-- Ignore --', 'Transaction Date', 'GL Code', 'Description', 'Amount', 'Location', 'Reference ID'];
         const rawPastedGrid = ref([]);
         const mappedHeaders = ref([]);
-        const uploadMonth = ref('');
+        const uploadMonth = ref(new Date().toISOString().slice(0, 7)); // Defaults to current YYYY-MM
         const isUploading = ref(false);
+
+        // Local Memory Store (Replaces cloud storage while testing)
+        const localHistoricalDatabase = ref(JSON.parse(localStorage.getItem('localHistoricalDatabase')) || {});
 
         const handleRawUpload = (event) => {
             const file = event.target.files[0];
             if (!file) return;
 
-            // PapaParse reads the local file instantly
+            // PapaParse reads the local file instantly in browser memory
             Papa.parse(file, {
                 complete: (results) => {
-                    if(results.data.length < 2) return alert("File appears empty.");
+                    if(results.data.length < 2) return alert("File appears empty or invalid.");
                     rawPastedGrid.value = results.data;
                     
-                    // Auto-guess headers
+                    // Smart-guess header mappings for GP Power Online exports
                     const firstRow = results.data[0];
                     mappedHeaders.value = firstRow.map(h => {
                         const hLow = (h || '').toLowerCase();
-                        if(hLow.includes('date') || hLow.includes('dt')) return 'Transaction Date';
-                        if(hLow.includes('gl') || hLow.includes('account')) return 'GL Code';
-                        if(hLow.includes('desc')) return 'Description';
-                        if(hLow.includes('amt') || hLow.includes('amount') || hLow.includes('owed')) return 'Amount';
-                        if(hLow.includes('loc') || hLow.includes('store')) return 'Location';
-                        if(hLow.includes('ref') || hLow.includes('trx')) return 'Reference ID';
+                        if(hLow.includes('date') || hLow.includes('dt') || hLow.includes('trx_dt')) return 'Transaction Date';
+                        if(hLow.includes('gl') || hLow.includes('account') || hLow.includes('actnum')) return 'GL Code';
+                        if(hLow.includes('desc') || hLow.includes('dscrptn')) return 'Description';
+                        if(hLow.includes('amt') || hLow.includes('amount') || hLow.includes('debit') || hLow.includes('credit')) return 'Amount';
+                        if(hLow.includes('loc') || hLow.includes('store') || hLow.includes('site')) return 'Location';
+                        if(hLow.includes('ref') || hLow.includes('trx') || hLow.includes('num') || hLow.includes('doc')) return 'Reference ID';
                         return '-- Ignore --';
                     });
+                    refreshIcons();
                 }
             });
         };
 
         const processAndUploadToCloud = async () => {
-            if (!uploadMonth.value) return alert("Please select the Target Year/Month for this file before uploading.");
+            if (!uploadMonth.value) return alert("Please select the Target Year/Month for this file.");
             if (rawPastedGrid.value.length < 2) return;
 
             isUploading.value = true;
             try {
-                // 1. Rebuild the CSV using ONLY mapped columns
-                const cleanData = [];
-                // Add the header row
+                // Rebuild data using strictly mapped standard columns
                 const activeHeaders = mappedHeaders.value.filter(h => h !== '-- Ignore --');
-                cleanData.push(activeHeaders);
+                const cleanRows = [];
 
-                // Add the data rows
                 for (let r = 1; r < rawPastedGrid.value.length; r++) {
                     const rawRow = rawPastedGrid.value[r];
-                    if(!rawRow || rawRow.length === 0 || !rawRow[0]) continue; // Skip empty rows
+                    if(!rawRow || rawRow.length === 0 || !rawRow[0]) continue;
                     
-                    const cleanRow = [];
+                    const rowObj = {};
                     let hasData = false;
                     
                     for (let c = 0; c < mappedHeaders.value.length; c++) {
-                        if (mappedHeaders.value[c] !== '-- Ignore --') {
+                        const targetHeader = mappedHeaders.value[c];
+                        if (targetHeader !== '-- Ignore --') {
                             const val = rawRow[c] || '';
-                            cleanRow.push(val);
+                            rowObj[targetHeader] = val;
                             if(val.trim() !== '') hasData = true;
                         }
                     }
-                    if(hasData) cleanData.push(cleanRow);
+                    if(hasData) cleanRows.push(rowObj);
                 }
 
-                // 2. Convert back to CSV string using PapaParse
-                const csvString = Papa.unparse(cleanData);
+                const monthKey = uploadMonth.value.replace('-', '_');
 
-                // 3. Upload to Firebase Storage
-                const fileName = `master_csvs/${uploadMonth.value.replace('-', '_')}_master.csv`; // e.g., 2024_01_master.csv
-                const fileRef = fbRef(storage, fileName);
-                
-                await uploadString(fileRef, csvString, 'raw', { contentType: 'text/csv' });
-                
-                alert(`Success! Standardized CSV saved to cloud as ${fileName}`);
+                // Save to local memory store for testing
+                localHistoricalDatabase.value[monthKey] = cleanRows;
+                localStorage.setItem('localHistoricalDatabase', JSON.stringify(localHistoricalDatabase.value));
+
+                // Optional: Attempt Firebase Cloud Storage upload if enabled later
+                try {
+                    const cleanCsvString = Papa.unparse({
+                        fields: activeHeaders,
+                        data: cleanRows.map(r => activeHeaders.map(h => r[h] || ''))
+                    });
+                    const fileName = `master_csvs/${monthKey}_master.csv`;
+                    const fileRef = fbRef(storage, fileName);
+                    await uploadString(fileRef, cleanCsvString, 'raw', { contentType: 'text/csv' });
+                    console.log(`Saved to cloud as ${fileName}`);
+                } catch (cloudErr) {
+                    console.log("Cloud storage upload skipped (Running in local test mode).");
+                }
+
+                alert(`Success! Processed ${cleanRows.length} standardized rows for ${uploadMonth.value}. You can now query this data in the Search Archive tab!`);
                 rawPastedGrid.value = [];
-                uploadMonth.value = '';
-                
+                activeTab.value = 'Search';
+                searchMonth.value = uploadMonth.value;
+                runSearch();
+
             } catch (error) {
-                console.error("Upload Error:", error);
-                alert("Failed to upload to Firebase Storage. Check console.");
+                console.error("Processing Error:", error);
+                alert("Failed to process CSV data.");
             }
             isUploading.value = false;
         };
 
         // --- SEARCH ENGINE LOGIC ---
-        const searchMonth = ref('');
+        const searchMonth = ref(new Date().toISOString().slice(0, 7));
         const searchGL = ref('');
         const searchQuery = ref('');
         const isSearching = ref(false);
@@ -149,63 +178,56 @@ createApp({
             return searchResults.value.reduce((sum, row) => sum + (parseFloat(String(row['Amount']).replace(/[^0-9.-]+/g,"")) || 0), 0);
         });
 
-        // In-memory cache so we don't re-download the same month twice
-        const fileCache = {}; 
-
         const runSearch = async () => {
             if (!searchMonth.value) return alert("Please select a month to search.");
             
             isSearching.value = true;
             searchResults.value = [];
             
-            const targetFileName = `master_csvs/${searchMonth.value.replace('-', '_')}_master.csv`;
-            let csvDataToSearch = [];
+            const monthKey = searchMonth.value.replace('-', '_');
+            let dataToSearch = localHistoricalDatabase.value[monthKey] || [];
 
-            try {
-                // 1. Check cache or Download
-                if (fileCache[targetFileName]) {
-                    csvDataToSearch = fileCache[targetFileName];
-                } else {
+            // If local memory is empty, attempt fetching from Firebase Storage (for future live use)
+            if (dataToSearch.length === 0) {
+                try {
+                    const targetFileName = `master_csvs/${monthKey}_master.csv`;
                     const fileRef = fbRef(storage, targetFileName);
                     const downloadUrl = await getDownloadURL(fileRef);
-                    
-                    // Fetch and parse the CSV string
                     const response = await fetch(downloadUrl);
                     const csvText = await response.text();
-                    
                     const parseResult = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-                    csvDataToSearch = parseResult.data;
-                    fileCache[targetFileName] = csvDataToSearch; // Save to cache
-                }
-
-                // 2. Filter the data in memory
-                const glFilter = searchGL.value.trim().toLowerCase();
-                const textFilter = searchQuery.value.trim().toLowerCase();
-
-                searchResults.value = csvDataToSearch.filter(row => {
-                    let matchesGL = true;
-                    let matchesText = true;
-
-                    if (glFilter) {
-                        matchesGL = (row['GL Code'] || '').toLowerCase().includes(glFilter);
-                    }
-                    if (textFilter) {
-                        const desc = (row['Description'] || '').toLowerCase();
-                        const refId = (row['Reference ID'] || '').toLowerCase();
-                        matchesText = desc.includes(textFilter) || refId.includes(textFilter);
-                    }
-
-                    return matchesGL && matchesText;
-                });
-
-            } catch (error) {
-                if (error.code === 'storage/object-not-found') {
-                    alert(`No historical data found for ${searchMonth.value}. Please import it first.`);
-                } else {
-                    console.error("Search error:", error);
-                    alert("An error occurred while fetching the data.");
+                    dataToSearch = parseResult.data;
+                } catch (e) {
+                    // Quietly catch if missing in cloud during test mode
                 }
             }
+
+            if (dataToSearch.length === 0) {
+                alert(`No mapped data found for ${searchMonth.value}. Please upload a CSV for this month in the Upload & Map tab first.`);
+                isSearching.value = false;
+                return;
+            }
+
+            // In-Memory Fast Filtering
+            const glFilter = searchGL.value.trim().toLowerCase();
+            const textFilter = searchQuery.value.trim().toLowerCase();
+
+            searchResults.value = dataToSearch.filter(row => {
+                let matchesGL = true;
+                let matchesText = true;
+
+                if (glFilter) {
+                    matchesGL = (row['GL Code'] || '').toLowerCase().includes(glFilter);
+                }
+                if (textFilter) {
+                    const desc = (row['Description'] || '').toLowerCase();
+                    const refId = (row['Reference ID'] || '').toLowerCase();
+                    const loc = (row['Location'] || '').toLowerCase();
+                    matchesText = desc.includes(textFilter) || refId.includes(textFilter) || loc.includes(textFilter);
+                }
+
+                return matchesGL && matchesText;
+            });
 
             isSearching.value = false;
         };
