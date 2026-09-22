@@ -60,7 +60,7 @@
       </button>
       <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
         <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-        <span>CLOUD CONNECTED</span>
+        <span>INDEXEDDB STAGING ACTIVE</span>
       </div>
     </div>
   </header>
@@ -125,7 +125,7 @@
         <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
       </div>
       <div class="mt-4 bg-slate-950 rounded-lg p-3 h-32 overflow-y-auto font-mono text-[10px] text-slate-400 space-y-1" id="terminal-logs">
-        <div>System initialized. Connected to Firebase Cloud Storage.</div>
+        <div>System initialized. Connected to Firebase Storage.</div>
       </div>
     </section>
 
@@ -204,6 +204,21 @@
     let extractedData = [];
     let originalFileName = "";
     let fullDebugLog = [];
+
+    // Helper: Native IndexedDB for unlimited capacity staging
+    function openAuditDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('RREDCO_Audit_Store', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('staging')) {
+            db.createObjectStore('staging');
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
 
     onAuthStateChanged(auth, (user) => {
       if (user && user.email) {
@@ -304,13 +319,12 @@
 
           const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0] };
 
-          // Extract and tie-out records
           for (let r = 1; r < Math.min(2000, raw2D.length); r++) {
             const row = raw2D[r];
             if (!row || row.length === 0 || row.every(c => c === null || c === undefined || String(c).trim() === '')) continue;
 
-            let docAmt = parseFloat(row[7]) || 0; // Debit
-            let curAmt = parseFloat(row[8]) || 0; // Credit
+            let docAmt = parseFloat(row[7]) || 0;
+            let curAmt = parseFloat(row[8]) || 0;
             
             extractedData.push({
               row_id: rowId++,
@@ -492,17 +506,22 @@
       document.getElementById('btn-pass').disabled = false;
     };
 
-    window.stageAuditData = () => {
+    window.stageAuditData = async () => {
       if (extractedData.length === 0) return;
       try {
-        localStorage.setItem('rredco_audit_staging', JSON.stringify(extractedData));
-        const btn = document.getElementById('btn-pass');
-        btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
-        btn.classList.remove('from-cyan-400', 'to-cyan-500');
-        btn.classList.add('from-emerald-400', 'to-emerald-500');
-        window.logSys(`Successfully staged ${extractedData.length} records to local memory for ledger.html terminal.`, 'success');
+        const db = await openAuditDB();
+        const tx = db.transaction('staging', 'readwrite');
+        tx.objectStore('staging').put(extractedData, 'rredco_audit_staging');
+
+        tx.oncomplete = () => {
+          const btn = document.getElementById('btn-pass');
+          btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
+          btn.classList.remove('from-cyan-400', 'to-cyan-500');
+          btn.classList.add('from-emerald-400', 'to-emerald-500');
+          window.logSys(`Successfully staged ${extractedData.length} records to IndexedDB for ledger.html terminal.`, 'success');
+        };
       } catch (err) {
-        window.logSys(`Failed to save to local storage: ${err.message}`, 'error');
+        window.logSys(`Failed to save staging data: ${err.message}`, 'error');
       }
     };
 
