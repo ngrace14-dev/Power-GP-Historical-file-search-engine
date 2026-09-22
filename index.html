@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Power GP Ledger Search</title>
     
+    <!-- Browser Tab Icon / Logo -->
+    <link rel="icon" type="image/png" href="RREDCO_Logo.png">
+    
     <!-- External Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,17 +15,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 
     <script>
-        // 1. Initialize global state immediately to prevent undefined errors
+        // Initialize global state
         window.appState = {
-            cloudConnected: false,
             user: null,
             ledgerData: []
         };
 
-        // 2. Define UI icon helper before any other scripts run
+        // UI icon helper
         window.safeRenderIcons = function() {
             try {
-                // Ensure icons render correctly on dynamic updates
                 if (window.FontAwesome) {
                     window.FontAwesome.dom.i2svg();
                 }
@@ -116,17 +117,18 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
-        // REPLACE THIS WITH YOUR FIREBASE CONFIG
+        // Firebase Configuration (Updated with your specific keys)
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
+            apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
             authDomain: "rredco-database.firebaseapp.com",
             projectId: "rredco-database",
             storageBucket: "rredco-database.firebasestorage.app",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            messagingSenderId: "96836268607",
+            appId: "1:96836268607:web:dea3fe719d8f8d619fbe8a",
+            measurementId: "G-PGY27N2N17"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -168,6 +170,7 @@
         logoutBtn.addEventListener('click', () => {
             signOut(auth);
             window.appState.ledgerData = [];
+            tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-gray-500"><i class="fa-solid fa-cloud-arrow-down text-4xl mb-3 text-gray-300 block"></i>Click "Pull From Cloud" to load General Ledger data.</td></tr>';
         });
 
         // Pull Data from Storage
@@ -211,7 +214,7 @@
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 
-                // Find actual header row (usually contains "Journal Entry" or "Account")
+                // Find actual header row
                 let headerRowIndex = 0;
                 for (let i = 0; i < Math.min(15, jsonData.length); i++) {
                     const rowStr = (jsonData[i] || []).join(' ').toLowerCase();
@@ -220,21 +223,17 @@
                         break;
                     }
                 }
-
-                const headers = jsonData[headerRowIndex];
                 
                 // Map data rows
                 for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
                     const row = jsonData[i];
                     if (!row || row.length === 0 || !row[0]) continue;
                     
-                    // Simple entity extraction from filename (e.g., "POMCO GL Detail..." -> "POMCO")
                     const entity = filename.split(' ')[0]; 
 
-                    // Map columns (adjust indexes based on your exact Excel layout)
                     window.appState.ledgerData.push({
                         entity: entity,
-                        trxDate: row[0] || '', // Adjust based on your GP export
+                        trxDate: row[0] || '',
                         journalEntry: row[1] || '',
                         accountNumber: row[2] || '',
                         description: row[3] || '',
