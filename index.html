@@ -156,13 +156,109 @@
     </main>
   </div>
 
-  <!-- 4. DEV CALIBRATION MODAL (EXCLUSIVELY FOR ADMIN) -->
+  <!-- 4. SYSTEM AUDIT & LIVE USER SESSION LOG APP (DEV / ADMIN ONLY) -->
+  <div id="log-app-screen" class="hidden flex-col min-h-screen">
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <button id="btn-back-portal-from-logs" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold" title="Back to App Launcher">
+            <i data-lucide="grid" class="w-4 h-4 text-amber-400"></i> Portal
+          </button>
+          
+          <div class="h-6 w-px bg-slate-700 mx-1"></div>
+
+          <div class="h-10 px-3 rounded-lg bg-white flex items-center justify-center shadow-md">
+            <img src="RREDCO_Logo.png" alt="RREDCO Logo" class="h-7 w-auto object-contain">
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">System Session & Audit Logs</h1>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-medium">Dev Terminal</span>
+            </div>
+            <p class="text-xs text-slate-400">Real-Time User Session Monitoring & Activity Profiles</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Cloud Sync Active
+          </div>
+
+          <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+            <span id="logUserEmail" class="text-xs text-slate-300 font-medium"></span>
+            <button id="logLogoutBtn" class="text-rose-400 hover:text-rose-300 transition" title="Sign Out">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6">
+      
+      <!-- Metrics Bar -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+            <i data-lucide="users" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-500 font-medium">Tracked User Profiles</span>
+            <p id="stat-log-users" class="text-2xl font-bold text-slate-900 mt-0.5">0 Accounts</p>
+          </div>
+        </div>
+
+        <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+            <i data-lucide="activity" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-500 font-medium">Total Activity Events</span>
+            <p id="stat-log-events" class="text-2xl font-bold text-slate-900 mt-0.5">0 Events</p>
+          </div>
+        </div>
+
+        <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+              <i data-lucide="clock" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-medium">Last Sync Event</span>
+              <p id="stat-log-last-sync" class="text-xs font-bold font-mono text-slate-800 mt-1">Just now</p>
+            </div>
+          </div>
+          <button id="btn-clear-system-logs" class="p-2 text-slate-400 hover:text-rose-600 transition" title="Clear Logs History">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Search & Filter Bar -->
+      <div class="bg-white p-4 border border-slate-200 rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="relative w-full sm:w-96">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+          <input type="text" id="log-search-input" placeholder="Search logs by user, event type, query..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+        </div>
+        <div class="text-xs text-slate-500">
+          Showing real-time session updates from Firebase Database
+        </div>
+      </div>
+
+      <!-- User Profiles & Dropdown Timelines -->
+      <div class="space-y-4" id="user-log-profiles-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </main>
+  </div>
+
+  <!-- 5. DEV CALIBRATION MODAL (EXCLUSIVELY FOR ADMIN) -->
   <div id="dev-calibration-modal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
         <div class="flex items-center gap-2">
           <i data-lucide="shield-alert" class="w-5 h-5 text-amber-400"></i>
-          <h3 class="text-base font-bold">System Dev Calibration & RBAC Settings</h3>
+          <h3 class="text-base font-bold">System Dev Calibration & User Access Registry</h3>
         </div>
         <button id="btn-close-dev-modal" class="text-slate-400 hover:text-white p-1 rounded transition">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -170,51 +266,61 @@
       </div>
 
       <div class="p-6 overflow-y-auto space-y-6 text-xs">
-        <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-amber-900">
-          <span class="font-bold">Admin Active:</span> Signed in as <code class="font-mono font-semibold">nicholas.grace@rredco.com</code>. Modifications apply immediately to the runtime permission engine.
+        <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-amber-900 flex items-center justify-between">
+          <div>
+            <span class="font-bold block">Admin Session Active</span>
+            <span class="text-[11px] text-amber-700">Logged in as <code class="font-mono font-semibold">nicholas.grace@rredco.com</code>. Changes apply immediately to application access gates.</span>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-mono text-[10px] font-bold">System Admin</span>
         </div>
 
-        <!-- Permission Matrix Manager -->
-        <div>
-          <h4 class="font-bold text-slate-800 text-sm mb-2 uppercase tracking-wider">User Application Access Matrix</h4>
-          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-            <div class="flex gap-2">
-              <input type="email" id="dev-grant-email" placeholder="user@rredco.com" class="flex-1 p-2 bg-white border border-slate-300 rounded font-mono" />
-              <select id="dev-grant-app" class="p-2 bg-white border border-slate-300 rounded font-medium">
-                <option value="gp-ledger">Power GP Historical Ledger</option>
-                <option value="fin-reporting">Financial Reporting Suite</option>
-                <option value="asset-tracker">Corporate Asset Tracker</option>
-              </select>
-              <button id="btn-add-permission" class="px-3 py-2 bg-gp-600 hover:bg-gp-500 text-white rounded font-semibold transition">Grant Access</button>
-            </div>
+        <!-- Add/Pre-Register New User Form -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+          <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Register / Authorize New Account</h4>
+          <div class="flex gap-2">
+            <input type="email" id="dev-grant-email" placeholder="e.g. employee@rredco.com" class="flex-1 p-2 bg-white border border-slate-300 rounded font-mono text-xs focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+            <button id="btn-add-permission" class="px-4 py-2 bg-gp-600 hover:bg-gp-500 text-white rounded font-semibold transition flex items-center gap-1.5 text-xs">
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Register User
+            </button>
+          </div>
+        </div>
 
-            <div class="mt-3">
-              <table class="w-full text-left bg-white rounded border border-slate-200">
-                <thead class="bg-slate-100 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th class="p-2">Target Email</th>
-                    <th class="p-2">Authorized Apps</th>
-                    <th class="p-2 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="permissions-table-body" class="divide-y divide-slate-100">
-                  <!-- Populated dynamically -->
-                </tbody>
-              </table>
-            </div>
+        <!-- Registered User Access Matrix Table -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Registered Users Access Matrix</h4>
+            <span id="registered-users-count" class="text-[11px] font-mono text-slate-500">0 Accounts</span>
+          </div>
+
+          <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left bg-white text-xs border-collapse">
+              <thead class="bg-slate-100 font-semibold border-b border-slate-200 text-slate-700">
+                <tr>
+                  <th class="p-2.5">Registered Account Email</th>
+                  <th class="p-2.5 text-center w-24">Power GP</th>
+                  <th class="p-2.5 text-center w-24">Financials</th>
+                  <th class="p-2.5 text-center w-24">Asset Tracker</th>
+                  <th class="p-2.5 text-center w-24">System Logs</th>
+                  <th class="p-2.5 text-right w-16">Action</th>
+                </tr>
+              </thead>
+              <tbody id="permissions-table-body" class="divide-y divide-slate-100 font-mono">
+                <!-- Populated dynamically with checkboxes -->
+              </tbody>
+            </table>
           </div>
         </div>
 
         <!-- System Diagnostics -->
         <div>
-          <h4 class="font-bold text-slate-800 text-sm mb-2 uppercase tracking-wider">System State Diagnostics</h4>
-          <div class="grid grid-cols-2 gap-3 font-mono">
+          <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wider mb-2">System Diagnostics & Environment</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
             <div class="p-3 bg-slate-100 rounded border border-slate-200">
-              <span class="text-slate-500 text-[10px] block">FIREBASE AUTH UID</span>
+              <span class="text-slate-500 text-[10px] block">FIREBASE AUTHENTICATED UID</span>
               <span id="diag-auth-uid" class="font-bold text-slate-800 truncate block"></span>
             </div>
             <div class="p-3 bg-slate-100 rounded border border-slate-200">
-              <span class="text-slate-500 text-[10px] block">CLOUD STORAGE BUCKET</span>
+              <span class="text-slate-500 text-[10px] block">STORAGE BUCKET</span>
               <span id="diag-storage-bucket" class="font-bold text-slate-800 truncate block">rredco-database.firebasestorage.app</span>
             </div>
           </div>
@@ -222,12 +328,12 @@
       </div>
 
       <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
-        <button id="btn-save-dev-settings" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded text-xs transition">Save Calibration</button>
+        <button id="btn-save-dev-settings" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded text-xs transition">Save & Close Settings</button>
       </div>
     </div>
   </div>
 
-  <!-- 5. POWER GP SEARCH APPLICATION WORKSPACE -->
+  <!-- 6. POWER GP SEARCH APPLICATION WORKSPACE -->
   <div id="app-screen" class="hidden flex-col min-h-screen">
     <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -511,6 +617,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, updatePassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+    import { getDatabase, ref as dbRef, push, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const ADMIN_EMAIL = "nicholas.grace@rredco.com";
 
@@ -526,37 +633,48 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const storage = getStorage(app);
+    const database = getDatabase(app);
 
-    // Initial Role-Based Access Control Registry
+    // Initial Registered Users Storage Setup
+    const defaultRegistered = ["nicholas.grace@rredco.com"];
+    const savedRegistered = JSON.parse(localStorage.getItem('rredco_registered_users') || '[]');
+    window.REGISTERED_USERS = Array.from(new Set([...defaultRegistered, ...savedRegistered]));
+
+    // Role-Based Access Control Registry
     window.APP_PERMISSIONS = JSON.parse(localStorage.getItem('rredco_permissions') || JSON.stringify({
-      "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker"],
-      "*": ["gp-ledger"] // Default permissions for authorized team members
+      "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"],
+      "*": ["gp-ledger"]
     }));
 
     window.AVAILABLE_APPS = [
       {
         id: "gp-ledger",
         title: "Power GP Historical Ledger",
-        version: "v2.7",
+        version: "v2.9",
         description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
-        icon: "database",
-        active: true
+        icon: "database"
+      },
+      {
+        id: "system-logs",
+        title: "System Audit & Live Session Logs",
+        version: "v1.0 (Admin)",
+        description: "Real-time user session tracking, query history, audit logs, and account activity monitor across all RREDCO instances.",
+        icon: "activity",
+        devOnly: true
       },
       {
         id: "fin-reporting",
         title: "Financial Reporting Suite",
         version: "v1.0 (Dev)",
         description: "Consolidated balance sheets, executive income statements, and entity trial balance reports.",
-        icon: "line-chart",
-        active: false
+        icon: "line-chart"
       },
       {
         id: "asset-tracker",
         title: "Corporate Asset Tracker",
         version: "v1.0 (Dev)",
         description: "Fixed assets register, depreciation schedules, and multi-location asset management.",
-        icon: "building-2",
-        active: false
+        icon: "building-2"
       }
     ];
 
@@ -608,22 +726,39 @@
     window.appState = {
       records: [], filteredRecords: [], locations: new Set(),
       searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '',
-      multiFilters: {}, multiLogic: 'AND', currentPage: 1, pageSize: 50, selectedRecord: null, user: null
+      multiFilters: {}, multiLogic: 'AND', currentPage: 1, pageSize: 50, selectedRecord: null, user: null,
+      systemLogs: []
     };
 
-    // Build Multi-Field Matrix UI
-    const multiGrid = document.getElementById('multi-input-grid');
-    window.GP_TARGET_FIELDS.forEach(field => {
-      multiGrid.innerHTML += `
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">${field}</label>
-          <input type="text" data-field="${field}" class="multi-field-input w-full p-2 border border-slate-200 rounded bg-white focus:ring-1 focus:ring-gp-500 text-xs font-mono" placeholder="Query..." />
-        </div>`;
-    });
+    // Real-Time Firebase Logging Tracker Function
+    function logUserActivity(eventType, details) {
+      if (!window.appState.user) return;
+      
+      const logPayload = {
+        email: window.appState.user.email,
+        uid: window.appState.user.uid,
+        type: eventType,
+        details: details,
+        timestamp: new Date().toISOString(),
+        timeFormatted: new Date().toLocaleString(),
+        userAgent: navigator.userAgent.slice(0, 80)
+      };
+
+      try {
+        // Push directly to Firebase Realtime DB
+        const logsRef = dbRef(database, 'system_activity_logs');
+        push(logsRef, logPayload);
+      } catch (err) {
+        console.warn("Local log cache fallback:", err);
+      }
+
+      // Synchronize in local array for immediate rendering
+      window.appState.systemLogs.unshift(logPayload);
+    }
 
     // Navigation Router
     function showScreen(screenId) {
-      const screens = ['login-screen', 'home-screen', 'app-screen'];
+      const screens = ['login-screen', 'home-screen', 'app-screen', 'log-app-screen'];
       screens.forEach(id => {
         const el = document.getElementById(id);
         if (id === screenId) {
@@ -640,11 +775,18 @@
     // Permission Check Helper
     function getUserPermissions(email) {
       if (!email) return [];
-      if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return ["gp-ledger", "fin-reporting", "asset-tracker"];
-      return window.APP_PERMISSIONS[email.toLowerCase()] || window.APP_PERMISSIONS["*"] || ["gp-ledger"];
+      const emailLower = email.toLowerCase();
+      if (emailLower === ADMIN_EMAIL.toLowerCase()) return ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"];
+      return window.APP_PERMISSIONS[emailLower] || window.APP_PERMISSIONS["*"] || ["gp-ledger"];
     }
 
-    // Render Portal Apps Grid based on User Role
+    // Save Users and Permissions
+    function syncUserStores() {
+      localStorage.setItem('rredco_registered_users', JSON.stringify(window.REGISTERED_USERS));
+      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+    }
+
+    // Render Portal Apps Grid
     function renderAppPortal() {
       const user = window.appState.user;
       if (!user) return;
@@ -667,7 +809,9 @@
       }
 
       grid.innerHTML = window.AVAILABLE_APPS.map(app => {
-        const hasAccess = userPerms.includes(app.id);
+        const isDevRestricted = app.devOnly && user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase();
+        const hasAccess = userPerms.includes(app.id) && !isDevRestricted;
+
         return `
           <div class="bg-white border ${hasAccess ? 'border-slate-200 hover:shadow-md' : 'border-slate-200 opacity-60 bg-slate-50/50'} rounded-2xl p-6 shadow-sm transition flex flex-col justify-between group">
             <div>
@@ -703,16 +847,163 @@
     }
 
     window.launchApp = (appId) => {
+      logUserActivity('APP_LAUNCH', `Launched ${appId} application`);
       if (appId === 'gp-ledger') showScreen('app-screen');
-      else alert('App module starting initialization...');
+      else if (appId === 'system-logs') {
+        document.getElementById('logUserEmail').textContent = window.appState.user.email;
+        showScreen('log-app-screen');
+      } else alert('App module starting initialization...');
     };
 
-    // Auth Listener
+    // System Logs Admin Dashboard Renderer
+    function renderSystemLogDashboard() {
+      const container = document.getElementById('user-log-profiles-container');
+      const searchQuery = (document.getElementById('log-search-input').value || '').toLowerCase();
+      
+      const logs = window.appState.systemLogs;
+      document.getElementById('stat-log-events').textContent = `${logs.length} Events`;
+
+      // Group logs by User Email
+      const userProfiles = {};
+      logs.forEach(log => {
+        const email = log.email || 'unknown@rredco.com';
+        if (!userProfiles[email]) {
+          userProfiles[email] = {
+            email: email,
+            lastActive: log.timeFormatted,
+            logs: []
+          };
+        }
+        userProfiles[email].logs.push(log);
+      });
+
+      const userEmailKeys = Object.keys(userProfiles);
+      document.getElementById('stat-log-users').textContent = `${userEmailKeys.length} Accounts`;
+      if (logs.length > 0) {
+        document.getElementById('stat-log-last-sync').textContent = logs[0].timeFormatted || 'Just now';
+      }
+
+      if (userEmailKeys.length === 0) {
+        container.innerHTML = `<div class="p-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">No session logs captured yet. Activity will stream here live.</div>`;
+        return;
+      }
+
+      container.innerHTML = userEmailKeys.map((email, idx) => {
+        const prof = userProfiles[email];
+        const filteredUserLogs = prof.logs.filter(l => 
+          !searchQuery || 
+          l.type.toLowerCase().includes(searchQuery) || 
+          l.details.toLowerCase().includes(searchQuery)
+        );
+
+        if (searchQuery && filteredUserLogs.length === 0) return '';
+
+        return `
+          <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <!-- User Profile Header Accordion Toggle -->
+            <div onclick="window.toggleUserLogAccordion('${idx}')" class="px-5 py-4 bg-slate-50 hover:bg-sky-50/50 cursor-pointer flex items-center justify-between border-b border-slate-200 transition">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold font-mono text-xs">
+                  ${email.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 class="text-xs sm:text-sm font-bold text-slate-900 font-mono">${email}</h3>
+                  <p class="text-[11px] text-slate-400">Last Session Active: ${prof.lastActive}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">${filteredUserLogs.length} Actions Recorded</span>
+                <i id="accordion-icon-${idx}" data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform"></i>
+              </div>
+            </div>
+
+            <!-- User Activity Dropdown Timeline -->
+            <div id="accordion-body-${idx}" class="p-5 border-t border-slate-100 space-y-3 bg-white">
+              <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">User Session Log Timeline</h4>
+              
+              <div class="space-y-2">
+                ${filteredUserLogs.map(l => {
+                  let badgeStyle = "bg-slate-100 text-slate-700";
+                  if (l.type === 'LOGIN') badgeStyle = "bg-emerald-100 text-emerald-800";
+                  if (l.type === 'LOGOUT') badgeStyle = "bg-rose-100 text-rose-800";
+                  if (l.type === 'SEARCH') badgeStyle = "bg-sky-100 text-sky-800";
+                  if (l.type === 'PULL_LEDGERS') badgeStyle = "bg-purple-100 text-purple-800";
+                  if (l.type === 'PASSWORD_CHANGE') badgeStyle = "bg-amber-100 text-amber-800";
+
+                  return `
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                      <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${badgeStyle}">${l.type}</span>
+                        <span class="font-medium text-slate-800">${l.details}</span>
+                      </div>
+                      <div class="text-[11px] font-mono text-slate-400">
+                        ${l.timeFormatted || l.timestamp}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    window.toggleUserLogAccordion = (idx) => {
+      const body = document.getElementById(`accordion-body-${idx}`);
+      const icon = document.getElementById(`accordion-icon-${idx}`);
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        icon.classList.add('rotate-180');
+      } else {
+        body.classList.add('hidden');
+        icon.classList.remove('rotate-180');
+      }
+    };
+
+    document.getElementById('log-search-input').addEventListener('input', renderSystemLogDashboard);
+    document.getElementById('btn-clear-system-logs').addEventListener('click', () => {
+      if (confirm('Clear all logged system activity events?')) {
+        try { remove(dbRef(database, 'system_activity_logs')); } catch (e) {}
+        window.appState.systemLogs = [];
+        renderSystemLogDashboard();
+      }
+    });
+
+    // Firebase Live Database Subscription for Logs
+    try {
+      const logsRef = dbRef(database, 'system_activity_logs');
+      onValue(logsRef, (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+          const list = Object.values(val).reverse();
+          window.appState.systemLogs = list;
+          renderSystemLogDashboard();
+        }
+      });
+    } catch (e) {
+      console.warn("Realtime DB Subscription Notice:", e);
+    }
+
+    // Auth Listener with Automated User Registration
     onAuthStateChanged(auth, (user) => {
         const pwdModal = document.getElementById('first-time-pwd-modal');
         
-        if (user) {
+        if (user && user.email) {
             window.appState.user = user;
+            const emailLower = user.email.toLowerCase();
+
+            if (!window.REGISTERED_USERS.includes(emailLower)) {
+              window.REGISTERED_USERS.push(emailLower);
+            }
+            if (!window.APP_PERMISSIONS[emailLower]) {
+              window.APP_PERMISSIONS[emailLower] = ["gp-ledger"];
+            }
+            syncUserStores();
+
             document.getElementById('userEmail').textContent = user.email;
             document.getElementById('portalUserEmail').textContent = user.email;
             
@@ -725,6 +1016,7 @@
             } else {
                 pwdModal.classList.add('hidden');
                 pwdModal.classList.remove('flex');
+                logUserActivity('LOGIN', 'User authenticated into Portal');
                 renderAppPortal();
                 showScreen('home-screen');
             }
@@ -757,45 +1049,76 @@
 
     function renderPermissionsTable() {
       const tbody = document.getElementById('permissions-table-body');
-      tbody.innerHTML = Object.entries(window.APP_PERMISSIONS).map(([email, apps]) => `
-        <tr>
-          <td class="p-2 font-mono text-slate-800 font-semibold">${email}</td>
-          <td class="p-2 text-slate-600">${apps.join(', ')}</td>
-          <td class="p-2 text-right">
-            ${email === ADMIN_EMAIL ? `<span class="text-[10px] text-amber-600 font-bold">Owner</span>` : 
-              `<button onclick="window.revokePermission('${email}')" class="text-rose-600 hover:text-rose-800 font-semibold text-[11px]">Revoke</button>`
-            }
-          </td>
-        </tr>
-      `).join('');
+      document.getElementById('registered-users-count').textContent = `${window.REGISTERED_USERS.length} Registered Accounts`;
+
+      tbody.innerHTML = window.REGISTERED_USERS.map(email => {
+        const emailLower = email.toLowerCase();
+        const userPerms = window.APP_PERMISSIONS[emailLower] || ["gp-ledger"];
+        const isAdmin = emailLower === ADMIN_EMAIL.toLowerCase();
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2.5 font-mono text-slate-800 font-semibold truncate max-w-[180px]" title="${email}">
+              ${email} ${isAdmin ? `<span class="ml-1 px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-sans">Admin</span>` : ''}
+            </td>
+            <td class="p-2.5 text-center">
+              <input type="checkbox" ${isAdmin || userPerms.includes('gp-ledger') ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${emailLower}', 'gp-ledger', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4">
+            </td>
+            <td class="p-2.5 text-center">
+              <input type="checkbox" ${isAdmin || userPerms.includes('fin-reporting') ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${emailLower}', 'fin-reporting', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4">
+            </td>
+            <td class="p-2.5 text-center">
+              <input type="checkbox" ${isAdmin || userPerms.includes('asset-tracker') ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${emailLower}', 'asset-tracker', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4">
+            </td>
+            <td class="p-2.5 text-center">
+              <input type="checkbox" ${isAdmin || userPerms.includes('system-logs') ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${emailLower}', 'system-logs', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4">
+            </td>
+            <td class="p-2.5 text-right font-sans">
+              ${isAdmin ? `<span class="text-[10px] text-slate-400">Owner</span>` : 
+                `<button onclick="window.removeRegisteredUser('${emailLower}')" class="text-rose-600 hover:text-rose-800 font-semibold text-[11px]">Remove</button>`
+              }
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
+
+    window.toggleUserAppPerm = (email, appId, isChecked) => {
+      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = [];
+      if (isChecked) {
+        if (!window.APP_PERMISSIONS[email].includes(appId)) window.APP_PERMISSIONS[email].push(appId);
+      } else {
+        window.APP_PERMISSIONS[email] = window.APP_PERMISSIONS[email].filter(a => a !== appId);
+      }
+      syncUserStores();
+      renderAppPortal();
+    };
 
     document.getElementById('btn-add-permission').addEventListener('click', () => {
       const emailInput = document.getElementById('dev-grant-email');
-      const appSelect = document.getElementById('dev-grant-app');
       const email = emailInput.value.trim().toLowerCase();
-      const appId = appSelect.value;
 
-      if (!email || !email.includes('@')) return alert('Enter a valid email.');
+      if (!email || !email.includes('@')) return alert('Enter a valid work email.');
 
-      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = [];
-      if (!window.APP_PERMISSIONS[email].includes(appId)) window.APP_PERMISSIONS[email].push(appId);
+      if (!window.REGISTERED_USERS.includes(email)) window.REGISTERED_USERS.push(email);
+      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = ["gp-ledger"];
 
-      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+      syncUserStores();
       emailInput.value = '';
       renderPermissionsTable();
       renderAppPortal();
     });
 
-    window.revokePermission = (email) => {
-      delete window.APP_PERMISSIONS[email];
-      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+    window.removeRegisteredUser = (email) => {
+      window.REGISTERED_USERS = window.REGISTERED_USERS.filter(e => e.toLowerCase() !== email.toLowerCase());
+      delete window.APP_PERMISSIONS[email.toLowerCase()];
+      syncUserStores();
       renderPermissionsTable();
       renderAppPortal();
     };
 
     document.getElementById('btn-save-dev-settings').addEventListener('click', () => {
-      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+      syncUserStores();
       document.getElementById('dev-calibration-modal').classList.add('hidden');
       document.getElementById('dev-calibration-modal').classList.remove('flex');
       renderAppPortal();
@@ -818,6 +1141,7 @@
         try {
             await updatePassword(auth.currentUser, newPwd);
             localStorage.setItem('pwd_updated_' + auth.currentUser.uid, 'true');
+            logUserActivity('PASSWORD_CHANGE', 'Updated permanent account password');
             
             document.getElementById('first-time-pwd-modal').classList.add('hidden');
             document.getElementById('first-time-pwd-modal').classList.remove('flex');
@@ -846,8 +1170,11 @@
 
     // Navigation Listeners
     document.getElementById('btn-back-portal').addEventListener('click', () => { renderAppPortal(); showScreen('home-screen'); });
-    document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
-    document.getElementById('portalLogoutBtn').addEventListener('click', () => signOut(auth));
+    document.getElementById('btn-back-portal-from-logs').addEventListener('click', () => { renderAppPortal(); showScreen('home-screen'); });
+    
+    document.getElementById('logoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'User signed out'); signOut(auth); });
+    document.getElementById('portalLogoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'User signed out'); signOut(auth); });
+    document.getElementById('logLogoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'User signed out'); signOut(auth); });
 
     // Storage Pull Logic (Dual-Method Parser for 100% Data Extraction)
     document.getElementById('btn-pull-cloud').addEventListener('click', async () => {
@@ -856,6 +1183,8 @@
         btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Downloading...`;
         lucide.createIcons();
         clearMemory();
+
+        logUserActivity('PULL_LEDGERS', 'Requested full cloud pull of 17 company ledger files');
 
         try {
             const folderRef = ref(storage, 'RREDCO Power GP');
@@ -1076,11 +1405,28 @@
     });
 
     // Inputs binding
-    document.getElementById('global-search-input').addEventListener('input', (e) => { window.appState.omniQuery = e.target.value; setTimeout(executeSearch, 300); });
+    document.getElementById('global-search-input').addEventListener('input', (e) => { 
+      window.appState.omniQuery = e.target.value; 
+      if (e.target.value.trim().length > 2) {
+        logUserActivity('SEARCH', `Global Query: "${e.target.value.trim()}"`);
+      }
+      setTimeout(executeSearch, 300); 
+    });
+    
     document.getElementById('single-field-target-key').addEventListener('change', (e) => { window.appState.singleTargetKey = e.target.value; executeSearch(); });
-    document.getElementById('single-field-target-value').addEventListener('input', (e) => { window.appState.singleTargetVal = e.target.value; setTimeout(executeSearch, 300); });
+    document.getElementById('single-field-target-value').addEventListener('input', (e) => { 
+      window.appState.singleTargetVal = e.target.value; 
+      if (e.target.value.trim().length > 2) {
+        logUserActivity('SEARCH', `Single Field Query [${window.appState.singleTargetKey}]: "${e.target.value.trim()}"`);
+      }
+      setTimeout(executeSearch, 300); 
+    });
+
     document.querySelectorAll('.multi-field-input').forEach(input => input.addEventListener('input', (e) => { window.appState.multiFilters[e.target.getAttribute('data-field')] = e.target.value; }));
-    document.getElementById('btn-apply-multi').addEventListener('click', executeSearch);
+    document.getElementById('btn-apply-multi').addEventListener('click', () => {
+      logUserActivity('SEARCH', 'Executed combinatorial multi-field search matrix');
+      executeSearch();
+    });
     document.getElementById('btn-reset-multi').addEventListener('click', () => { document.querySelectorAll('.multi-field-input').forEach(i => i.value = ''); window.appState.multiFilters = {}; executeSearch(); });
     document.getElementById('filter-location-select').addEventListener('change', (e) => window.setLocationFilter(e.target.value));
 
@@ -1102,6 +1448,7 @@
     // CSV Export
     document.getElementById('btn-export-results').addEventListener('click', () => {
         if(window.appState.filteredRecords.length === 0) return alert('No records to export');
+        logUserActivity('EXPORT_CSV', `Exported ${window.appState.filteredRecords.length} records to CSV`);
         const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
             const out = { 'Entity': r._location };
             window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
