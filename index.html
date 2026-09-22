@@ -1,299 +1,676 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Power GP Ledger Search</title>
-    
-    <!-- Browser Tab Icon / Logo -->
-    <link rel="icon" type="image/png" href="RREDCO_Logo.png">
-    
-    <!-- External Libraries -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power GP Ledger Search</title>
+  
+  <!-- Browser Tab Icon / Logo -->
+  <link rel="icon" type="image/png" href="RREDCO_Logo.png">
 
-    <script>
-        // Initialize global state
-        window.appState = {
-            user: null,
-            ledgerData: []
-        };
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Data Parsers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
-        // UI icon helper
-        window.safeRenderIcons = function() {
-            try {
-                if (window.FontAwesome) {
-                    window.FontAwesome.dom.i2svg();
-                }
-            } catch (e) {
-                console.warn("Icon rendering skipped:", e);
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gp: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49'
             }
-        };
-    </script>
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .mark-highlight { background-color: #fef08a; color: #854d0e; padding: 0.5px 3px; border-radius: 3px; font-weight: 600; }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
 
-    <!-- Top Navigation -->
-    <header class="bg-slate-800 text-white p-4 shadow-md flex justify-between items-center">
-        <div class="flex items-center space-x-4">
-            <h1 class="text-xl font-bold"><i class="fa-solid fa-book-open mr-2"></i> Power GP Historical Ledger</h1>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-lg bg-gp-600 flex items-center justify-center text-white font-bold shadow-md shadow-gp-600/30">
+          <i data-lucide="database" class="w-5 h-5"></i>
         </div>
-        
-        <div class="flex items-center space-x-4">
-            <!-- Pull Action (Read Only) -->
-            <button id="pullBtn" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm font-medium transition hidden">
-                <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Pull From Cloud
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Power GP Online</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gp-700/80 text-sky-200 border border-gp-500/30 font-medium">Read-Only Search Terminal</span>
+          </div>
+          <p class="text-xs text-slate-400">Targeted & Multi-Field Search for Dynamics GP General Ledger exports</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div id="authContainer" class="flex items-center gap-3">
+            <button id="loginBtn" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-white transition shadow-sm border border-slate-600">
+                Sign In
             </button>
-            
-            <div id="authContainer" class="text-sm">
-                <button id="loginBtn" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded transition">Sign In</button>
-                <div id="userInfo" class="hidden flex items-center space-x-3">
-                    <span id="userEmail" class="text-gray-300"></span>
-                    <button id="logoutBtn" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-right-from-bracket"></i></button>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="flex-grow p-6">
-        
-        <!-- Controls & Filters -->
-        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-wrap gap-4 items-center justify-between">
-            <div class="flex items-center space-x-4 flex-grow max-w-2xl">
-                <div class="relative flex-grow">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fa-solid fa-magnifying-glass text-gray-400"></i>
-                    </div>
-                    <input type="text" id="searchInput" placeholder="Search accounts, journal entries, or descriptions..." class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                </div>
-                <select id="entityFilter" class="block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
-                    <option value="ALL">All Entities</option>
-                    <option value="POMCO">POMCO</option>
-                    <option value="RREDCO">RREDCO</option>
-                    <option value="RRCSCO">RRCSCO</option>
-                    <option value="WRGCC">WRGCC</option>
-                </select>
-            </div>
-            
-            <div class="flex space-x-2">
-                <button id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium transition">
-                    <i class="fa-solid fa-file-csv mr-1"></i> Export CSV
+            <div id="userInfo" class="hidden flex items-center gap-3">
+                <span id="userEmail" class="text-xs text-slate-300"></span>
+                <button id="logoutBtn" class="text-rose-400 hover:text-rose-300" title="Sign Out">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
                 </button>
             </div>
         </div>
+        
+        <button id="btn-pull-cloud" class="hidden inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
+          <i data-lucide="cloud-download" class="w-4 h-4"></i>
+          Pull Ledgers From Cloud
+        </button>
 
-        <!-- Data Table -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div class="overflow-x-auto max-h-[70vh]">
-                <table class="min-w-full divide-y divide-gray-200 relative">
-                    <thead class="bg-gray-50 sticky top-0 z-10">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trx Date</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Journal Entry</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Number</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Debit</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Credit</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
-                        <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                                <i class="fa-solid fa-cloud-arrow-down text-4xl mb-3 text-gray-300 block"></i>
-                                Click "Pull From Cloud" to load General Ledger data.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <button id="btn-export-results" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gp-600 hover:bg-gp-500 text-white transition shadow-sm">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          Export (<span id="export-count">0</span>)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+    <!-- Quick Metrics -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Cloud Repository Status</h3>
+        <span id="sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">In-Memory Active</span>
+      </div>
+      
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+          <span class="text-xs text-slate-500 font-medium">Entities Loaded</span>
+          <p id="stat-locations" class="text-xl font-bold text-slate-900 mt-1">0 / 17</p>
         </div>
-    </main>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+          <span class="text-xs text-slate-500 font-medium">Total GL Rows</span>
+          <p id="stat-rows" class="text-xl font-bold text-slate-900 mt-1">0</p>
+        </div>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+          <span class="text-xs text-slate-500 font-medium">Active Matches</span>
+          <p id="stat-matches" class="text-xl font-bold text-gp-600 mt-1">0</p>
+        </div>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col justify-center">
+          <button id="btn-clear-all" class="text-rose-600 hover:text-rose-700 font-medium hover:bg-rose-50 px-3 py-2 rounded transition text-xs border border-rose-200 hidden">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5 inline mr-1"></i> Clear Local Memory
+          </button>
+        </div>
+      </div>
+    </div>
 
-    <!-- Firebase SDK (Modular) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+    <!-- Search Interfaces -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+      
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Search Mode:</span>
+          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
+            <button id="mode-omni" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition">Global Search</button>
+            <button id="mode-single" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Target One Field</button>
+            <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
+          </div>
+        </div>
 
-        // Firebase Configuration (Updated with your specific keys)
-        const firebaseConfig = {
-            apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
-            authDomain: "rredco-database.firebaseapp.com",
-            projectId: "rredco-database",
-            storageBucket: "rredco-database.firebasestorage.app",
-            messagingSenderId: "96836268607",
-            appId: "1:96836268607:web:dea3fe719d8f8d619fbe8a",
-            measurementId: "G-PGY27N2N17"
-        };
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <label class="text-xs font-medium text-slate-600 whitespace-nowrap">Filter Location:</label>
+          <select id="filter-location-select" class="text-xs bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-gp-500 focus:border-gp-500 w-full sm:w-48">
+            <option value="">All Locations / Files</option>
+          </select>
+        </div>
+      </div>
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
+      <!-- SECTION 1: Omni Global Search -->
+      <div id="container-omni-search" class="space-y-2">
+        <div class="relative flex flex-col sm:flex-row gap-2">
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <i data-lucide="search" class="w-4 h-4"></i>
+            </div>
+            <input type="text" id="global-search-input" placeholder='Search any field, e.g. "Contoso", JE-10492, Sales, 000-1100...' class="w-full pl-10 pr-20 py-2.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-gp-500 font-mono" />
+            <div class="absolute inset-y-0 right-0 pr-2 flex items-center">
+              <button id="btn-clear-global" class="p-1 rounded text-slate-400 hover:text-slate-600 hidden">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        // UI Elements
+      <!-- SECTION 2: Single Targeted Field Search -->
+      <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-700">Target Exactly One Field</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+          <div class="sm:col-span-4">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Field</label>
+            <select id="single-field-target-key" class="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-medium">
+              <option value="Department">Department</option>
+              <option value="Journal Entry">Journal Entry</option>
+              <option value="Invoice Number" selected>Invoice Number</option>
+              <option value="Originating Master Name">Originating Master Name</option>
+              <option value="TRX Date">TRX Date</option>
+              <option value="Account Number">Account Number</option>
+              <option value="Account Description">Account Description</option>
+              <option value="Debit Amount">Debit Amount</option>
+              <option value="Credit Amount">Credit Amount</option>
+              <option value="Reference">Reference</option>
+              <option value="Description">Description</option>
+              <option value="Originating TRX Source">Originating TRX Source</option>
+              <option value="User Who Posted">User Who Posted</option>
+            </select>
+          </div>
+          <div class="sm:col-span-8">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Query Value</label>
+            <div class="relative">
+              <input type="text" id="single-field-target-value" placeholder="Enter exact or partial value..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+              <button id="btn-apply-single" class="absolute right-1 top-1 bottom-1 px-3 bg-gp-600 hover:bg-gp-500 text-white rounded text-xs font-medium">Search</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: Multi-Field Search Matrix -->
+      <div id="container-multi-search" class="hidden space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <div>
+            <span class="text-xs font-bold text-slate-800">Combinatorial Multi-Field Search Matrix</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5 text-xs text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
+              <label class="font-medium">Logic Mode:</label>
+              <label class="inline-flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="multi-logic" value="AND" checked class="text-gp-600">
+                <span class="font-semibold text-slate-800">Match ALL (AND)</span>
+              </label>
+              <span class="text-slate-300">|</span>
+              <label class="inline-flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="multi-logic" value="OR" class="text-gp-600">
+                <span class="font-semibold text-slate-800">Match ANY (OR)</span>
+              </label>
+            </div>
+            <button id="btn-reset-multi" class="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded bg-white hover:bg-slate-100">Reset</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs" id="multi-input-grid">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2">
+          <button id="btn-apply-multi" class="px-4 py-2 bg-gp-600 hover:bg-gp-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5">
+            <i data-lucide="filter" class="w-3.5 h-3.5"></i> Apply Matrix Search
+          </button>
+        </div>
+      </div>
+
+      <div id="location-badges" class="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
+        <div class="text-xs text-slate-400 py-1">Please sign in and pull data from cloud.</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[440px]">
+      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-700">General Ledger Results</span>
+          <span id="results-count-badge" class="px-2 py-0.5 text-xs font-medium bg-slate-200 text-slate-700 rounded-full">0 rows</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-slate-500">Rows per page:</label>
+          <select id="pagination-page-size" class="text-xs bg-white border border-slate-200 rounded px-2 py-1">
+            <option value="15">15</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="overflow-x-auto flex-1 relative" style="max-height: 560px;">
+        <table id="main-results-table" class="w-full text-left text-xs border-collapse whitespace-nowrap">
+          <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 backdrop-blur border-b border-slate-200 font-semibold select-none">
+            <tr id="table-header-row">
+              <th class="py-2.5 px-3 text-center w-10">#</th>
+              <th class="py-2.5 px-3">Location / Entity</th>
+              <th class="py-2.5 px-3">Department</th>
+              <th class="py-2.5 px-3">Journal Entry</th>
+              <th class="py-2.5 px-3 text-sky-700">Invoice Number</th>
+              <th class="py-2.5 px-3">Originating Master Name</th>
+              <th class="py-2.5 px-3">TRX Date</th>
+              <th class="py-2.5 px-3">Account Number</th>
+              <th class="py-2.5 px-3">Account Description</th>
+              <th class="py-2.5 px-3 text-right">Debit Amount</th>
+              <th class="py-2.5 px-3 text-right">Credit Amount</th>
+              <th class="py-2.5 px-3">Reference</th>
+              <th class="py-2.5 px-3">Description</th>
+              <th class="py-2.5 px-3">Originating TRX Source</th>
+              <th class="py-2.5 px-3">User Who Posted</th>
+              <th class="py-2.5 px-3 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
+            <tr>
+              <td colspan="16" class="py-16 text-center text-slate-400">
+                <div class="max-w-sm mx-auto flex flex-col items-center">
+                  <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                    <i data-lucide="cloud-download" class="w-6 h-6"></i>
+                  </div>
+                  <p class="font-medium text-slate-700 text-sm">No Database Records Loaded</p>
+                  <p class="text-xs text-slate-400 mt-1">Authenticate and pull master GP files from Cloud Storage.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+        <div id="pagination-info">Showing 0 to 0 of 0 entries</div>
+        <div class="flex items-center gap-1.5" id="pagination-controls">
+          <button id="btn-prev-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100 disabled:opacity-40">Previous</button>
+          <span id="pagination-current-page" class="font-medium px-2 text-slate-700">1</span>
+          <button id="btn-next-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100 disabled:opacity-40">Next</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Record Inspector Modal -->
+  <div id="detail-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-gp-600 text-white flex items-center justify-center font-bold text-sm">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900" id="modal-title">Power GP General Ledger Entry</h3>
+            <p class="text-xs text-slate-500" id="modal-subtitle">Details across the 13 primary Dynamics GP technical fields</p>
+          </div>
+        </div>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto flex-1 space-y-4">
+        <div class="flex flex-wrap gap-2 pb-3 border-b border-slate-100" id="modal-badges"></div>
+        <div>
+          <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">13 Power GP Columns</h4>
+          <div id="modal-fields-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+        <button id="btn-modal-dismiss" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-sm font-semibold transition">Close Inspector</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK & App Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
+        authDomain: "rredco-database.firebaseapp.com",
+        projectId: "rredco-database",
+        storageBucket: "rredco-database.firebasestorage.app",
+        messagingSenderId: "96836268607",
+        appId: "1:96836268607:web:dea3fe719d8f8d619fbe8a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const storage = getStorage(app);
+
+    window.COMPANY_ENTITIES = [
+      { code: 'E01', name: 'POMCO E01', short: 'POMCO' },
+      { code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },
+      { code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },
+      { code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },
+      { code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },
+      { code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },
+      { code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },
+      { code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },
+      { code: 'E09', name: 'RRICO E09', short: 'RRICO' },
+      { code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },
+      { code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },
+      { code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },
+      { code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },
+      { code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },
+      { code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },
+      { code: 'E16', name: 'WRMM E16', short: 'WRMM' },
+      { code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }
+    ];
+
+    window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
+    
+    window.FIELD_ALIASES = {
+      'Department': ['department', 'dept', 'deptnmbr'],
+      'Journal Entry': ['journal entry', 'jrnentry', 'je'],
+      'Invoice Number': ['invoice number', 'invoice', 'invoicenbr', 'docnumbr'],
+      'Originating Master Name': ['originating master name', 'ormstrnm', 'master name'],
+      'TRX Date': ['trx date', 'trxdate', 'transaction date', 'docdate'],
+      'Account Number': ['account number', 'actnumst', 'gl_account'],
+      'Account Description': ['account description', 'actdescr', 'account_name'],
+      'Debit Amount': ['debit amount', 'debitamt', 'debit', 'dr_amount'],
+      'Credit Amount': ['credit amount', 'crdtamnt', 'credit', 'cr_amount'],
+      'Reference': ['reference', 'refrence', 'ref'],
+      'Description': ['description', 'dscriptn', 'desc'],
+      'Originating TRX Source': ['originating trx source', 'ortrxsrc', 'trx_source'],
+      'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by']
+    };
+
+    window.appState = {
+      records: [], filteredRecords: [], locations: new Set(),
+      searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '',
+      multiFilters: {}, multiLogic: 'AND', currentPage: 1, pageSize: 50, selectedRecord: null, user: null
+    };
+
+    // Build Multi-Field HTML dynamically
+    const multiGrid = document.getElementById('multi-input-grid');
+    window.GP_TARGET_FIELDS.forEach(field => {
+      multiGrid.innerHTML += `
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">${field}</label>
+          <input type="text" data-field="${field}" class="multi-field-input w-full p-2 border border-slate-200 rounded bg-white focus:ring-1 focus:ring-gp-500 text-xs font-mono" placeholder="Query..." />
+        </div>`;
+    });
+
+    // Auth Listeners
+    onAuthStateChanged(auth, (user) => {
         const loginBtn = document.getElementById('loginBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const pullBtn = document.getElementById('pullBtn');
         const userInfo = document.getElementById('userInfo');
-        const userEmail = document.getElementById('userEmail');
-        const searchInput = document.getElementById('searchInput');
-        const tableBody = document.getElementById('tableBody');
-
-        // Auth Listeners
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                window.appState.user = user;
-                loginBtn.classList.add('hidden');
-                userInfo.classList.remove('hidden');
-                pullBtn.classList.remove('hidden');
-                userEmail.textContent = user.email;
-            } else {
-                window.appState.user = null;
-                loginBtn.classList.remove('hidden');
-                userInfo.classList.add('hidden');
-                pullBtn.classList.add('hidden');
-                tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center">Please sign in to view ledger data.</td></tr>';
-            }
-        });
-
-        loginBtn.addEventListener('click', () => {
-            const provider = new GoogleAuthProvider();
-            signInWithPopup(auth, provider).catch(error => alert('Login failed: ' + error.message));
-        });
-
-        logoutBtn.addEventListener('click', () => {
-            signOut(auth);
-            window.appState.ledgerData = [];
-            tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-gray-500"><i class="fa-solid fa-cloud-arrow-down text-4xl mb-3 text-gray-300 block"></i>Click "Pull From Cloud" to load General Ledger data.</td></tr>';
-        });
-
-        // Pull Data from Storage
-        pullBtn.addEventListener('click', async () => {
-            if (!window.appState.user) return alert("Please sign in first.");
-            
-            pullBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Pulling...';
-            tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><br>Downloading and parsing files from cloud...</td></tr>';
-            window.appState.ledgerData = [];
-
-            try {
-                const folderRef = ref(storage, 'RREDCO Power GP');
-                const result = await listAll(folderRef);
-                
-                for (const itemRef of result.items) {
-                    if (itemRef.name.endsWith('.xlsx')) {
-                        const url = await getDownloadURL(itemRef);
-                        await parseExcelFromUrl(url, itemRef.name);
-                    }
-                }
-                
-                renderTable();
-                
-            } catch (error) {
-                console.error("Storage pull error:", error);
-                alert("Failed to pull data. Ensure CORS is configured and rules are published.");
-                tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Error loading data. See console.</td></tr>';
-            } finally {
-                pullBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down mr-1"></i> Pull From Cloud';
-            }
-        });
-
-        // Parse GP Excel Files bypassing Title rows
-        async function parseExcelFromUrl(url, filename) {
-            try {
-                const response = await fetch(url);
-                const arrayBuffer = await response.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                
-                // Find actual header row
-                let headerRowIndex = 0;
-                for (let i = 0; i < Math.min(15, jsonData.length); i++) {
-                    const rowStr = (jsonData[i] || []).join(' ').toLowerCase();
-                    if (rowStr.includes('account') || rowStr.includes('journal entry')) {
-                        headerRowIndex = i;
-                        break;
-                    }
-                }
-                
-                // Map data rows
-                for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-                    const row = jsonData[i];
-                    if (!row || row.length === 0 || !row[0]) continue;
-                    
-                    const entity = filename.split(' ')[0]; 
-
-                    window.appState.ledgerData.push({
-                        entity: entity,
-                        trxDate: row[0] || '',
-                        journalEntry: row[1] || '',
-                        accountNumber: row[2] || '',
-                        description: row[3] || '',
-                        debit: parseFloat(row[4]) || 0,
-                        credit: parseFloat(row[5]) || 0
-                    });
-                }
-            } catch (err) {
-                console.error("Error parsing " + filename, err);
-            }
+        const pullBtn = document.getElementById('btn-pull-cloud');
+        
+        if (user) {
+            window.appState.user = user;
+            loginBtn.classList.add('hidden');
+            userInfo.classList.remove('hidden');
+            pullBtn.classList.remove('hidden');
+            document.getElementById('userEmail').textContent = user.email;
+        } else {
+            window.appState.user = null;
+            loginBtn.classList.remove('hidden');
+            userInfo.classList.add('hidden');
+            pullBtn.classList.add('hidden');
+            clearMemory();
         }
+    });
 
-        // Render Table logic
-        function renderTable() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const filterEntity = document.getElementById('entityFilter').value;
+    document.getElementById('loginBtn').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()));
+    document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+
+    // Storage Pull Logic (Excel .xlsx -> JSON mapping)
+    document.getElementById('btn-pull-cloud').addEventListener('click', async () => {
+        if (!window.appState.user) return alert("Please sign in.");
+        const btn = document.getElementById('btn-pull-cloud');
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Downloading...`;
+        lucide.createIcons();
+        clearMemory();
+
+        try {
+            const folderRef = ref(storage, 'RREDCO Power GP');
+            const result = await listAll(folderRef);
+            for (const itemRef of result.items) {
+                if (itemRef.name.endsWith('.xlsx')) {
+                    const url = await getDownloadURL(itemRef);
+                    await parseExcelFromStorage(url, itemRef.name);
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error downloading ledgers. Ensure CORS rules are active.");
+        } finally {
+            btn.innerHTML = `<i data-lucide="cloud-download" class="w-4 h-4"></i> Pull Ledgers From Cloud`;
+            lucide.createIcons();
+        }
+    });
+
+    async function parseExcelFromStorage(url, filename) {
+        try {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
             
-            const filtered = window.appState.ledgerData.filter(row => {
-                const matchesSearch = Object.values(row).join(' ').toLowerCase().includes(searchTerm);
-                const matchesEntity = filterEntity === 'ALL' || row.entity === filterEntity;
-                return matchesSearch && matchesEntity;
+            const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            let headerRowIndex = 0;
+            for (let i = 0; i < Math.min(15, rawData.length); i++) {
+                const rowStr = (rawData[i] || []).join(' ').toLowerCase();
+                if (rowStr.includes('account') || rowStr.includes('journal entry')) {
+                    headerRowIndex = i; break;
+                }
+            }
+            
+            const dataObjects = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
+            const entityMatch = window.COMPANY_ENTITIES.find(e => filename.includes(e.short)) || { name: filename.split(' ')[0] };
+            
+            const normalized = dataObjects.map((row, idx) => {
+                const item = { _id: `${entityMatch.name}__${idx}`, _location: entityMatch.name, _sourceFile: filename, _rowIndex: idx + 1 };
+                window.GP_TARGET_FIELDS.forEach(f => item[f] = '');
+
+                for (const [rawKey, rawVal] of Object.entries(row)) {
+                    let standardKey = rawKey;
+                    const cleanKey = String(rawKey).toLowerCase().trim();
+                    for (const [key, aliases] of Object.entries(window.FIELD_ALIASES)) {
+                        if (cleanKey === key.toLowerCase() || aliases.some(a => cleanKey.includes(a))) standardKey = key;
+                    }
+                    if (window.GP_TARGET_FIELDS.includes(standardKey)) {
+                        item[standardKey] = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : '';
+                    }
+                }
+                return item;
             });
 
-            if (filtered.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No records found.</td></tr>';
-                return;
-            }
+            normalized.forEach(row => {
+                window.appState.records.push(row);
+                window.appState.locations.add(row._location);
+            });
 
-            // Render first 500 rows to prevent browser freeze
-            tableBody.innerHTML = filtered.slice(0, 500).map(row => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-2 text-sm text-gray-900">${row.entity}</td>
-                    <td class="px-6 py-2 text-sm text-gray-500">${row.trxDate}</td>
-                    <td class="px-6 py-2 text-sm text-gray-500">${row.journalEntry}</td>
-                    <td class="px-6 py-2 text-sm font-medium text-blue-600">${row.accountNumber}</td>
-                    <td class="px-6 py-2 text-sm text-gray-500 truncate max-w-xs">${row.description}</td>
-                    <td class="px-6 py-2 text-sm text-gray-900 text-right">${row.debit > 0 ? '$' + row.debit.toFixed(2) : '-'}</td>
-                    <td class="px-6 py-2 text-sm text-gray-900 text-right">${row.credit > 0 ? '$' + row.credit.toFixed(2) : '-'}</td>
-                </tr>
-            `).join('');
-            window.safeRenderIcons();
+            updateLocationFilterUI();
+            executeSearch();
+        } catch (err) { console.error("Error parsing " + filename, err); }
+    }
+
+    // Logic implementation for UI modes
+    function executeSearch() {
+      const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiFilters, multiLogic } = window.appState;
+      let filtered = records;
+
+      if (activeLocation) filtered = filtered.filter(r => r._location === activeLocation);
+
+      if (searchMode === 'omni' && omniQuery.trim()) {
+        const q = omniQuery.trim().toLowerCase();
+        filtered = filtered.filter(r => window.GP_TARGET_FIELDS.some(f => String(r[f] || '').toLowerCase().includes(q)));
+      } else if (searchMode === 'single' && singleTargetVal.trim()) {
+        const q = singleTargetVal.trim().toLowerCase();
+        filtered = filtered.filter(r => String(r[singleTargetKey] || '').toLowerCase().includes(q));
+      } else if (searchMode === 'multi') {
+        const activeEntries = Object.entries(multiFilters).filter(([k, v]) => v && v.trim() !== '');
+        if (activeEntries.length > 0) {
+          filtered = filtered.filter(row => {
+            const logicTest = ([field, q]) => String(row[field] || '').toLowerCase().includes(q.trim().toLowerCase());
+            return multiLogic === 'AND' ? activeEntries.every(logicTest) : activeEntries.some(logicTest);
+          });
         }
+      }
 
-        searchInput.addEventListener('input', renderTable);
-        document.getElementById('entityFilter').addEventListener('change', renderTable);
+      window.appState.filteredRecords = filtered;
+      window.appState.currentPage = 1;
+      renderTable();
+      updateMetrics();
+    }
 
-        // CSV Export
-        document.getElementById('exportCsvBtn').addEventListener('click', () => {
-            if (window.appState.ledgerData.length === 0) return alert("No data to export.");
-            const csv = Papa.unparse(window.appState.ledgerData);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", "ledger_export.csv");
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+    function renderTable() {
+      const tbody = document.getElementById('table-body');
+      const { currentPage, pageSize, filteredRecords } = window.appState;
+      const start = (currentPage - 1) * pageSize;
+      const pageSlice = filteredRecords.slice(start, start + pageSize);
+
+      if (filteredRecords.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="16" class="py-14 text-center text-slate-400">No matching records found.</td></tr>`;
+        updatePaginationInfo(0, 0, 0);
+        return;
+      }
+
+      tbody.innerHTML = pageSlice.map((r, idx) => `
+        <tr class="hover:bg-sky-50/50 cursor-pointer" onclick="window.openRecordDetail('${r._id}')">
+          <td class="py-2 px-3 text-center text-slate-400 text-[11px]">${start + idx + 1}</td>
+          <td class="py-2 px-3 text-[11px] font-semibold text-sky-800">${r._location}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r['Department'] || '-'}</td>
+          <td class="py-2 px-3 font-mono font-bold">${r['Journal Entry'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-sky-700">${r['Invoice Number'] || '-'}</td>
+          <td class="py-2 px-3 truncate max-w-[160px]">${r['Originating Master Name'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r['TRX Date'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-gp-700 text-[11px]">${r['Account Number'] || '-'}</td>
+          <td class="py-2 px-3 truncate max-w-[180px]">${r['Account Description'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-right">${r['Debit Amount'] ? '$'+parseFloat(r['Debit Amount']).toFixed(2) : '-'}</td>
+          <td class="py-2 px-3 font-mono text-right">${r['Credit Amount'] ? '$'+parseFloat(r['Credit Amount']).toFixed(2) : '-'}</td>
+          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Reference'] || '-'}</td>
+          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Description'] || '-'}</td>
+          <td class="py-2 px-3 text-[10px] text-slate-500">${r['Originating TRX Source'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r['User Who Posted'] || '-'}</td>
+          <td class="py-2 px-3 text-center"><button class="p-1 text-slate-400"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button></td>
+        </tr>
+      `).join('');
+      
+      lucide.createIcons();
+      updatePaginationInfo(start + 1, Math.min(start + pageSize, filteredRecords.length), filteredRecords.length);
+    }
+
+    function updateMetrics() {
+      document.getElementById('stat-locations').textContent = `${window.appState.locations.size} / 17`;
+      document.getElementById('stat-rows').textContent = window.appState.records.length.toLocaleString();
+      document.getElementById('stat-matches').textContent = window.appState.filteredRecords.length.toLocaleString();
+      document.getElementById('results-count-badge').textContent = `${window.appState.filteredRecords.length.toLocaleString()} rows`;
+      document.getElementById('export-count').textContent = window.appState.filteredRecords.length.toLocaleString();
+      
+      const clrBtn = document.getElementById('btn-clear-all');
+      window.appState.records.length > 0 ? clrBtn.classList.remove('hidden') : clrBtn.classList.add('hidden');
+      renderLocationChips();
+    }
+
+    function renderLocationChips() {
+      const container = document.getElementById('location-badges');
+      let html = `<button onclick="window.setLocationFilter('')" class="px-2.5 py-1 text-xs rounded-md font-semibold transition ${!window.appState.activeLocation ? 'bg-gp-600 text-white' : 'bg-slate-100'}">All 17 Entities</button>`;
+      window.COMPANY_ENTITIES.forEach(ent => {
+        const count = window.appState.records.filter(r => r._location === ent.name).length;
+        if(count > 0) html += `<button onclick="window.setLocationFilter('${ent.name}')" class="px-2.5 py-1 text-xs rounded-md border ${window.appState.activeLocation === ent.name ? 'bg-sky-50 border-gp-500 font-bold' : 'bg-white font-medium'}">${ent.short} (${count})</button>`;
+      });
+      container.innerHTML = html;
+    }
+
+    function updateLocationFilterUI() {
+      const select = document.getElementById('filter-location-select');
+      select.innerHTML = '<option value="">All Locations / Files</option>';
+      window.COMPANY_ENTITIES.forEach(ent => {
+        const count = window.appState.records.filter(r => r._location === ent.name).length;
+        if(count > 0) select.innerHTML += `<option value="${ent.name}">${ent.code} - ${ent.name} (${count} rows)</option>`;
+      });
+    }
+
+    window.setLocationFilter = (loc) => { window.appState.activeLocation = loc; document.getElementById('filter-location-select').value = loc; executeSearch(); };
+
+    function updatePaginationInfo(start, end, total) {
+      document.getElementById('pagination-info').textContent = `Showing ${start} to ${end} of ${total.toLocaleString()} records`;
+      document.getElementById('pagination-current-page').textContent = `${window.appState.currentPage} / ${Math.max(1, Math.ceil(total / window.appState.pageSize))}`;
+      document.getElementById('btn-prev-page').disabled = window.appState.currentPage <= 1;
+      document.getElementById('btn-next-page').disabled = window.appState.currentPage >= Math.ceil(total / window.appState.pageSize);
+    }
+
+    function clearMemory() {
+        window.appState.records = []; window.appState.filteredRecords = []; window.appState.locations.clear();
+        updateLocationFilterUI(); executeSearch();
+    }
+
+    // Event Listeners for UI interaction
+    document.getElementById('btn-clear-all').addEventListener('click', clearMemory);
+    document.getElementById('btn-prev-page').addEventListener('click', () => { if(window.appState.currentPage > 1) { window.appState.currentPage--; renderTable(); }});
+    document.getElementById('btn-next-page').addEventListener('click', () => { if(window.appState.currentPage < Math.ceil(window.appState.filteredRecords.length / window.appState.pageSize)) { window.appState.currentPage++; renderTable(); }});
+    document.getElementById('pagination-page-size').addEventListener('change', (e) => { window.appState.pageSize = parseInt(e.target.value); window.appState.currentPage = 1; renderTable(); });
+    
+    // Tab switching logic
+    ['omni', 'single', 'multi'].forEach(mode => {
+        document.getElementById(`mode-${mode}`).addEventListener('click', () => {
+            window.appState.searchMode = mode;
+            ['omni', 'single', 'multi'].forEach(m => {
+                document.getElementById(`mode-${m}`).className = "px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition";
+                document.getElementById(`container-${m}-search`).classList.add('hidden');
+            });
+            document.getElementById(`mode-${mode}`).className = "px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition";
+            document.getElementById(`container-${mode}-search`).classList.remove('hidden');
+            executeSearch();
         });
-    </script>
+    });
+
+    // Inputs binding
+    document.getElementById('global-search-input').addEventListener('input', (e) => { window.appState.omniQuery = e.target.value; setTimeout(executeSearch, 300); });
+    document.getElementById('single-field-target-key').addEventListener('change', (e) => { window.appState.singleTargetKey = e.target.value; executeSearch(); });
+    document.getElementById('single-field-target-value').addEventListener('input', (e) => { window.appState.singleTargetVal = e.target.value; setTimeout(executeSearch, 300); });
+    document.querySelectorAll('.multi-field-input').forEach(input => input.addEventListener('input', (e) => { window.appState.multiFilters[e.target.getAttribute('data-field')] = e.target.value; }));
+    document.getElementById('btn-apply-multi').addEventListener('click', executeSearch);
+    document.getElementById('btn-reset-multi').addEventListener('click', () => { document.querySelectorAll('.multi-field-input').forEach(i => i.value = ''); window.appState.multiFilters = {}; executeSearch(); });
+    document.getElementById('filter-location-select').addEventListener('change', (e) => window.setLocationFilter(e.target.value));
+
+    // Modal Logic
+    window.openRecordDetail = (id) => {
+        const r = window.appState.records.find(rec => rec._id === id);
+        if(!r) return;
+        document.getElementById('modal-title').textContent = `Journal Entry ${r['Journal Entry'] || 'Record'}`;
+        document.getElementById('modal-badges').innerHTML = `<span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono text-[11px] font-semibold">Entity: ${r._location}</span><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-semibold">User: ${r['User Who Posted'] || 'SYSTEM'}</span>`;
+        document.getElementById('modal-fields-grid').innerHTML = window.GP_TARGET_FIELDS.map(f => `<div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg"><div class="text-[10px] uppercase font-bold text-slate-500">${f}</div><div class="text-xs font-semibold text-slate-900 mt-1 break-all">${r[f] || '-'}</div></div>`).join('');
+        document.getElementById('detail-modal').classList.remove('hidden');
+        document.getElementById('detail-modal').classList.add('flex');
+    };
+    ['btn-close-modal', 'btn-modal-dismiss'].forEach(id => document.getElementById(id).addEventListener('click', () => {
+        document.getElementById('detail-modal').classList.add('hidden');
+        document.getElementById('detail-modal').classList.remove('flex');
+    }));
+
+    // CSV Export
+    document.getElementById('btn-export-results').addEventListener('click', () => {
+        if(window.appState.filteredRecords.length === 0) return alert('No records to export');
+        const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
+            const out = { 'Entity': r._location };
+            window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
+            return out;
+        }));
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `GP_Ledger_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    });
+
+    lucide.createIcons();
+  </script>
 </body>
 </html>
