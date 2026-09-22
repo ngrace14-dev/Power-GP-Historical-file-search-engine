@@ -156,14 +156,14 @@
           </div>
 
           <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span class="text-[11px] font-mono text-slate-400">v2.4 • Read-Only</span>
+            <span class="text-[11px] font-mono text-slate-400">v2.5 • Read-Only</span>
             <button id="launch-gp-app" class="px-4 py-2 rounded-lg bg-gp-600 hover:bg-gp-500 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
               Launch App <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
             </button>
           </div>
         </div>
 
-        <!-- App 2: Placeholder for Future Expansion -->
+        <!-- App 2: Placeholder -->
         <div class="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-6 flex flex-col justify-between opacity-75">
           <div>
             <div class="flex items-center justify-between mb-4">
@@ -184,7 +184,7 @@
           </div>
         </div>
 
-        <!-- App 3: Placeholder for Future Expansion -->
+        <!-- App 3: Placeholder -->
         <div class="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-6 flex flex-col justify-between opacity-75">
           <div>
             <div class="flex items-center justify-between mb-4">
@@ -215,7 +215,6 @@
     <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <!-- Back to Home Portal Button -->
           <button id="btn-back-portal" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold" title="Back to App Launcher">
             <i data-lucide="grid" class="w-4 h-4 text-gp-500"></i> Portal
           </button>
@@ -531,20 +530,28 @@
 
     window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
     
+    // Expanded Aliases for Dynamics GP Document / Invoice Numbers
     window.FIELD_ALIASES = {
-      'Department': ['department', 'dept', 'deptnmbr'],
-      'Journal Entry': ['journal entry', 'jrnentry', 'je'],
-      'Invoice Number': ['invoice number', 'invoice', 'invoicenbr', 'docnumbr'],
-      'Originating Master Name': ['originating master name', 'ormstrnm', 'master name'],
-      'TRX Date': ['trx date', 'trxdate', 'transaction date', 'docdate'],
-      'Account Number': ['account number', 'actnumst', 'gl_account'],
-      'Account Description': ['account description', 'actdescr', 'account_name'],
-      'Debit Amount': ['debit amount', 'debitamt', 'debit', 'dr_amount'],
-      'Credit Amount': ['credit amount', 'crdtamnt', 'credit', 'cr_amount'],
-      'Reference': ['reference', 'refrence', 'ref'],
-      'Description': ['description', 'dscriptn', 'desc'],
-      'Originating TRX Source': ['originating trx source', 'ortrxsrc', 'trx_source'],
-      'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by']
+      'Department': ['department', 'dept', 'deptnmbr', 'department_id', 'cost_center'],
+      'Journal Entry': ['journal entry', 'jrnentry', 'je', 'journal_entry'],
+      'Invoice Number': [
+        'invoice number', 'invoice', 'invoicenbr', 'docnumbr', 'doc number',
+        'document number', 'doc num', 'doc no', 'document no', 'voucher',
+        'voucher number', 'vchrnmbr', 'orig doc number', 'originating doc number',
+        'originating document number', 'sop number', 'sopnumbe', 'invoice #',
+        'inv #', 'inv no', 'inv number', 'doc_number', 'document_number',
+        'invoice_number', 'apply to doc num', 'aptodcct', 'origdocnum'
+      ],
+      'Originating Master Name': ['originating master name', 'ormstrnm', 'master name', 'custname', 'vendname', 'entity_name'],
+      'TRX Date': ['trx date', 'trxdate', 'transaction date', 'docdate', 'posteddt', 'date'],
+      'Account Number': ['account number', 'actnumst', 'gl_account', 'account', 'actindx'],
+      'Account Description': ['account description', 'actdescr', 'account_name', 'account_desc'],
+      'Debit Amount': ['debit amount', 'debitamt', 'debit', 'dr_amount', 'dr'],
+      'Credit Amount': ['credit amount', 'crdtamnt', 'credit', 'cr_amount', 'cr'],
+      'Reference': ['reference', 'refrence', 'ref', 'batch_ref'],
+      'Description': ['description', 'dscriptn', 'desc', 'line_desc'],
+      'Originating TRX Source': ['originating trx source', 'ortrxsrc', 'trx_source', 'source'],
+      'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by', 'username']
     };
 
     window.appState = {
@@ -660,7 +667,7 @@
     document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
     document.getElementById('portalLogoutBtn').addEventListener('click', () => signOut(auth));
 
-    // Storage Pull Logic (Excel .xlsx -> JSON mapping)
+    // Storage Pull Logic (Excel .xlsx -> JSON mapping with robust header cleaning)
     document.getElementById('btn-pull-cloud').addEventListener('click', async () => {
         if (!window.appState.user) return;
         const btn = document.getElementById('btn-pull-cloud');
@@ -697,7 +704,7 @@
             let headerRowIndex = 0;
             for (let i = 0; i < Math.min(15, rawData.length); i++) {
                 const rowStr = (rawData[i] || []).join(' ').toLowerCase();
-                if (rowStr.includes('account') || rowStr.includes('journal entry')) {
+                if (rowStr.includes('account') || rowStr.includes('journal entry') || rowStr.includes('invoice') || rowStr.includes('document')) {
                     headerRowIndex = i; break;
                 }
             }
@@ -711,10 +718,16 @@
 
                 for (const [rawKey, rawVal] of Object.entries(row)) {
                     let standardKey = rawKey;
-                    const cleanKey = String(rawKey).toLowerCase().trim();
+                    // Clean linebreaks, extra spaces, special chars from raw headers
+                    const cleanKey = String(rawKey).toLowerCase().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+
                     for (const [key, aliases] of Object.entries(window.FIELD_ALIASES)) {
-                        if (cleanKey === key.toLowerCase() || aliases.some(a => cleanKey.includes(a))) standardKey = key;
+                        if (cleanKey === key.toLowerCase() || aliases.some(a => cleanKey === a.toLowerCase() || cleanKey.includes(a.toLowerCase()))) {
+                            standardKey = key;
+                            break;
+                        }
                     }
+
                     if (window.GP_TARGET_FIELDS.includes(standardKey)) {
                         item[standardKey] = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : '';
                     }
@@ -779,7 +792,7 @@
           <td class="py-2 px-3 text-[11px] font-semibold text-sky-800">${r._location}</td>
           <td class="py-2 px-3 font-mono text-[11px]">${r['Department'] || '-'}</td>
           <td class="py-2 px-3 font-mono font-bold">${r['Journal Entry'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-sky-700">${r['Invoice Number'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-sky-700 font-semibold">${r['Invoice Number'] || '-'}</td>
           <td class="py-2 px-3 truncate max-w-[160px]">${r['Originating Master Name'] || '-'}</td>
           <td class="py-2 px-3 font-mono text-[11px]">${r['TRX Date'] || '-'}</td>
           <td class="py-2 px-3 font-mono text-gp-700 text-[11px]">${r['Account Number'] || '-'}</td>
