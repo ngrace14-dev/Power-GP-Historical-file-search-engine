@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <!-- PapaParse for fast CSV parsing -->
+  <!-- PapaParse for high-performance CSV parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <!-- SheetJS (xlsx) for reading .xlsx workbooks from Firebase Storage -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -133,7 +133,6 @@
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3">
-        <!-- Cloud Storage Connectivity & Manager Auth Badge -->
         <div id="auth-status-container" class="flex items-center gap-2">
           <div id="cloud-status-indicator" class="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-slate-800 border border-slate-700 text-slate-300">
             <span id="cloud-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
@@ -170,8 +169,6 @@
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-      
-      <!-- Upload Dropzone Card with Location Tagger -->
       <div class="lg:col-span-8 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
         <div>
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
@@ -202,11 +199,10 @@
 
         <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400">
           <span class="inline-flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-gp-600"></i> 17 Corporate Entities Supported</span>
-          <span class="inline-flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i> Direct Cloud Sync via Firestore</span>
+          <span class="inline-flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i> Direct Cloud Sync via Firestore & Storage</span>
         </div>
       </div>
 
-      <!-- Quick Metrics & Repository Status -->
       <div class="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
@@ -246,8 +242,6 @@
     </div>
 
     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-      
-      <!-- Top Mode Selection: Quick Search vs Targeted Single Field vs Multi-Field -->
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
         <div class="flex items-center gap-2">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Search Mode:</span>
@@ -258,7 +252,6 @@
           </div>
         </div>
 
-        <!-- Location Filter Dropdown -->
         <div class="flex items-center gap-2 w-full sm:w-auto">
           <label class="text-xs font-medium text-slate-600 whitespace-nowrap">Filter Location:</label>
           <select id="filter-location-select" class="text-xs bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-gp-500 focus:border-gp-500 w-full sm:w-48">
@@ -267,7 +260,7 @@
         </div>
       </div>
 
-      <!-- SECTION 1: Omni Global Search Input -->
+      <!-- Omni Search Container -->
       <div id="container-omni-search" class="space-y-2">
         <div class="relative flex flex-col sm:flex-row gap-2">
           <div class="relative flex-1">
@@ -289,7 +282,7 @@
         </div>
       </div>
 
-      <!-- SECTION 2: Single Targeted Field Search -->
+      <!-- Single Field Target Container -->
       <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-slate-700">Target Exactly One Field</span>
@@ -331,7 +324,6 @@
         </div>
       </div>
 
-      <!-- SECTION 3: Multi-Field Search Matrix -->
       <div id="container-multi-search" class="hidden space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
           <div>
@@ -357,7 +349,6 @@
           </div>
         </div>
 
-        <!-- 13 Standard Power GP General Ledger Fields Input Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs">
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Department</label>
@@ -432,15 +423,12 @@
         </div>
       </div>
 
-      <!-- Quick Location / File Chips -->
       <div id="location-badges" class="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
         <div class="text-xs text-slate-400 py-1">Connecting to repository...</div>
       </div>
     </div>
 
     <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[440px]">
-      
-      <!-- Table Actions Toolbar -->
       <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-700">General Ledger Results</span>
@@ -459,7 +447,6 @@
         </div>
       </div>
 
-      <!-- Results Table with the exact 13 Power GP Columns & Excel Obsidian Styling -->
       <div class="overflow-x-auto flex-1 relative" style="max-height: 560px;">
         <table id="main-results-table" class="excel-table whitespace-nowrap">
           <thead>
@@ -498,7 +485,6 @@
         </table>
       </div>
 
-      <!-- Pagination Footer -->
       <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
         <div id="pagination-info">Showing 0 to 0 of 0 entries</div>
         <div class="flex items-center gap-1.5" id="pagination-controls">
@@ -554,7 +540,7 @@
     </div>
   </div>
 
-  <!-- Manager Sign-In Modal matching Firestore Security Rules -->
+  <!-- Manager Sign-In Modal -->
   <div id="auth-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 animate-in fade-in zoom-in-95 duration-150">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
@@ -585,7 +571,7 @@
     </div>
   </div>
 
-  <!-- Cloud Diagnostics Modal -->
+  <!-- Diagnostics Modal -->
   <div id="diagnostics-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-150">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
@@ -620,11 +606,579 @@
             <i data-lucide="play" class="w-3 h-3"></i> Run Full Health Check
           </button>
           <button id="btn-diag-dismiss" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium">
-          Close
-        </button>
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </div>
+
+  <script>
+    // 1. Safe icon rendering function in global scope
+    window.safeRenderIcons = function() {
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (e) {
+        console.warn('Lucide icons render warning:', e);
+      }
+    };
+
+    // 2. Global reactive application state
+    window.appState = {
+      records: [],
+      filteredRecords: [],
+      locations: new Set(),
+      searchMode: 'omni', // 'omni' | 'single' | 'multi'
+      activeLocation: '',
+      omniQuery: '',
+      singleTargetKey: 'Invoice Number',
+      singleTargetVal: '',
+      multiFilters: {},
+      multiLogic: 'AND', // 'AND' | 'OR'
+      currentPage: 1,
+      pageSize: 50,
+      selectedRecord: null,
+      cloudConnected: false
+    };
+
+    // 3. Corporate entities list (17 companies)
+    window.COMPANY_ENTITIES = [
+      { code: 'E01', name: 'POMCO E01', short: 'POMCO' },
+      { code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },
+      { code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },
+      { code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },
+      { code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },
+      { code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },
+      { code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },
+      { code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },
+      { code: 'E09', name: 'RRICO E09', short: 'RRICO' },
+      { code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },
+      { code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },
+      { code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },
+      { code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },
+      { code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },
+      { code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },
+      { code: 'E16', name: 'WRMM E16', short: 'WRMM' },
+      { code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }
+    ];
+
+    // 4. Standard 13 Power GP fields & aliases
+    window.GP_TARGET_FIELDS = [
+      'Department',
+      'Journal Entry',
+      'Invoice Number',
+      'Originating Master Name',
+      'TRX Date',
+      'Account Number',
+      'Account Description',
+      'Debit Amount',
+      'Credit Amount',
+      'Reference',
+      'Description',
+      'Originating TRX Source',
+      'User Who Posted'
+    ];
+
+    window.FIELD_ALIASES = {
+      'Department': ['department', 'dept', 'deptnmbr', 'department_id', 'cost_center'],
+      'Journal Entry': ['journal entry', 'jrnentry', 'je', 'journal_entry', 'docnumbr_gl'],
+      'Invoice Number': ['invoice number', 'invoice', 'invoicenbr', 'invoice_num', 'invoice_no', 'inv_number', 'inv_no', 'docnumbr', 'vchrnmbr', 'sopnumbe', 'aptodcct', 'origdocnum', 'inv_id'],
+      'Originating Master Name': ['originating master name', 'ormstrnm', 'master name', 'custname', 'vendname', 'entity_name'],
+      'TRX Date': ['trx date', 'trxdate', 'transaction date', 'docdate', 'posteddt', 'date'],
+      'Account Number': ['account number', 'actnumst', 'actindx', 'gl_account', 'account'],
+      'Account Description': ['account description', 'actdescr', 'account_desc', 'account_name'],
+      'Debit Amount': ['debit amount', 'debitamt', 'debit', 'dr_amount', 'dr'],
+      'Credit Amount': ['credit amount', 'crdtamnt', 'credit', 'cr_amount', 'cr'],
+      'Reference': ['reference', 'refrence', 'ref', 'batch_ref'],
+      'Description': ['description', 'dscriptn', 'desc', 'line_desc', 'trx_desc'],
+      'Originating TRX Source': ['originating trx source', 'ortrxsrc', 'trx_source', 'source', 'sourcdoc'],
+      'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by', 'username', 'user_id']
+    };
+
+    window.showToast = function(message, type = 'info') {
+      const existing = document.getElementById('gp-toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'gp-toast';
+      toast.className = `fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-lg shadow-lg border text-xs font-semibold flex items-center gap-2 transition-all transform duration-200 ${
+        type === 'success' ? 'bg-emerald-800 text-white border-emerald-700' :
+        type === 'error' ? 'bg-rose-800 text-white border-rose-700' :
+        'bg-slate-900 text-white border-slate-700'
+      }`;
+
+      const iconName = type === 'success' ? 'check-circle-2' : type === 'error' ? 'alert-triangle' : 'info';
+      toast.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4"></i> <span>${escapeHTML(message)}</span>`;
+      document.body.appendChild(toast);
+      window.safeRenderIcons();
+
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 3500);
+    };
+
+    window.escapeHTML = function(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    };
+
+    window.formatMoney = function(val) {
+      if (!val || val === '-' || val === '0.00' || val === '0') return '<span class="text-slate-300 font-normal">-</span>';
+      const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
+      if (isNaN(num)) return escapeHTML(val);
+      return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    };
+
+    window.formatAmountColor = function(val) {
+      const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
+      if (isNaN(num) || num === 0) return 'text-slate-400';
+      return 'text-slate-900';
+    };
+
+    window.highlightCell = function(str) {
+      if (!str) return '<span class="text-slate-300">-</span>';
+      const clean = escapeHTML(String(str));
+      const { searchMode, omniQuery, singleTargetVal } = window.appState;
+      let needle = '';
+
+      if (searchMode === 'omni' && omniQuery && omniQuery.length > 1) needle = omniQuery.trim();
+      else if (searchMode === 'single' && singleTargetVal && singleTargetVal.length > 1) needle = singleTargetVal.trim();
+
+      if (!needle) return clean;
+      const safeNeedle = needle.replace(/[*^$+?()[\]{}]/g, '');
+      const regex = new RegExp(`(${safeNeedle})`, 'gi');
+      return clean.replace(regex, '<mark class="mark-highlight">$1</mark>');
+    };
+
+    window.matchStandardField = function(rawHeader) {
+      if (!rawHeader) return '';
+      const clean = String(rawHeader).toLowerCase().trim();
+      const aliasesMap = window.FIELD_ALIASES || {};
+
+      for (const [standardKey, aliases] of Object.entries(aliasesMap)) {
+        if (clean === standardKey.toLowerCase()) return standardKey;
+        if (Array.isArray(aliases) && aliases.some(alias => clean === alias || clean.includes(alias))) {
+          return standardKey;
+        }
+      }
+      return rawHeader;
+    };
+
+    window.detectEntityFromFileName = function(filename) {
+      if (!filename) return null;
+      const upper = filename.toUpperCase();
+
+      for (const ent of window.COMPANY_ENTITIES) {
+        const codePattern = new RegExp(`(^|[^A-Z0-9])${ent.code}([^A-Z0-9]|$)`, 'i');
+        if (codePattern.test(upper)) return ent.name;
+
+        const cleanShort = ent.short.replace(/[^A-Z0-9]/gi, '');
+        const cleanUpper = upper.replace(/[^A-Z0-9]/gi, '');
+        if (cleanUpper.includes(cleanShort)) return ent.name;
+      }
+      return null;
+    };
+
+    window.renderTable = function() {
+      const tbody = document.getElementById('table-body');
+      if (!tbody) return;
+
+      const { currentPage, pageSize, filteredRecords } = window.appState;
+      const startIdx = (currentPage - 1) * pageSize;
+      const endIdx = startIdx + pageSize;
+      const pageSlice = filteredRecords.slice(startIdx, endIdx);
+
+      if (filteredRecords.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="16" class="py-14 text-center text-slate-400">
+              <div class="flex flex-col items-center justify-center">
+                <i data-lucide="search-x" class="w-8 h-8 text-slate-300 mb-2"></i>
+                <p class="font-semibold text-slate-700 text-sm">No Matching Records Found</p>
+                <p class="text-xs text-slate-400 mt-1">Try clearing filters or selecting another location.</p>
+              </div>
+            </td>
+          </tr>
+        `;
+        window.safeRenderIcons();
+        window.updatePaginationInfo(0, 0, 0);
+        return;
+      }
+
+      let html = '';
+      pageSlice.forEach((r, idx) => {
+        const rowNum = startIdx + idx + 1;
+        const entityLabel = r._location || 'General';
+        const entityCodeMatch = entityLabel.match(/E\d\d?/i);
+        const entityBadge = entityCodeMatch ? entityCodeMatch[0].toUpperCase() : 'GP';
+
+        html += `
+          <tr class="hover:bg-emerald-50/50 transition cursor-pointer" onclick="window.openRecordDetail('${r._id}')">
+            <td class="text-center font-mono text-slate-400 text-[11px]">${rowNum}</td>
+            <td>
+              <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">
+                <span class="px-1 py-0.2 rounded bg-sky-200 text-sky-900 font-mono text-[10px]">${entityBadge}</span>
+                ${escapeHTML(entityLabel)}
+              </span>
+            </td>
+            <td class="font-mono text-[11px] font-medium text-slate-700">${highlightCell(r['Department'])}</td>
+            <td class="font-mono font-bold text-slate-900">${highlightCell(r['Journal Entry'])}</td>
+            <td class="font-mono text-sky-700 font-semibold">${highlightCell(r['Invoice Number'])}</td>
+            <td class="font-semibold text-slate-800 truncate max-w-[160px]" title="${escapeHTML(r['Originating Master Name'])}">${highlightCell(r['Originating Master Name'])}</td>
+            <td class="font-mono text-slate-600 text-[11px]">${highlightCell(r['TRX Date'])}</td>
+            <td class="font-mono text-[11px] text-gp-700 font-semibold">${highlightCell(r['Account Number'])}</td>
+            <td class="text-slate-700 truncate max-w-[180px]" title="${escapeHTML(r['Account Description'])}">${highlightCell(r['Account Description'])}</td>
+            <td class="font-mono font-semibold text-right ${formatAmountColor(r['Debit Amount'])}">${formatMoney(r['Debit Amount'])}</td>
+            <td class="font-mono font-semibold text-right ${formatAmountColor(r['Credit Amount'])}">${formatMoney(r['Credit Amount'])}</td>
+            <td class="text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Reference'])}">${highlightCell(r['Reference'])}</td>
+            <td class="text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Description'])}">${highlightCell(r['Description'])}</td>
+            <td class="font-mono text-[10px] text-slate-500">${highlightCell(r['Originating TRX Source'])}</td>
+            <td class="font-mono text-[11px] text-slate-600">${highlightCell(r['User Who Posted'])}</td>
+            <td class="text-center">
+              <button onclick="event.stopPropagation(); window.openRecordDetail('${r._id}')" class="p-1 text-slate-400 hover:text-gp-600 hover:bg-sky-50 rounded" title="Inspect Record">
+                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+      window.safeRenderIcons();
+      window.updatePaginationInfo(startIdx + 1, Math.min(endIdx, filteredRecords.length), filteredRecords.length);
+    };
+
+    window.updatePaginationInfo = function(start, end, total) {
+      const infoEl = document.getElementById('pagination-info');
+      const pageEl = document.getElementById('pagination-current-page');
+      const prevBtn = document.getElementById('btn-prev-page');
+      const nextBtn = document.getElementById('btn-next-page');
+
+      if (infoEl) infoEl.textContent = `Showing ${start} to ${end} of ${total.toLocaleString()} records`;
+      if (pageEl) pageEl.textContent = `${window.appState.currentPage} / ${Math.max(1, Math.ceil(total / window.appState.pageSize))}`;
+      if (prevBtn) prevBtn.disabled = window.appState.currentPage <= 1;
+      if (nextBtn) nextBtn.disabled = window.appState.currentPage >= Math.ceil(total / window.appState.pageSize);
+    };
+
+    window.updateMetrics = function() {
+      const total = window.appState.records.length;
+      const matched = window.appState.filteredRecords.length;
+      const locCount = window.appState.locations.size;
+
+      const locEl = document.getElementById('stat-locations');
+      const rowsEl = document.getElementById('stat-rows');
+      const matchesEl = document.getElementById('stat-matches');
+      const countBadge = document.getElementById('results-count-badge');
+      const exportBadge = document.getElementById('export-count');
+      const clearBtn = document.getElementById('btn-clear-all');
+
+      if (locEl) locEl.textContent = `${locCount} / 17`;
+      if (rowsEl) rowsEl.textContent = total.toLocaleString();
+      if (matchesEl) matchesEl.textContent = matched.toLocaleString();
+      if (countBadge) countBadge.textContent = `${matched.toLocaleString()} rows`;
+      if (exportBadge) exportBadge.textContent = matched.toLocaleString();
+
+      if (clearBtn) {
+        if (total > 0) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+      }
+
+      window.renderLocationChips();
+    };
+
+    window.renderLocationChips = function() {
+      const container = document.getElementById('location-badges');
+      if (!container) return;
+
+      const { activeLocation, records } = window.appState;
+
+      let html = `
+        <button onclick="window.setLocationFilter('')" class="px-2.5 py-1 text-xs rounded-md font-semibold transition ${!activeLocation ? 'bg-gp-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
+          All 17 Entities (${records.length})
+        </button>
+      `;
+
+      window.COMPANY_ENTITIES.forEach(ent => {
+        const count = records.filter(r => r._location === ent.name).length;
+        const isActive = activeLocation === ent.name;
+        const hasRecords = count > 0;
+
+        html += `
+          <button 
+            onclick="window.setLocationFilter('${escapeHTML(ent.name)}')" 
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border transition ${
+              isActive 
+                ? 'bg-sky-50 text-gp-800 border-gp-500 font-bold shadow-xs' 
+                : hasRecords 
+                  ? 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 font-medium' 
+                  : 'bg-slate-50/60 hover:bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+            }"
+            title="${ent.name}: ${count} records"
+          >
+            <span class="px-1 py-0.5 rounded text-[10px] font-mono ${isActive ? 'bg-gp-600 text-white' : hasRecords ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-400'}">${ent.code}</span>
+            <span>${ent.short}</span>
+            <span class="text-[10px] ${hasRecords ? 'text-slate-500 font-semibold' : 'text-slate-300'}">(${count})</span>
+          </button>
+        `;
+      });
+
+      container.innerHTML = html;
+      window.safeRenderIcons();
+    };
+
+    window.updateLocationFilterUI = function() {
+      const select = document.getElementById('filter-location-select');
+      if (!select) return;
+
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">All Locations / Files</option>';
+
+      window.COMPANY_ENTITIES.forEach(ent => {
+        const count = window.appState.records.filter(r => r._location === ent.name).length;
+        const opt = document.createElement('option');
+        opt.value = ent.name;
+        opt.textContent = `${ent.code} - ${ent.name} (${count} rows)`;
+        select.appendChild(opt);
+      });
+
+      select.value = currentVal;
+    };
+
+    window.setLocationFilter = function(loc) {
+      window.appState.activeLocation = loc;
+      const select = document.getElementById('filter-location-select');
+      if (select) select.value = loc;
+      window.executeSearch();
+    };
+
+    window.executeSearch = function() {
+      const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiFilters, multiLogic } = window.appState;
+
+      let filtered = records;
+
+      if (activeLocation) {
+        filtered = filtered.filter(r => r._location === activeLocation);
+      }
+
+      if (searchMode === 'omni') {
+        const q = (omniQuery || '').trim().toLowerCase();
+        if (q) {
+          filtered = filtered.filter(row => {
+            for (const field of window.GP_TARGET_FIELDS) {
+              const val = String(row[field] || '').toLowerCase();
+              if (val.includes(q)) return true;
+            }
+            if (row._location && row._location.toLowerCase().includes(q)) return true;
+            return false;
+          });
+        }
+      } else if (searchMode === 'single') {
+        const queryVal = (singleTargetVal || '').trim().toLowerCase();
+        if (queryVal && singleTargetKey) {
+          filtered = filtered.filter(row => {
+            const cell = String(row[singleTargetKey] || '').toLowerCase();
+            return cell.includes(queryVal);
+          });
+        }
+      } else if (searchMode === 'multi') {
+        const activeFieldEntries = Object.entries(multiFilters).filter(([k, v]) => v && v.trim() !== '');
+
+        if (activeFieldEntries.length > 0) {
+          filtered = filtered.filter(row => {
+            if (multiLogic === 'AND') {
+              return activeFieldEntries.every(([field, queryVal]) => matchFieldCondition(row[field], queryVal));
+            } else {
+              return activeFieldEntries.some(([field, queryVal]) => matchFieldCondition(row[field], queryVal));
+            }
+          });
+        }
+      }
+
+      window.appState.filteredRecords = filtered;
+      window.appState.currentPage = 1;
+      window.renderTable();
+      window.updateMetrics();
+    };
+
+    function matchFieldCondition(cellValue, condition) {
+      if (!cellValue) return false;
+      const strCell = String(cellValue).trim().toLowerCase();
+      const strCond = String(condition).trim().toLowerCase();
+
+      if (strCond.startsWith('>') || strCond.startsWith('<')) {
+        const numCell = parseFloat(strCell.replace(/[^0-9.-]+/g, ''));
+        if (isNaN(numCell)) return false;
+
+        if (strCond.startsWith('>=')) return numCell >= parseFloat(strCond.slice(2));
+        if (strCond.startsWith('>')) return numCell > parseFloat(strCond.slice(1));
+        if (strCond.startsWith('<=')) return numCell <= parseFloat(strCond.slice(2));
+        if (strCond.startsWith('<')) return numCell < parseFloat(strCond.slice(1));
+      }
+
+      return strCell.includes(strCond);
+    }
+
+    window.integrateIncomingRecords = function(incoming, locTag) {
+      const existingIds = new Set(window.appState.records.map(r => r._id));
+
+      incoming.forEach(row => {
+        if (!existingIds.has(row._id)) {
+          window.appState.records.push(row);
+          if (row._location) window.appState.locations.add(row._location);
+        }
+      });
+
+      window.updateLocationFilterUI();
+      window.executeSearch();
+      window.updateMetrics();
+    };
+
+    window.parseAndIngestCSV = function(locationName, csvContent, fileName) {
+      if (!window.Papa) return;
+
+      Papa.parse(csvContent, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        complete: function(results) {
+          if (!results.data || results.data.length === 0) return;
+
+          const rawRows = results.data;
+          const headers = results.meta.fields || [];
+
+          const headerMap = {};
+          headers.forEach(h => {
+            headerMap[h] = window.matchStandardField(h);
+          });
+
+          const normalized = rawRows.map((row, idx) => {
+            const item = {
+              _id: `${locationName}__${fileName || 'csv'}__${idx}__${Math.random().toString(36).substring(2, 7)}`,
+              _location: locationName,
+              _sourceFile: fileName || `${locationName}.csv`,
+              _rowIndex: idx + 1
+            };
+
+            window.GP_TARGET_FIELDS.forEach(field => {
+              item[field] = '';
+            });
+
+            for (const [rawKey, rawVal] of Object.entries(row)) {
+              const mapped = headerMap[rawKey] || rawKey;
+              item[mapped] = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : '';
+            }
+
+            return item;
+          });
+
+          window.integrateIncomingRecords(normalized, locationName);
+          window.showToast(`Loaded ${normalized.length} records for ${locationName}`, 'success');
+        },
+        error: function(err) {
+          window.showToast(`Error reading CSV: ${err.message}`, 'error');
+        }
+      });
+    };
+
+    window.openRecordDetail = function(id) {
+      const record = window.appState.records.find(r => r._id === id);
+      if (!record) return;
+
+      window.appState.selectedRecord = record;
+      const modal = document.getElementById('detail-modal');
+      const title = document.getElementById('modal-title');
+      const subtitle = document.getElementById('modal-subtitle');
+      const badges = document.getElementById('modal-badges');
+      const grid = document.getElementById('modal-fields-grid');
+      const rawJson = document.getElementById('modal-raw-json');
+
+      if (title) title.textContent = `Journal Entry ${record['Journal Entry'] || 'Record'}`;
+      if (subtitle) subtitle.textContent = `Entity: ${record._location || 'General'} | Source: ${record._sourceFile} (Row ${record._rowIndex})`;
+
+      if (badges) {
+        badges.innerHTML = `
+          <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono text-[11px] font-semibold">Entity: ${record._location || 'General'}</span>
+          <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-[11px]">Source: ${record['Originating TRX Source'] || 'GL'}</span>
+          <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-semibold">User: ${record['User Who Posted'] || 'SYSTEM'}</span>
+        `;
+      }
+
+      if (grid) {
+        let gridHtml = '';
+        window.GP_TARGET_FIELDS.forEach(field => {
+          const isAmt = field.includes('Amount');
+          const formatted = isAmt ? formatMoney(record[field]) : escapeHTML(record[field]);
+          gridHtml += `
+            <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <div class="text-[10px] uppercase font-bold text-slate-500">${field}</div>
+              <div class="text-xs font-semibold text-slate-900 mt-1 break-all">${formatted || '<span class="text-slate-300 italic font-normal">empty</span>'}</div>
+            </div>
+          `;
+        });
+        grid.innerHTML = gridHtml;
+      }
+
+      if (rawJson) {
+        const cleanDump = { ...record };
+        delete cleanDump._id;
+        rawJson.textContent = JSON.stringify(cleanDump, null, 2);
+      }
+
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      window.safeRenderIcons();
+    };
+
+    window.closeModal = function() {
+      const modal = document.getElementById('detail-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+
+    window.openAuthModal = function() {
+      const modal = document.getElementById('auth-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        const emailInput = document.getElementById('auth-email-input');
+        if (emailInput) emailInput.focus();
+      }
+    };
+
+    window.closeAuthModal = function() {
+      const modal = document.getElementById('auth-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+
+    window.openDiagnosticsModal = function() {
+      const modal = document.getElementById('diagnostics-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        if (window.runCloudDiagnostics) window.runCloudDiagnostics();
+      }
+    };
+
+    window.closeDiagnosticsModal = function() {
+      const modal = document.getElementById('diagnostics-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+  </script>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -671,7 +1225,7 @@
           const userEmail = user?.email?.toLowerCase() || '';
 
           if (user && (AUTHORIZED_MANAGERS.includes(userEmail) || userEmail.endsWith('@rredco.com'))) {
-            window.appState.cloudConnected = true;
+            if (window.appState) window.appState.cloudConnected = true;
             if (cloudDot) cloudDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
             if (cloudStatusText) cloudStatusText.textContent = `Manager (${user.email.split('@')[0]})`;
             if (stateLabel) {
@@ -687,10 +1241,10 @@
               authActionBtn.className = "inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition shadow-sm";
             }
             listenToCloudLocations();
-            // Automatically attempt cloud pull on manager login
+            // Automatically pull from storage once manager is signed in
             window.pullLocationsFromCloud(true);
           } else {
-            window.appState.cloudConnected = false;
+            if (window.appState) window.appState.cloudConnected = false;
             if (cloudDot) cloudDot.className = "w-2 h-2 rounded-full bg-amber-400";
             if (cloudStatusText) cloudStatusText.textContent = user ? "Unauthorized User" : "Manager Login Required";
             if (stateLabel) {
@@ -708,7 +1262,7 @@
           }
         });
       } catch (err) {
-        console.warn("Firebase connection warning:", err);
+        console.warn("Firebase initialization warning:", err);
       }
     }
 
@@ -731,97 +1285,20 @@
           });
 
           if (cloudRecords.length > 0) {
-            integrateIncomingRecords(cloudRecords, 'Cloud Firestore');
+            window.integrateIncomingRecords(cloudRecords, 'Cloud Firestore');
           }
         }, (error) => {
-          console.warn("Firestore live listener standby (Storage pull remains primary):", error.code);
+          console.warn("Firestore live listener standby:", error.code);
         });
       } catch (err) {
         console.warn("Firestore snapshot initialization skipped:", err);
       }
     }
 
-    window.saveLocationsToCloud = async function() {
-      if (!auth?.currentUser) {
-        openAuthModal();
-        showToast('Please sign in as an authorized manager first.', 'error');
-        return;
-      }
-
-      const email = auth.currentUser.email?.toLowerCase() || '';
-      if (!AUTHORIZED_MANAGERS.includes(email) && !email.endsWith('@rredco.com')) {
-        showToast('Access denied: Account is not in authorized manager list.', 'error');
-        return;
-      }
-
-      if (window.appState.records.length === 0) {
-        showToast('No records loaded to save. Please import files first.', 'error');
-        return;
-      }
-
-      const btn = document.getElementById('btn-sync-cloud');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Saving...`;
-        safeRenderIcons();
-      }
-
-      try {
-        const locationGroups = {};
-        window.appState.records.forEach(rec => {
-          const loc = rec._location || 'General';
-          if (!locationGroups[loc]) locationGroups[loc] = [];
-          locationGroups[loc].push(rec);
-        });
-
-        // 1. Save to Firestore /powerGP collection
-        for (const [locationName, recordsList] of Object.entries(locationGroups)) {
-          const safeId = locationName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-          const docRef = doc(db, 'powerGP', safeId);
-
-          await setDoc(docRef, {
-            location: locationName,
-            updatedAt: new Date().toISOString(),
-            updatedBy: auth.currentUser.email,
-            recordCount: recordsList.length,
-            records: recordsList.slice(0, 2000)
-          });
-        }
-
-        // 2. Also save consolidated master CSV to Firebase Storage master_csvs/
-        try {
-          const exportCols = ['_location', ...window.GP_TARGET_FIELDS];
-          const rows = window.appState.records.map(r => {
-            const rowData = {};
-            exportCols.forEach(c => rowData[c === '_location' ? 'Location' : c] = r[c] || '');
-            return rowData;
-          });
-          const csvText = Papa.unparse(rows);
-          const currentMonth = new Date().toISOString().slice(0, 7).replace('-', '_');
-          const fileRef = fbStorageRef(storage, `master_csvs/${currentMonth}_master.csv`);
-          await uploadString(fileRef, csvText, 'raw', { contentType: 'text/csv' });
-        } catch (storageSaveErr) {
-          console.warn("Storage CSV backup warning:", storageSaveErr);
-        }
-
-        showToast(`Saved ${window.appState.records.length} records across ${Object.keys(locationGroups).length} entities to Cloud!`, 'success');
-      } catch (err) {
-        console.error("Firestore save error:", err);
-        showToast(`Firestore save error: ${err.message}`, 'error');
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = `<i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i> <span class="hidden md:inline">Save Locations to</span> Cloud`;
-          safeRenderIcons();
-        }
-      }
-    };
-
-    // Helper: Smart Header Row Detection for Excel & CSV (skips Dynamics GP report title headers)
+    // Helper to find the actual header row in Excel exports
     function extractRowsWithSmartHeader(raw2DArray, defaultEntity, fileName) {
       if (!Array.isArray(raw2DArray) || raw2DArray.length === 0) return [];
 
-      // Find the row index that best matches standard GL column names
       let headerRowIndex = 0;
       let maxScore = 0;
 
@@ -851,7 +1328,7 @@
       const headers = (raw2DArray[headerRowIndex] || []).map(h => String(h || '').trim());
       const headerMap = {};
       headers.forEach((h, colIdx) => {
-        headerMap[colIdx] = matchStandardField(h);
+        headerMap[colIdx] = window.matchStandardField(h);
       });
 
       const normalizedRecords = [];
@@ -859,7 +1336,6 @@
         const row = raw2DArray[r];
         if (!row || row.length === 0) continue;
 
-        // Skip completely empty or summary footer rows
         const hasContent = row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
         if (!hasContent) continue;
 
@@ -881,7 +1357,6 @@
           }
         });
 
-        // Ensure at least one substantive field is populated
         if (item['Journal Entry'] || item['Invoice Number'] || item['Account Number'] || item['Debit Amount'] || item['Credit Amount'] || item['Description']) {
           normalizedRecords.push(item);
         }
@@ -893,8 +1368,8 @@
     window.pullLocationsFromCloud = async function(isSilent = false) {
       if (!auth?.currentUser) {
         if (!isSilent) {
-          openAuthModal();
-          showToast('Please sign in as an authorized manager first.', 'error');
+          window.openAuthModal();
+          window.showToast('Please sign in as an authorized manager first.', 'error');
         }
         return;
       }
@@ -902,7 +1377,7 @@
       const pullBtn = document.getElementById('btn-pull-cloud-header');
       if (pullBtn && !isSilent) {
         pullBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Checking Cloud...`;
-        safeRenderIcons();
+        window.safeRenderIcons();
       }
 
       let totalRetrieved = 0;
@@ -910,28 +1385,19 @@
       const discoveredFiles = [];
 
       try {
-        // 1. Scan folders: RREDCO Power GP, master_csvs, and root bucket
         const foldersToScan = ['RREDCO Power GP', 'master_csvs'];
 
-        // Also inspect root bucket directory to capture any files placed outside folders
         try {
           const rootRef = fbStorageRef(storage);
           const rootListing = await listAll(rootRef);
-          
-          // Add any root files
           rootListing.items.forEach(it => discoveredFiles.push(it));
-
-          // Discover any other folders dynamically
           rootListing.prefixes.forEach(prefix => {
-            if (!foldersToScan.includes(prefix.name)) {
-              foldersToScan.push(prefix.name);
-            }
+            if (!foldersToScan.includes(prefix.name)) foldersToScan.push(prefix.name);
           });
         } catch (rootListErr) {
           console.info("Root directory enumeration fallback:", rootListErr.message);
         }
 
-        // Collect all items across target folders
         for (const folderName of foldersToScan) {
           try {
             const folderRef = fbStorageRef(storage, folderName);
@@ -942,14 +1408,8 @@
           }
         }
 
-        // De-duplicate discovered files by full path
         const uniqueItems = Array.from(new Map(discoveredFiles.map(item => [item.fullPath, item])).values());
 
-        if (discoveredFiles.length === 0 && !isSilent) {
-          console.info("No files discovered across target folders.");
-        }
-
-        // Process each discovered workbook / CSV file
         for (const itemRef of uniqueItems) {
           const fileNameLower = itemRef.name.toLowerCase();
           const isExcel = fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls');
@@ -962,35 +1422,31 @@
             const resp = await fetch(url);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-            const entityName = detectEntityFromFileName(itemRef.name) || 'General';
+            const entityName = window.detectEntityFromFileName(itemRef.name) || 'General';
 
-            if (isExcel) {
-              // Parse Excel via SheetJS
+            if (isExcel && window.XLSX) {
               const arrayBuffer = await resp.arrayBuffer();
               const workbook = XLSX.read(arrayBuffer, { type: 'array' });
               
-              // Process all sheets in the workbook (many GL exports place data on sheet 1 or named sheet)
               workbook.SheetNames.forEach(sheetName => {
                 const worksheet = workbook.Sheets[sheetName];
-                // Convert to 2D array for smart header detection
                 const raw2D = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
                 const rows = extractRowsWithSmartHeader(raw2D, entityName, `${itemRef.name} [${sheetName}]`);
 
                 if (rows.length > 0) {
-                  integrateIncomingRecords(rows, entityName);
+                  window.integrateIncomingRecords(rows, entityName);
                   totalRetrieved += rows.length;
                 }
               });
 
               storageFileCount++;
-            } else if (isCSV) {
-              // Parse CSV via PapaParse
+            } else if (isCSV && window.Papa) {
               const csvText = await resp.text();
               const parsed = Papa.parse(csvText, { skipEmptyLines: 'greedy' });
               const rows = extractRowsWithSmartHeader(parsed.data, entityName, itemRef.name);
 
               if (rows.length > 0) {
-                integrateIncomingRecords(rows, entityName);
+                window.integrateIncomingRecords(rows, entityName);
                 totalRetrieved += rows.length;
               }
 
@@ -1001,7 +1457,7 @@
           }
         }
 
-        // 2. Secondary pull from Firestore /powerGP
+        // Secondary pull from Firestore /powerGP
         try {
           const collectionRef = collection(db, 'powerGP');
           const snapshot = await getDocs(collectionRef);
@@ -1018,7 +1474,7 @@
           });
 
           if (fetched.length > 0) {
-            integrateIncomingRecords(fetched, 'Cloud Firestore');
+            window.integrateIncomingRecords(fetched, 'Cloud Firestore');
             totalRetrieved += fetched.length;
           }
         } catch (fsErr) {
@@ -1027,21 +1483,93 @@
 
       } catch (err) {
         console.error("Cloud pull general error:", err);
-        if (!isSilent) {
-          showToast(`Cloud storage pull warning: ${err.message}`, 'error');
-        }
+        if (!isSilent) window.showToast(`Cloud pull warning: ${err.message}`, 'error');
       } finally {
         if (pullBtn && !isSilent) {
           pullBtn.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span>Pull From Cloud</span>`;
-          safeRenderIcons();
+          window.safeRenderIcons();
         }
 
         if (!isSilent) {
           if (totalRetrieved > 0) {
-            showToast(`Loaded ${totalRetrieved.toLocaleString()} records from ${storageFileCount} Cloud file(s)!`, 'success');
+            window.showToast(`Loaded ${totalRetrieved.toLocaleString()} records from ${storageFileCount} Cloud file(s)!`, 'success');
           } else {
-            showToast('No readable records found. Check manager sign-in state or storage folder permissions.', 'info');
+            window.showToast('No readable records found. Check manager sign-in state or storage folder permissions.', 'info');
           }
+        }
+      }
+    };
+
+    window.saveLocationsToCloud = async function() {
+      if (!auth?.currentUser) {
+        window.openAuthModal();
+        window.showToast('Please sign in as an authorized manager first.', 'error');
+        return;
+      }
+
+      const email = auth.currentUser.email?.toLowerCase() || '';
+      if (!AUTHORIZED_MANAGERS.includes(email) && !email.endsWith('@rredco.com')) {
+        window.showToast('Access denied: Account is not in authorized manager list.', 'error');
+        return;
+      }
+
+      if (window.appState.records.length === 0) {
+        window.showToast('No records loaded to save. Please import files first.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-sync-cloud');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Saving...`;
+        window.safeRenderIcons();
+      }
+
+      try {
+        const locationGroups = {};
+        window.appState.records.forEach(rec => {
+          const loc = rec._location || 'General';
+          if (!locationGroups[loc]) locationGroups[loc] = [];
+          locationGroups[loc].push(rec);
+        });
+
+        for (const [locationName, recordsList] of Object.entries(locationGroups)) {
+          const safeId = locationName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+          const docRef = doc(db, 'powerGP', safeId);
+
+          await setDoc(docRef, {
+            location: locationName,
+            updatedAt: new Date().toISOString(),
+            updatedBy: auth.currentUser.email,
+            recordCount: recordsList.length,
+            records: recordsList.slice(0, 2000)
+          });
+        }
+
+        try {
+          const exportCols = ['_location', ...window.GP_TARGET_FIELDS];
+          const rows = window.appState.records.map(r => {
+            const rowData = {};
+            exportCols.forEach(c => rowData[c === '_location' ? 'Location' : c] = r[c] || '');
+            return rowData;
+          });
+          const csvText = Papa.unparse(rows);
+          const currentMonth = new Date().toISOString().slice(0, 7).replace('-', '_');
+          const fileRef = fbStorageRef(storage, `master_csvs/${currentMonth}_master.csv`);
+          await uploadString(fileRef, csvText, 'raw', { contentType: 'text/csv' });
+        } catch (storageSaveErr) {
+          console.warn("Storage CSV backup warning:", storageSaveErr);
+        }
+
+        window.showToast(`Saved ${window.appState.records.length} records across ${Object.keys(locationGroups).length} entities to Cloud!`, 'success');
+      } catch (err) {
+        console.error("Firestore save error:", err);
+        window.showToast(`Firestore save error: ${err.message}`, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i> <span class="hidden md:inline">Save Locations to</span> Cloud`;
+          window.safeRenderIcons();
         }
       }
     };
@@ -1054,7 +1582,7 @@
 
       if (userEl) {
         if (auth?.currentUser) {
-          userEl.innerHTML = `<span class="text-emerald-700 font-bold">Authenticated</span>: ${auth.currentUser.email} (UID: ${auth.currentUser.uid.slice(0, 8)}...)`;
+          userEl.innerHTML = `<span class="text-emerald-700 font-bold">Authenticated</span>: ${auth.currentUser.email}`;
         } else {
           userEl.innerHTML = `<span class="text-rose-600 font-bold">Not Logged In</span>. Click Sign In in the header to authenticate.`;
         }
@@ -1066,9 +1594,8 @@
         return;
       }
 
-      // Test Firestore
       if (fsEl) fsEl.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin inline"></i> Checking collection /powerGP...`;
-      safeRenderIcons();
+      window.safeRenderIcons();
       try {
         const snap = await getDocs(collection(db, 'powerGP'));
         fsEl.innerHTML = `<span class="text-emerald-700 font-bold">Connected</span>. Found ${snap.size} entity document(s).`;
@@ -1076,9 +1603,8 @@
         fsEl.innerHTML = `<span class="text-rose-600 font-bold">Notice:</span> ${e.message}`;
       }
 
-      // Test Storage in RREDCO Power GP
       if (stEl) stEl.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin inline"></i> Checking folder "RREDCO Power GP"...`;
-      safeRenderIcons();
+      window.safeRenderIcons();
       try {
         const folderRef = fbStorageRef(storage, 'RREDCO Power GP');
         const list = await listAll(folderRef);
@@ -1094,7 +1620,7 @@
         stEl.innerHTML = `<span class="text-rose-600 font-bold">Storage Error:</span> ${e.message}`;
         if (stFiles) stFiles.innerHTML = '';
       }
-      safeRenderIcons();
+      window.safeRenderIcons();
     };
 
     window.managerSignIn = async function(email, password) {
@@ -1103,8 +1629,8 @@
 
       try {
         await signInWithEmailAndPassword(auth, email.trim(), password);
-        closeAuthModal();
-        showToast(`Signed in as ${email}`, 'success');
+        window.closeAuthModal();
+        window.showToast(`Signed in as ${email}`, 'success');
       } catch (err) {
         if (errorDiv) {
           errorDiv.textContent = err.message || 'Failed to authenticate.';
@@ -1116,9 +1642,9 @@
     window.managerSignOut = async function() {
       try {
         await signOut(auth);
-        showToast('Signed out successfully.', 'info');
+        window.showToast('Signed out successfully.', 'info');
       } catch (err) {
-        showToast(`Sign out error: ${err.message}`, 'error');
+        window.showToast(`Sign out error: ${err.message}`, 'error');
       }
     };
 
@@ -1126,43 +1652,34 @@
   </script>
 
   <script>
-    function openAuthModal() {
-      const modal = document.getElementById('auth-modal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        const emailInput = document.getElementById('auth-email-input');
-        if (emailInput) emailInput.focus();
+    function exportFilteredCSV() {
+      if (window.appState.filteredRecords.length === 0) {
+        window.showToast('No matching records to export.', 'info');
+        return;
       }
-    }
 
-    function closeAuthModal() {
-      const modal = document.getElementById('auth-modal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
-    }
+      const exportCols = ['_location', ...window.GP_TARGET_FIELDS];
+      const rows = window.appState.filteredRecords.map(r => {
+        const rowData = {};
+        exportCols.forEach(c => rowData[c === '_location' ? 'Entity' : c] = r[c] || '');
+        return rowData;
+      });
 
-    function openDiagnosticsModal() {
-      const modal = document.getElementById('diagnostics-modal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        if (window.runCloudDiagnostics) window.runCloudDiagnostics();
-      }
-    }
-
-    function closeDiagnosticsModal() {
-      const modal = document.getElementById('diagnostics-modal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
+      const csv = Papa.unparse(rows);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `PowerGP_GL_Export_${window.appState.activeLocation ? window.appState.activeLocation.replace(/\s+/g, '_') : 'All_Entities'}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      window.showToast(`Exported ${window.appState.filteredRecords.length} records to CSV`, 'success');
     }
 
     function initializeAppUI() {
-      safeRenderIcons();
+      window.safeRenderIcons();
 
       const authBtn = document.getElementById('btn-auth-action');
       const closeAuthBtn = document.getElementById('btn-close-auth-modal');
@@ -1173,9 +1690,9 @@
       const dismissDiagBtn = document.getElementById('btn-diag-dismiss');
       const runDiagBtn = document.getElementById('btn-run-diag');
 
-      if (diagBtn) diagBtn.addEventListener('click', openDiagnosticsModal);
-      if (closeDiagBtn) closeDiagBtn.addEventListener('click', closeDiagnosticsModal);
-      if (dismissDiagBtn) dismissDiagBtn.addEventListener('click', closeDiagnosticsModal);
+      if (diagBtn) diagBtn.addEventListener('click', window.openDiagnosticsModal);
+      if (closeDiagBtn) closeDiagBtn.addEventListener('click', window.closeDiagnosticsModal);
+      if (dismissDiagBtn) dismissDiagBtn.addEventListener('click', window.closeDiagnosticsModal);
       if (runDiagBtn) runDiagBtn.addEventListener('click', () => {
         if (window.runCloudDiagnostics) window.runCloudDiagnostics();
       });
@@ -1186,12 +1703,12 @@
           if (label && label.textContent.includes('Sign Out')) {
             if (window.managerSignOut) window.managerSignOut();
           } else {
-            openAuthModal();
+            window.openAuthModal();
           }
         });
       }
 
-      if (closeAuthBtn) closeAuthBtn.addEventListener('click', closeAuthModal);
+      if (closeAuthBtn) closeAuthBtn.addEventListener('click', window.closeAuthModal);
 
       if (authForm) {
         authForm.addEventListener('submit', (e) => {
@@ -1250,7 +1767,7 @@
           if (modeMultiBtn) modeMultiBtn.className = "px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition";
           if (multiContainer) multiContainer.classList.remove('hidden');
         }
-        executeSearch();
+        window.executeSearch();
       }
 
       if (modeOmniBtn) modeOmniBtn.addEventListener('click', () => setMode('omni'));
@@ -1267,7 +1784,7 @@
           }
 
           clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(executeSearch, 150);
+          debounceTimer = setTimeout(window.executeSearch, 150);
         });
       }
 
@@ -1276,14 +1793,14 @@
           if (globalSearchInput) globalSearchInput.value = '';
           window.appState.omniQuery = '';
           clearGlobalBtn.classList.add('hidden');
-          executeSearch();
+          window.executeSearch();
         });
       }
 
       if (singleKeySelect) {
         singleKeySelect.addEventListener('change', (e) => {
           window.appState.singleTargetKey = e.target.value;
-          executeSearch();
+          window.executeSearch();
         });
       }
 
@@ -1291,14 +1808,14 @@
         singleValInput.addEventListener('input', (e) => {
           window.appState.singleTargetVal = e.target.value;
           clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(executeSearch, 150);
+          debounceTimer = setTimeout(window.executeSearch, 150);
         });
       }
 
       if (applySingleBtn) {
         applySingleBtn.addEventListener('click', () => {
           if (singleValInput) window.appState.singleTargetVal = singleValInput.value;
-          executeSearch();
+          window.executeSearch();
         });
       }
 
@@ -1312,7 +1829,7 @@
       document.querySelectorAll('input[name="multi-logic"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
           window.appState.multiLogic = e.target.value;
-          executeSearch();
+          window.executeSearch();
         });
       });
 
@@ -1322,8 +1839,8 @@
             const field = input.getAttribute('data-field');
             window.appState.multiFilters[field] = input.value;
           });
-          executeSearch();
-          showToast('Applied multi-field filter', 'info');
+          window.executeSearch();
+          window.showToast('Applied multi-field filter', 'info');
         });
       }
 
@@ -1333,8 +1850,8 @@
             input.value = '';
           });
           window.appState.multiFilters = {};
-          executeSearch();
-          showToast('Reset all multi-field filters', 'info');
+          window.executeSearch();
+          window.showToast('Reset all multi-field filters', 'info');
         });
       }
 
@@ -1349,7 +1866,7 @@
         prevPageBtn.addEventListener('click', () => {
           if (window.appState.currentPage > 1) {
             window.appState.currentPage--;
-            renderTable();
+            window.renderTable();
           }
         });
       }
@@ -1360,7 +1877,7 @@
           const maxPage = Math.ceil(window.appState.filteredRecords.length / window.appState.pageSize);
           if (window.appState.currentPage < maxPage) {
             window.appState.currentPage++;
-            renderTable();
+            window.renderTable();
           }
         });
       }
@@ -1370,7 +1887,7 @@
         pageSizeSelect.addEventListener('change', (e) => {
           window.appState.pageSize = parseInt(e.target.value, 10);
           window.appState.currentPage = 1;
-          renderTable();
+          window.renderTable();
         });
       }
 
@@ -1381,10 +1898,10 @@
           window.appState.filteredRecords = [];
           window.appState.locations.clear();
           window.appState.activeLocation = '';
-          updateLocationFilterUI();
-          executeSearch();
-          updateMetrics();
-          showToast('Local records cache cleared', 'info');
+          window.updateLocationFilterUI();
+          window.executeSearch();
+          window.updateMetrics();
+          window.showToast('Local records cache cleared', 'info');
         });
       }
 
@@ -1439,12 +1956,12 @@
         Array.from(files).forEach(f => {
           let resolvedEntity = selectedEntityVal;
           if (selectedEntityVal === 'AUTO') {
-            resolvedEntity = detectEntityFromFileName(f.name) || 'General';
+            resolvedEntity = window.detectEntityFromFileName(f.name) || 'General';
           }
 
           const reader = new FileReader();
           reader.onload = function(evt) {
-            parseAndIngestCSV(resolvedEntity, evt.target.result, f.name);
+            window.parseAndIngestCSV(resolvedEntity, evt.target.result, f.name);
           };
           reader.readAsText(f);
         });
@@ -1452,8 +1969,8 @@
 
       const closeModalBtn = document.getElementById('btn-close-modal');
       const dismissModalBtn = document.getElementById('btn-modal-dismiss');
-      if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
-      if (dismissModalBtn) dismissModalBtn.addEventListener('click', closeModal);
+      if (closeModalBtn) closeModalBtn.addEventListener('click', window.closeModal);
+      if (dismissModalBtn) dismissModalBtn.addEventListener('click', window.closeModal);
 
       const copyJsonBtn = document.getElementById('btn-copy-record-json');
       if (copyJsonBtn) {
@@ -1466,7 +1983,7 @@
           ta.select();
           document.execCommand('copy');
           document.body.removeChild(ta);
-          showToast('Copied record JSON to clipboard!', 'success');
+          window.showToast('Copied record JSON to clipboard!', 'success');
         });
       }
 
@@ -1479,10 +1996,10 @@
         });
       }
 
-      updateLocationFilterUI();
-      renderLocationChips();
-      renderTable();
-      updateMetrics();
+      window.updateLocationFilterUI();
+      window.renderLocationChips();
+      window.renderTable();
+      window.updateMetrics();
     }
 
     if (document.readyState === 'loading') {
