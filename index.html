@@ -620,14 +620,12 @@
             <i data-lucide="play" class="w-3 h-3"></i> Run Full Health Check
           </button>
           <button id="btn-diag-dismiss" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium">
-            Close
-          </button>
-        </div>
+          Close
+        </button>
       </div>
     </div>
   </div>
 
-  <script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -672,7 +670,7 @@
           currentUser = user;
           const userEmail = user?.email?.toLowerCase() || '';
 
-          if (user && AUTHORIZED_MANAGERS.includes(userEmail)) {
+          if (user && (AUTHORIZED_MANAGERS.includes(userEmail) || userEmail.endsWith('@rredco.com'))) {
             window.appState.cloudConnected = true;
             if (cloudDot) cloudDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
             if (cloudStatusText) cloudStatusText.textContent = `Manager (${user.email.split('@')[0]})`;
@@ -689,7 +687,7 @@
               authActionBtn.className = "inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition shadow-sm";
             }
             listenToCloudLocations();
-            // Automatically attempt dual cloud pull on manager login
+            // Automatically attempt cloud pull on manager login
             window.pullLocationsFromCloud(true);
           } else {
             window.appState.cloudConnected = false;
@@ -736,7 +734,6 @@
             integrateIncomingRecords(cloudRecords, 'Cloud Firestore');
           }
         }, (error) => {
-          // Non-fatal warning if Firestore collection is not initialized yet
           console.warn("Firestore live listener standby (Storage pull remains primary):", error.code);
         });
       } catch (err) {
@@ -751,13 +748,14 @@
         return;
       }
 
-      if (!AUTHORIZED_MANAGERS.includes(auth.currentUser.email?.toLowerCase())) {
+      const email = auth.currentUser.email?.toLowerCase() || '';
+      if (!AUTHORIZED_MANAGERS.includes(email) && !email.endsWith('@rredco.com')) {
         showToast('Access denied: Account is not in authorized manager list.', 'error');
         return;
       }
 
       if (window.appState.records.length === 0) {
-        showToast('No records loaded to save. Please import CSV files first.', 'error');
+        showToast('No records loaded to save. Please import files first.', 'error');
         return;
       }
 
@@ -786,7 +784,7 @@
             updatedAt: new Date().toISOString(),
             updatedBy: auth.currentUser.email,
             recordCount: recordsList.length,
-            records: recordsList.slice(0, 1500)
+            records: recordsList.slice(0, 2000)
           });
         }
 
@@ -819,6 +817,79 @@
       }
     };
 
+    // Helper: Smart Header Row Detection for Excel & CSV (skips Dynamics GP report title headers)
+    function extractRowsWithSmartHeader(raw2DArray, defaultEntity, fileName) {
+      if (!Array.isArray(raw2DArray) || raw2DArray.length === 0) return [];
+
+      // Find the row index that best matches standard GL column names
+      let headerRowIndex = 0;
+      let maxScore = 0;
+
+      for (let i = 0; i < Math.min(raw2DArray.length, 12); i++) {
+        const row = raw2DArray[i];
+        if (!Array.isArray(row)) continue;
+
+        let score = 0;
+        row.forEach(cell => {
+          if (!cell) return;
+          const s = String(cell).toLowerCase().trim();
+          if (s.includes('journal') || s.includes('jrnentry') || s.includes('je')) score += 3;
+          if (s.includes('invoice') || s.includes('docnumbr') || s.includes('vchrnmbr')) score += 3;
+          if (s.includes('debit') || s.includes('credit')) score += 2;
+          if (s.includes('account') || s.includes('actnum') || s.includes('gl')) score += 2;
+          if (s.includes('date') || s.includes('trx')) score += 2;
+          if (s.includes('department') || s.includes('dept')) score += 2;
+          if (s.includes('description') || s.includes('desc')) score += 1;
+        });
+
+        if (score > maxScore) {
+          maxScore = score;
+          headerRowIndex = i;
+        }
+      }
+
+      const headers = (raw2DArray[headerRowIndex] || []).map(h => String(h || '').trim());
+      const headerMap = {};
+      headers.forEach((h, colIdx) => {
+        headerMap[colIdx] = matchStandardField(h);
+      });
+
+      const normalizedRecords = [];
+      for (let r = headerRowIndex + 1; r < raw2DArray.length; r++) {
+        const row = raw2DArray[r];
+        if (!row || row.length === 0) continue;
+
+        // Skip completely empty or summary footer rows
+        const hasContent = row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
+        if (!hasContent) continue;
+
+        const item = {
+          _id: `${defaultEntity}__${fileName}__${r}__${Math.random().toString(36).substring(2, 7)}`,
+          _location: defaultEntity,
+          _sourceFile: fileName,
+          _rowIndex: r + 1
+        };
+
+        window.GP_TARGET_FIELDS.forEach(field => {
+          item[field] = '';
+        });
+
+        row.forEach((cellVal, colIdx) => {
+          const targetField = headerMap[colIdx] || headers[colIdx] || `Col_${colIdx}`;
+          if (cellVal !== null && cellVal !== undefined) {
+            item[targetField] = String(cellVal).trim();
+          }
+        });
+
+        // Ensure at least one substantive field is populated
+        if (item['Journal Entry'] || item['Invoice Number'] || item['Account Number'] || item['Debit Amount'] || item['Credit Amount'] || item['Description']) {
+          normalizedRecords.push(item);
+        }
+      }
+
+      return normalizedRecords;
+    }
+
     window.pullLocationsFromCloud = async function(isSilent = false) {
       if (!auth?.currentUser) {
         if (!isSilent) {
@@ -836,109 +907,141 @@
 
       let totalRetrieved = 0;
       let storageFileCount = 0;
+      const discoveredFiles = [];
 
-      // A. Pull from Firebase Storage ("RREDCO Power GP" & fallback "master_csvs") - PRIMARY SOURCE
-      const targetFolders = ['RREDCO Power GP', 'master_csvs'];
-      for (const folderName of targetFolders) {
-        try {
-          const storageFolderRef = fbStorageRef(storage, folderName);
-          const fileList = await listAll(storageFolderRef);
-
-          for (const itemRef of fileList.items) {
-            try {
-              const url = await getDownloadURL(itemRef);
-              const resp = await fetch(url);
-              const entityName = detectEntityFromFileName(itemRef.name) || 'General';
-
-              if (itemRef.name.toLowerCase().endsWith('.xlsx') || itemRef.name.toLowerCase().endsWith('.xls')) {
-                // Parse Excel binary buffer with SheetJS
-                const arrayBuffer = await resp.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const firstSheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[firstSheetName];
-                const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
-                if (rawRows && rawRows.length > 0) {
-                  const headers = Object.keys(rawRows[0]);
-                  const headerMap = {};
-                  headers.forEach(h => {
-                    headerMap[h] = matchStandardField(h);
-                  });
-
-                  const normalized = rawRows.map((row, idx) => {
-                    const item = {
-                      _id: `${entityName}__${itemRef.name}__${idx}__${Math.random().toString(36).substring(2, 7)}`,
-                      _location: entityName,
-                      _sourceFile: itemRef.name,
-                      _rowIndex: idx + 1
-                    };
-                    window.GP_TARGET_FIELDS.forEach(field => {
-                      item[field] = '';
-                    });
-                    for (const [rawKey, rawVal] of Object.entries(row)) {
-                      const mapped = headerMap[rawKey] || rawKey;
-                      item[mapped] = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : '';
-                    }
-                    return item;
-                  });
-
-                  integrateIncomingRecords(normalized, entityName);
-                  totalRetrieved += normalized.length;
-                  storageFileCount++;
-                }
-              } else {
-                // Parse plaintext CSV with PapaParse
-                const csvData = await resp.text();
-                if (csvData && csvData.length > 10) {
-                  parseAndIngestCSV(entityName, csvData, itemRef.name);
-                  totalRetrieved++;
-                  storageFileCount++;
-                }
-              }
-            } catch (fileErr) {
-              console.warn(`Could not load storage file ${itemRef.name}:`, fileErr);
-            }
-          }
-        } catch (storageErr) {
-          console.info(`Storage folder check for "${folderName}":`, storageErr.message);
-        }
-      }
-
-      // B. Optional pull from Firestore (/powerGP collection)
       try {
-        const collectionRef = collection(db, 'powerGP');
-        const snapshot = await getDocs(collectionRef);
-        const fetched = [];
-        snapshot.forEach(d => {
-          const data = d.data();
-          if (data && data.records && Array.isArray(data.records)) {
-            fetched.push(...data.records);
-          } else if (data && typeof data === 'object') {
-            if (data['Journal Entry'] || data['Invoice Number'] || data['Account Number']) {
-              fetched.push({ _id: d.id, ...data });
+        // 1. Scan folders: RREDCO Power GP, master_csvs, and root bucket
+        const foldersToScan = ['RREDCO Power GP', 'master_csvs'];
+
+        // Also inspect root bucket directory to capture any files placed outside folders
+        try {
+          const rootRef = fbStorageRef(storage);
+          const rootListing = await listAll(rootRef);
+          
+          // Add any root files
+          rootListing.items.forEach(it => discoveredFiles.push(it));
+
+          // Discover any other folders dynamically
+          rootListing.prefixes.forEach(prefix => {
+            if (!foldersToScan.includes(prefix.name)) {
+              foldersToScan.push(prefix.name);
             }
-          }
-        });
-
-        if (fetched.length > 0) {
-          integrateIncomingRecords(fetched, 'Cloud Firestore');
-          totalRetrieved += fetched.length;
+          });
+        } catch (rootListErr) {
+          console.info("Root directory enumeration fallback:", rootListErr.message);
         }
+
+        // Collect all items across target folders
+        for (const folderName of foldersToScan) {
+          try {
+            const folderRef = fbStorageRef(storage, folderName);
+            const res = await listAll(folderRef);
+            res.items.forEach(it => discoveredFiles.push(it));
+          } catch (folderErr) {
+            console.warn(`Could not list folder "${folderName}":`, folderErr.message);
+          }
+        }
+
+        // De-duplicate discovered files by full path
+        const uniqueItems = Array.from(new Map(discoveredFiles.map(item => [item.fullPath, item])).values());
+
+        if (discoveredFiles.length === 0 && !isSilent) {
+          console.info("No files discovered across target folders.");
+        }
+
+        // Process each discovered workbook / CSV file
+        for (const itemRef of uniqueItems) {
+          const fileNameLower = itemRef.name.toLowerCase();
+          const isExcel = fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls');
+          const isCSV = fileNameLower.endsWith('.csv') || fileNameLower.endsWith('.txt');
+
+          if (!isExcel && !isCSV) continue;
+
+          try {
+            const url = await getDownloadURL(itemRef);
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+            const entityName = detectEntityFromFileName(itemRef.name) || 'General';
+
+            if (isExcel) {
+              // Parse Excel via SheetJS
+              const arrayBuffer = await resp.arrayBuffer();
+              const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+              
+              // Process all sheets in the workbook (many GL exports place data on sheet 1 or named sheet)
+              workbook.SheetNames.forEach(sheetName => {
+                const worksheet = workbook.Sheets[sheetName];
+                // Convert to 2D array for smart header detection
+                const raw2D = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+                const rows = extractRowsWithSmartHeader(raw2D, entityName, `${itemRef.name} [${sheetName}]`);
+
+                if (rows.length > 0) {
+                  integrateIncomingRecords(rows, entityName);
+                  totalRetrieved += rows.length;
+                }
+              });
+
+              storageFileCount++;
+            } else if (isCSV) {
+              // Parse CSV via PapaParse
+              const csvText = await resp.text();
+              const parsed = Papa.parse(csvText, { skipEmptyLines: 'greedy' });
+              const rows = extractRowsWithSmartHeader(parsed.data, entityName, itemRef.name);
+
+              if (rows.length > 0) {
+                integrateIncomingRecords(rows, entityName);
+                totalRetrieved += rows.length;
+              }
+
+              storageFileCount++;
+            }
+          } catch (fileErr) {
+            console.warn(`Failed reading file ${itemRef.name}:`, fileErr);
+          }
+        }
+
+        // 2. Secondary pull from Firestore /powerGP
+        try {
+          const collectionRef = collection(db, 'powerGP');
+          const snapshot = await getDocs(collectionRef);
+          const fetched = [];
+          snapshot.forEach(d => {
+            const data = d.data();
+            if (data && data.records && Array.isArray(data.records)) {
+              fetched.push(...data.records);
+            } else if (data && typeof data === 'object') {
+              if (data['Journal Entry'] || data['Invoice Number'] || data['Account Number']) {
+                fetched.push({ _id: d.id, ...data });
+              }
+            }
+          });
+
+          if (fetched.length > 0) {
+            integrateIncomingRecords(fetched, 'Cloud Firestore');
+            totalRetrieved += fetched.length;
+          }
+        } catch (fsErr) {
+          console.warn("Firestore sync check standby:", fsErr.message);
+        }
+
       } catch (err) {
-        // Firestore is secondary; do not break if rules or collection are pending
-        console.warn("Firestore sync check skipped:", err.message);
-      }
+        console.error("Cloud pull general error:", err);
+        if (!isSilent) {
+          showToast(`Cloud storage pull warning: ${err.message}`, 'error');
+        }
+      } finally {
+        if (pullBtn && !isSilent) {
+          pullBtn.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span>Pull From Cloud</span>`;
+          safeRenderIcons();
+        }
 
-      if (pullBtn && !isSilent) {
-        pullBtn.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span>Pull From Cloud</span>`;
-        safeRenderIcons();
-      }
-
-      if (!isSilent) {
-        if (totalRetrieved > 0) {
-          showToast(`Loaded ${totalRetrieved.toLocaleString()} records from ${storageFileCount} Cloud workbook(s)!`, 'success');
-        } else {
-          showToast('No files could be read from Cloud Storage. Check Storage permissions or sign-in state.', 'info');
+        if (!isSilent) {
+          if (totalRetrieved > 0) {
+            showToast(`Loaded ${totalRetrieved.toLocaleString()} records from ${storageFileCount} Cloud file(s)!`, 'success');
+          } else {
+            showToast('No readable records found. Check manager sign-in state or storage folder permissions.', 'info');
+          }
         }
       }
     };
@@ -970,7 +1073,7 @@
         const snap = await getDocs(collection(db, 'powerGP'));
         fsEl.innerHTML = `<span class="text-emerald-700 font-bold">Connected</span>. Found ${snap.size} entity document(s).`;
       } catch (e) {
-        fsEl.innerHTML = `<span class="text-rose-600 font-bold">Error:</span> ${e.message}`;
+        fsEl.innerHTML = `<span class="text-rose-600 font-bold">Notice:</span> ${e.message}`;
       }
 
       // Test Storage in RREDCO Power GP
@@ -979,16 +1082,16 @@
       try {
         const folderRef = fbStorageRef(storage, 'RREDCO Power GP');
         const list = await listAll(folderRef);
-        stEl.innerHTML = `<span class="text-emerald-700 font-bold">Connected</span>. Found ${list.items.length} Excel/CSV workbook(s).`;
+        stEl.innerHTML = `<span class="text-emerald-700 font-bold">Connected</span>. Found ${list.items.length} workbook(s).`;
         if (stFiles) {
           if (list.items.length > 0) {
             stFiles.innerHTML = list.items.map(it => `• 📊 <strong>${it.name}</strong>`).join('<br>');
           } else {
-            stFiles.innerHTML = '<span class="italic text-slate-400">Folder exists, but no files detected.</span>';
+            stFiles.innerHTML = '<span class="italic text-slate-400">Folder exists, but no files detected inside.</span>';
           }
         }
       } catch (e) {
-        stEl.innerHTML = `<span class="text-rose-600 font-bold">Error:</span> ${e.message}`;
+        stEl.innerHTML = `<span class="text-rose-600 font-bold">Storage Error:</span> ${e.message}`;
         if (stFiles) stFiles.innerHTML = '';
       }
       safeRenderIcons();
