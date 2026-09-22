@@ -28,7 +28,7 @@
             }
           },
           fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+            sans: ['Calibri', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
             mono: ['JetBrains Mono', 'Fira Code', 'monospace']
           }
         }
@@ -37,6 +37,18 @@
   </script>
 
   <style>
+    [v-cloak] { display: none !important; }
+
+    body, html {
+      height: 100%;
+      margin: 0;
+      font-family: 'Calibri', 'Inter', sans-serif;
+      background-color: #f3f4f6;
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -51,6 +63,41 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+
+    .excel-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .excel-table th, .excel-table td {
+      border-right: 1px solid #e5e7eb;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    .excel-table th {
+      background-color: #111827; /* Obsidian */
+      color: #f59e0b; /* Gold */
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .excel-table td {
+      background-color: #ffffff;
+      color: #374151;
+    }
+
+    .excel-table tr:hover td { 
+      background-color: #ecfdf5; /* Light Emerald */ 
+    }
+
     .mark-highlight {
       background-color: #fef08a;
       color: #854d0e;
@@ -58,6 +105,7 @@
       border-radius: 3px;
       font-weight: 600;
     }
+
     .dropzone-active {
       border-color: #0284c7 !important;
       background-color: #f0f9ff !important;
@@ -83,19 +131,20 @@
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Cloud Storage Connectivity Badge -->
         <div id="cloud-status-indicator" class="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-          <span id="cloud-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span id="cloud-status-text">Engine Ready</span>
+          <span id="cloud-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+          <span id="cloud-status-text">Connecting to Cloud...</span>
         </div>
 
-        <button id="btn-load-sample" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-sky-400"></i>
-          <span class="hidden sm:inline">Reload Sample</span> Multi-Location Data
-        </button>
-
-        <button id="btn-sync-cloud" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
+        <button id="btn-sync-cloud" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
           <i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i>
           <span class="hidden md:inline">Save Locations to</span> Cloud
+        </button>
+
+        <button id="btn-pull-cloud-header" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Sync From</span> Cloud
         </button>
 
         <button id="btn-export-results" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gp-600 hover:bg-gp-500 text-white transition shadow-sm">
@@ -141,15 +190,16 @@
 
         <div class="mt-3 flex items-center justify-between text-[11px] text-slate-400">
           <span class="inline-flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-gp-600"></i> 17 Corporate Entities Supported</span>
-          <span class="inline-flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i> Instant Local Memory & Cloud Backup</span>
+          <span class="inline-flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i> Direct Cloud Sync via Firestore</span>
         </div>
       </div>
 
+      <!-- Quick Metrics & Repository Status -->
       <div class="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Repository Status</h3>
-            <span id="sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Online & Active</span>
+            <span id="sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">Connecting...</span>
           </div>
           
           <div class="grid grid-cols-2 gap-2.5">
@@ -167,7 +217,7 @@
             </div>
             <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
               <span class="text-[11px] text-slate-500">Cloud Status</span>
-              <p id="stat-cloud-state" class="text-xs font-bold text-slate-700 mt-1">Ready</p>
+              <p id="stat-cloud-state" class="text-xs font-bold text-slate-700 mt-1">Connecting</p>
             </div>
           </div>
         </div>
@@ -185,7 +235,7 @@
 
     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
       
-      <!-- Top Mode Selection -->
+      <!-- Top Mode Selection: Quick Search vs Targeted Single Field vs Multi-Field -->
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
         <div class="flex items-center gap-2">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Search Mode:</span>
@@ -227,6 +277,7 @@
         </div>
       </div>
 
+      <!-- SECTION 2: Single Targeted Field Search -->
       <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-slate-700">Target Exactly One Field</span>
@@ -268,6 +319,7 @@
         </div>
       </div>
 
+      <!-- SECTION 3: Multi-Field Search Matrix -->
       <div id="container-multi-search" class="hidden space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
           <div>
@@ -293,6 +345,7 @@
           </div>
         </div>
 
+        <!-- 13 Standard Power GP General Ledger Fields Input Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs">
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Department</label>
@@ -369,7 +422,7 @@
 
       <!-- Quick Location / File Chips -->
       <div id="location-badges" class="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
-        <div class="text-xs text-slate-400 py-1">Initializing repository data...</div>
+        <div class="text-xs text-slate-400 py-1">Connecting to repository...</div>
       </div>
     </div>
 
@@ -394,38 +447,38 @@
         </div>
       </div>
 
-      <!-- Results Table with the exact 13 Power GP Columns -->
+      <!-- Results Table with the exact 13 Power GP Columns & Excel Obsidian Styling -->
       <div class="overflow-x-auto flex-1 relative" style="max-height: 560px;">
-        <table id="main-results-table" class="w-full text-left text-xs border-collapse whitespace-nowrap">
-          <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 backdrop-blur border-b border-slate-200 font-semibold select-none">
+        <table id="main-results-table" class="excel-table whitespace-nowrap">
+          <thead>
             <tr id="table-header-row">
-              <th class="py-2.5 px-3 text-center w-10">#</th>
-              <th class="py-2.5 px-3">Location / Plant</th>
-              <th class="py-2.5 px-3">Department</th>
-              <th class="py-2.5 px-3">Journal Entry</th>
-              <th class="py-2.5 px-3 text-sky-700">Invoice Number</th>
-              <th class="py-2.5 px-3">Originating Master Name</th>
-              <th class="py-2.5 px-3">TRX Date</th>
-              <th class="py-2.5 px-3">Account Number</th>
-              <th class="py-2.5 px-3">Account Description</th>
-              <th class="py-2.5 px-3 text-right">Debit Amount</th>
-              <th class="py-2.5 px-3 text-right">Credit Amount</th>
-              <th class="py-2.5 px-3">Reference</th>
-              <th class="py-2.5 px-3">Description</th>
-              <th class="py-2.5 px-3">Originating TRX Source</th>
-              <th class="py-2.5 px-3">User Who Posted</th>
-              <th class="py-2.5 px-3 text-center">Action</th>
+              <th class="text-center w-10">#</th>
+              <th>Location / Plant</th>
+              <th>Department</th>
+              <th>Journal Entry</th>
+              <th class="text-amber-400">Invoice Number</th>
+              <th>Originating Master Name</th>
+              <th>TRX Date</th>
+              <th>Account Number</th>
+              <th>Account Description</th>
+              <th class="text-right">Debit Amount</th>
+              <th class="text-right">Credit Amount</th>
+              <th>Reference</th>
+              <th>Description</th>
+              <th>Originating TRX Source</th>
+              <th>User Who Posted</th>
+              <th class="text-center">Action</th>
             </tr>
           </thead>
-          <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
+          <tbody id="table-body" class="font-sans">
             <tr>
               <td colspan="16" class="py-16 text-center text-slate-400">
                 <div class="max-w-sm mx-auto flex flex-col items-center">
                   <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-                    <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-gp-600"></i>
+                    <i data-lucide="cloud-off" class="w-6 h-6 text-slate-400"></i>
                   </div>
-                  <p class="font-medium text-slate-700 text-sm">Initializing Power GP Query Engine...</p>
-                  <p class="text-xs text-slate-400 mt-1">Mounting memory caches and corporate entity maps.</p>
+                  <p class="font-medium text-slate-700 text-sm">No Dynamics GP Records in Repository</p>
+                  <p class="text-xs text-slate-400 mt-1">Upload CSV files above or sync from the cloud to view and search records.</p>
                 </div>
               </td>
             </tr>
@@ -490,14 +543,13 @@
   </div>
 
   <script>
-    // Safe icon refresh that never halts script execution if Lucide CDN is slow
     function safeRenderIcons() {
       try {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
         }
       } catch (e) {
-        console.warn('Lucide icons render warning:', e);
+        console.warn('Lucide render warning:', e);
       }
     }
 
@@ -555,42 +607,22 @@
       'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by', 'username', 'user_id']
     };
 
-    // Central Application Reactive State
+    // Clean initial state with NO mock data
     window.appState = {
       records: [],
       filteredRecords: [],
       locations: new Set(),
-      searchMode: 'omni', // 'omni' | 'single' | 'multi'
+      searchMode: 'omni',
       activeLocation: '',
       omniQuery: '',
       singleTargetKey: 'Invoice Number',
       singleTargetVal: '',
       multiFilters: {},
-      multiLogic: 'AND', // 'AND' | 'OR'
+      multiLogic: 'AND',
       currentPage: 1,
       pageSize: 50,
       selectedRecord: null,
       cloudConnected: false
-    };
-
-    const SAMPLE_LOCATION_DATA = {
-      "POMCO E01": `Department,Journal Entry,Invoice Number,Originating Master Name,TRX Date,Account Number,Account Description,Debit Amount,Credit Amount,Reference,Description,Originating TRX Source,User Who Posted
-100 - Executive,10420,INV-2026-0891,Apex Technical Solutions,2026-08-01,000-1100-00,Operating Cash Acct,85000.00,0.00,Q3 Working Capital,POMCO Intercompany Transfer,GLTRX000001,ADMIN
-100 - Executive,10420,INV-2026-0891,Apex Technical Solutions,2026-08-01,000-1200-00,Accounts Receivable,0.00,85000.00,Q3 Working Capital,POMCO Intercompany Transfer,GLTRX000001,ADMIN
-200 - Management,10421,INV-DEL-98402,Deloitte Consulting,2026-08-04,000-6100-00,Professional Fees,14500.00,0.00,Audit Interim Review,Tax & Compliance Audit,PMTRX000034,AP_CLERK
-200 - Management,10421,INV-DEL-98402,Deloitte Consulting,2026-08-04,000-2000-00,Accounts Payable,0.00,14500.00,Audit Interim Review,Tax & Compliance Audit,PMTRX000034,AP_CLERK`,
-
-      "RRCLLC E02": `Department,Journal Entry,Invoice Number,Originating Master Name,TRX Date,Account Number,Account Description,Debit Amount,Credit Amount,Reference,Description,Originating TRX Source,User Who Posted
-300 - Logistics,20101,BOL-773410,Titan Freight Lines,2026-08-02,000-1500-00,Direct Freight Expense,26400.00,0.00,Intermodal Fleet Shipment,Bulk Material Dispatch,PMTRX000088,LOGISTICS_USER
-300 - Logistics,20101,BOL-773410,Titan Freight Lines,2026-08-02,000-2000-00,Accounts Payable,0.00,26400.00,Intermodal Fleet Shipment,Bulk Material Dispatch,PMTRX000088,LOGISTICS_USER`,
-
-      "WRGCC E14": `Department,Journal Entry,Invoice Number,Originating Master Name,TRX Date,Account Number,Account Description,Debit Amount,Credit Amount,Reference,Description,Originating TRX Source,User Who Posted
-500 - Commercial,40112,ESC-99201,SunTrust Operations,2026-08-11,000-1120-00,Commercial Escrow,94200.00,0.00,WRGCC Bond Guarantee,Surety Bond Release,GLTRX000045,TREASURY
-500 - Commercial,40112,ESC-99201,SunTrust Operations,2026-08-11,000-4100-00,Commercial Contracting,0.00,94200.00,WRGCC Bond Guarantee,Surety Bond Release,GLTRX000045,TREASURY`,
-
-      "RR-KR3 JV E17": `Department,Journal Entry,Invoice Number,Originating Master Name,TRX Date,Account Number,Account Description,Debit Amount,Credit Amount,Reference,Description,Originating TRX Source,User Who Posted
-600 - Joint Venture,50220,KR3-CALL-008,KR3 Joint Ventures Corp,2026-08-14,000-1850-00,JV Investment Equity,350000.00,0.00,JV Capital Call Q3,Member Distribution Allocation,GLTRX000099,CFO_USER
-600 - Joint Venture,50220,KR3-CALL-008,KR3 Joint Ventures Corp,2026-08-14,000-1100-00,Operating Cash Acct,0.00,350000.00,JV Capital Call Q3,Member Distribution Allocation,GLTRX000099,CFO_USER`
     };
 
     function matchStandardField(rawHeader) {
@@ -627,7 +659,7 @@
 
     function parseAndIngestCSV(locationName, csvContent, fileName) {
       if (!window.Papa) {
-        console.error('PapaParse library is loading or blocked.');
+        showToast('CSV parsing library is not ready.', 'error');
         return;
       }
 
@@ -635,7 +667,10 @@
         header: true,
         skipEmptyLines: 'greedy',
         complete: function(results) {
-          if (!results.data || results.data.length === 0) return;
+          if (!results.data || results.data.length === 0) {
+            showToast('The provided CSV contains no rows.', 'error');
+            return;
+          }
 
           const rawRows = results.data;
           const headers = results.meta.fields || [];
@@ -666,6 +701,7 @@
           });
 
           integrateIncomingRecords(normalized, locationName);
+          showToast(`Imported ${normalized.length} records into ${locationName}`, 'success');
         },
         error: function(err) {
           showToast(`Error parsing CSV: ${err.message}`, 'error');
@@ -764,10 +800,29 @@
       const tbody = document.getElementById('table-body');
       if (!tbody) return;
 
-      const { currentPage, pageSize, filteredRecords } = window.appState;
+      const { currentPage, pageSize, filteredRecords, records } = window.appState;
       const startIdx = (currentPage - 1) * pageSize;
       const endIdx = startIdx + pageSize;
       const pageSlice = filteredRecords.slice(startIdx, endIdx);
+
+      if (records.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="16" class="py-16 text-center text-slate-400">
+              <div class="max-w-sm mx-auto flex flex-col items-center">
+                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                  <i data-lucide="cloud-off" class="w-6 h-6 text-slate-400"></i>
+                </div>
+                <p class="font-medium text-slate-700 text-sm">No Dynamics GP Records in Repository</p>
+                <p class="text-xs text-slate-400 mt-1">Upload CSV files above or sync from the cloud to view and search records.</p>
+              </div>
+            </td>
+          </tr>
+        `;
+        safeRenderIcons();
+        updatePaginationInfo(0, 0, 0);
+        return;
+      }
 
       if (filteredRecords.length === 0) {
         tbody.innerHTML = `
@@ -794,31 +849,31 @@
         const entityBadge = entityCodeMatch ? entityCodeMatch[0].toUpperCase() : 'GP';
 
         html += `
-          <tr class="hover:bg-sky-50/50 transition group cursor-pointer" onclick="window.openRecordDetail('${r._id}')">
-            <td class="py-2 px-3 text-center font-mono text-slate-400 text-[11px]">${rowNum}</td>
+          <tr class="cursor-pointer" onclick="window.openRecordDetail('${r._id}')">
+            <td class="text-center font-mono text-slate-400 text-[11px]">${rowNum}</td>
             
-            <td class="py-2 px-3">
+            <td>
               <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">
                 <span class="px-1 py-0.2 rounded bg-sky-200 text-sky-900 font-mono text-[10px]">${entityBadge}</span>
                 ${escapeHTML(entityLabel)}
               </span>
             </td>
 
-            <td class="py-2 px-3 font-mono text-[11px] font-medium text-slate-700">${highlightCell(r['Department'])}</td>
-            <td class="py-2 px-3 font-mono font-bold text-slate-900">${highlightCell(r['Journal Entry'])}</td>
-            <td class="py-2 px-3 font-mono text-sky-700 font-semibold">${highlightCell(r['Invoice Number'])}</td>
-            <td class="py-2 px-3 font-semibold text-slate-800 truncate max-w-[160px]" title="${escapeHTML(r['Originating Master Name'])}">${highlightCell(r['Originating Master Name'])}</td>
-            <td class="py-2 px-3 font-mono text-slate-600 text-[11px]">${highlightCell(r['TRX Date'])}</td>
-            <td class="py-2 px-3 font-mono text-[11px] text-gp-700 font-semibold">${highlightCell(r['Account Number'])}</td>
-            <td class="py-2 px-3 text-slate-700 truncate max-w-[180px]" title="${escapeHTML(r['Account Description'])}">${highlightCell(r['Account Description'])}</td>
-            <td class="py-2 px-3 font-mono font-semibold text-right ${formatAmountColor(r['Debit Amount'])}">${formatMoney(r['Debit Amount'])}</td>
-            <td class="py-2 px-3 font-mono font-semibold text-right ${formatAmountColor(r['Credit Amount'])}">${formatMoney(r['Credit Amount'])}</td>
-            <td class="py-2 px-3 text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Reference'])}">${highlightCell(r['Reference'])}</td>
-            <td class="py-2 px-3 text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Description'])}">${highlightCell(r['Description'])}</td>
-            <td class="py-2 px-3 font-mono text-[10px] text-slate-500">${highlightCell(r['Originating TRX Source'])}</td>
-            <td class="py-2 px-3 font-mono text-[11px] text-slate-600">${highlightCell(r['User Who Posted'])}</td>
+            <td class="font-mono text-[11px] font-medium text-slate-700">${highlightCell(r['Department'])}</td>
+            <td class="font-mono font-bold text-slate-900">${highlightCell(r['Journal Entry'])}</td>
+            <td class="font-mono text-sky-700 font-semibold">${highlightCell(r['Invoice Number'])}</td>
+            <td class="font-semibold text-slate-800 truncate max-w-[160px]" title="${escapeHTML(r['Originating Master Name'])}">${highlightCell(r['Originating Master Name'])}</td>
+            <td class="font-mono text-slate-600 text-[11px]">${highlightCell(r['TRX Date'])}</td>
+            <td class="font-mono text-[11px] text-gp-700 font-semibold">${highlightCell(r['Account Number'])}</td>
+            <td class="text-slate-700 truncate max-w-[180px]" title="${escapeHTML(r['Account Description'])}">${highlightCell(r['Account Description'])}</td>
+            <td class="font-mono font-semibold text-right ${formatAmountColor(r['Debit Amount'])}">${formatMoney(r['Debit Amount'])}</td>
+            <td class="font-mono font-semibold text-right ${formatAmountColor(r['Credit Amount'])}">${formatMoney(r['Credit Amount'])}</td>
+            <td class="text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Reference'])}">${highlightCell(r['Reference'])}</td>
+            <td class="text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Description'])}">${highlightCell(r['Description'])}</td>
+            <td class="font-mono text-[10px] text-slate-500">${highlightCell(r['Originating TRX Source'])}</td>
+            <td class="font-mono text-[11px] text-slate-600">${highlightCell(r['User Who Posted'])}</td>
 
-            <td class="py-2 px-3 text-center">
+            <td class="text-center">
               <button onclick="event.stopPropagation(); window.openRecordDetail('${r._id}')" class="p-1 text-slate-400 hover:text-gp-600 hover:bg-sky-50 rounded" title="Inspect Record">
                 <i data-lucide="eye" class="w-3.5 h-3.5"></i>
               </button>
@@ -1057,7 +1112,6 @@
       showToast(`Exported ${window.appState.filteredRecords.length} records to CSV`, 'success');
     }
 
-    // Non-blocking in-app notification banner
     function showToast(message, type = 'info') {
       const existing = document.getElementById('gp-toast');
       if (existing) existing.remove();
@@ -1079,46 +1133,197 @@
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       }, 3500);
     }
+  </script>
 
-    async function initCloudSyncSafely() {
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'power-gp-search-default';
+    let app, db, auth, currentUser;
+
+    // Use environment config if provided, otherwise fallback to project config
+    const defaultFirebaseConfig = {
+      apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
+      authDomain: "rredco-database.firebaseapp.com",
+      projectId: "rredco-database",
+      storageBucket: "rredco-database.firebasestorage.app",
+      messagingSenderId: "968362680607",
+      appId: "1:968362680607:web:dea3fe719d8f8d619fbe8a"
+    };
+
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : defaultFirebaseConfig;
+
+    async function initFirestoreBackend() {
       const stateLabel = document.getElementById('stat-cloud-state');
       const cloudDot = document.getElementById('cloud-dot');
       const cloudStatusText = document.getElementById('cloud-status-text');
+      const syncBadge = document.getElementById('sync-badge');
 
       try {
-        const fbAppModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-        const fbFirestoreModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
 
-        const firebaseConfig = {
-          apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
-          authDomain: "rredco-database.firebaseapp.com",
-          projectId: "rredco-database",
-          storageBucket: "rredco-database.firebasestorage.app",
-          messagingSenderId: "968362680607",
-          appId: "1:968362680607:web:dea3fe719d8f8d619fbe8a"
-        };
+        // RULE 3: Auth before queries
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
 
-        const app = fbAppModule.initializeApp(firebaseConfig);
-        window.db = fbFirestoreModule.getFirestore(app);
+        currentUser = auth.currentUser;
+        if (!currentUser) return;
+
         window.appState.cloudConnected = true;
 
-        if (cloudDot) cloudDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
-        if (cloudStatusText) cloudStatusText.textContent = "Cloud Synced";
+        if (cloudDot) {
+          cloudDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+        }
+        if (cloudStatusText) {
+          cloudStatusText.textContent = `Cloud Connected (${currentUser.uid.slice(0, 6)})`;
+        }
         if (stateLabel) {
-          stateLabel.textContent = "Synced to RREDCO";
+          stateLabel.textContent = "Synced to Firestore";
           stateLabel.className = "text-xs font-bold text-emerald-600 mt-1";
         }
+        if (syncBadge) {
+          syncBadge.textContent = "Live Firestore";
+          syncBadge.className = "px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800";
+        }
+
+        // Setup real-time listener on the public data collection (RULE 1)
+        listenToCloudLocations();
       } catch (err) {
-        console.info('Cloud storage operating in fast local cache mode:', err.message);
-        if (cloudDot) cloudDot.className = "w-2 h-2 rounded-full bg-sky-400";
-        if (cloudStatusText) cloudStatusText.textContent = "Local Memory Engine";
+        console.warn("Firestore connection warning:", err);
+        if (cloudDot) {
+          cloudDot.className = "w-2 h-2 rounded-full bg-amber-400";
+        }
+        if (cloudStatusText) {
+          cloudStatusText.textContent = "Local Offline Engine";
+        }
         if (stateLabel) {
-          stateLabel.textContent = "In-Memory Active";
+          stateLabel.textContent = "In-Memory Mode";
           stateLabel.className = "text-xs font-bold text-slate-600 mt-1";
+        }
+        if (syncBadge) {
+          syncBadge.textContent = "Local Memory";
+          syncBadge.className = "px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700";
         }
       }
     }
 
+    function listenToCloudLocations() {
+      if (!db || !auth.currentUser) return;
+      // RULE 1: Strict collection path /artifacts/{appId}/public/data/{collectionName}
+      const locCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'power_gp_records');
+
+      onSnapshot(locCollectionRef, (snapshot) => {
+        const cloudRecords = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data && data.records && Array.isArray(data.records)) {
+            data.records.forEach(r => cloudRecords.push(r));
+          }
+        });
+
+        if (cloudRecords.length > 0) {
+          integrateIncomingRecords(cloudRecords, 'Cloud Firestore');
+          showToast(`Synced ${cloudRecords.length} records from Firestore`, 'info');
+        }
+      }, (error) => {
+        console.error("Firestore onSnapshot error:", error);
+      });
+    }
+
+    window.saveLocationsToCloud = async function() {
+      if (!db || !auth || !auth.currentUser) {
+        showToast('Connecting to Firestore... please try again in a moment.', 'error');
+        return;
+      }
+
+      if (window.appState.records.length === 0) {
+        showToast('No records loaded to save. Please import CSV files first.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-sync-cloud');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Saving...`;
+        safeRenderIcons();
+      }
+
+      try {
+        const locationGroups = {};
+        window.appState.records.forEach(rec => {
+          const loc = rec._location || 'General';
+          if (!locationGroups[loc]) locationGroups[loc] = [];
+          locationGroups[loc].push(rec);
+        });
+
+        for (const [locationName, recordsList] of Object.entries(locationGroups)) {
+          const safeId = locationName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+          // RULE 1: Strict document path
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'power_gp_records', safeId);
+
+          await setDoc(docRef, {
+            location: locationName,
+            updatedAt: new Date().toISOString(),
+            recordCount: recordsList.length,
+            records: recordsList.slice(0, 1500) // Stay well within Firestore 1MB doc limit
+          });
+        }
+
+        showToast(`Saved ${window.appState.records.length} records across ${Object.keys(locationGroups).length} entities to Cloud!`, 'success');
+      } catch (err) {
+        console.error("Firestore save error:", err);
+        showToast(`Firestore save error: ${err.message}`, 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i> <span class="hidden md:inline">Save Locations to</span> Cloud`;
+          safeRenderIcons();
+        }
+      }
+    };
+
+    window.pullLocationsFromCloud = async function() {
+      if (!db || !auth || !auth.currentUser) {
+        showToast('Firestore not connected. Running offline.', 'error');
+        return;
+      }
+
+      try {
+        const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'power_gp_records');
+        const snapshot = await getDocs(collectionRef);
+        const fetched = [];
+        snapshot.forEach(d => {
+          const data = d.data();
+          if (data && data.records && Array.isArray(data.records)) {
+            fetched.push(...data.records);
+          }
+        });
+
+        if (fetched.length > 0) {
+          integrateIncomingRecords(fetched, 'Cloud Sync');
+          showToast(`Retrieved ${fetched.length} records from Firestore!`, 'success');
+        } else {
+          showToast('No records found in Cloud Firestore yet. Import a CSV and save to Cloud first!', 'info');
+        }
+      } catch (err) {
+        console.error("Firestore pull error:", err);
+        showToast(`Cloud fetch failed: ${err.message}`, 'error');
+      }
+    };
+
+    initFirestoreBackend();
+  </script>
+
+  <script>
     function initializeAppUI() {
       safeRenderIcons();
 
@@ -1292,16 +1497,6 @@
         });
       }
 
-      const sampleBtn = document.getElementById('btn-load-sample');
-      if (sampleBtn) {
-        sampleBtn.addEventListener('click', () => {
-          for (const [entityName, csvContent] of Object.entries(SAMPLE_LOCATION_DATA)) {
-            parseAndIngestCSV(entityName, csvContent, `${entityName.replace(/[\s-]+/g, '_')}_GL.csv`);
-          }
-          showToast('Loaded sample records across your corporate entities!', 'success');
-        });
-      }
-
       const clearAllBtn = document.getElementById('btn-clear-all');
       if (clearAllBtn) {
         clearAllBtn.addEventListener('click', () => {
@@ -1313,6 +1508,27 @@
           executeSearch();
           updateMetrics();
           showToast('Local records cache cleared', 'info');
+        });
+      }
+
+      const syncCloudBtn = document.getElementById('btn-sync-cloud');
+      if (syncCloudBtn) {
+        syncCloudBtn.addEventListener('click', () => {
+          if (window.saveLocationsToCloud) window.saveLocationsToCloud();
+        });
+      }
+
+      const pullCloudBtn = document.getElementById('btn-pull-cloud');
+      if (pullCloudBtn) {
+        pullCloudBtn.addEventListener('click', () => {
+          if (window.pullLocationsFromCloud) window.pullLocationsFromCloud();
+        });
+      }
+
+      const pullCloudHeaderBtn = document.getElementById('btn-pull-cloud-header');
+      if (pullCloudHeaderBtn) {
+        pullCloudHeaderBtn.addEventListener('click', () => {
+          if (window.pullLocationsFromCloud) window.pullLocationsFromCloud();
         });
       }
 
@@ -1346,13 +1562,12 @@
         Array.from(files).forEach(f => {
           let resolvedEntity = selectedEntityVal;
           if (selectedEntityVal === 'AUTO') {
-            resolvedEntity = detectEntityFromFileName(f.name) || 'POMCO E01';
+            resolvedEntity = detectEntityFromFileName(f.name) || 'General';
           }
 
           const reader = new FileReader();
           reader.onload = function(evt) {
             parseAndIngestCSV(resolvedEntity, evt.target.result, f.name);
-            showToast(`Loaded ${f.name} into ${resolvedEntity}`, 'success');
           };
           reader.readAsText(f);
         });
@@ -1387,13 +1602,10 @@
         });
       }
 
-      for (const [entityName, csvContent] of Object.entries(SAMPLE_LOCATION_DATA)) {
-        parseAndIngestCSV(entityName, csvContent, `${entityName.replace(/[\s-]+/g, '_')}_GL.csv`);
-      }
-
       updateLocationFilterUI();
       renderLocationChips();
-      initCloudSyncSafely();
+      renderTable();
+      updateMetrics();
     }
 
     if (document.readyState === 'loading') {
