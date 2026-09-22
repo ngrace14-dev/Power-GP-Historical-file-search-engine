@@ -241,7 +241,7 @@
           <input type="text" id="log-search-input" placeholder="Search logs by user, event type, query..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none" />
         </div>
         <div class="text-xs text-slate-500">
-          Showing real-time session updates from Firebase Database
+          Showing real-time session updates & user profiles
         </div>
       </div>
 
@@ -623,6 +623,7 @@
     const firebaseConfig = {
         apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
         authDomain: "rredco-database.firebaseapp.com",
+        databaseURL: "https://rredco-database-default-rtdb.firebaseio.com",
         projectId: "rredco-database",
         storageBucket: "rredco-database.firebasestorage.app",
         messagingSenderId: "96836268607",
@@ -639,6 +640,9 @@
     const savedRegistered = JSON.parse(localStorage.getItem('rredco_registered_users') || '[]');
     window.REGISTERED_USERS = Array.from(new Set([...defaultRegistered, ...savedRegistered]));
 
+    // System Logs Initial Local Cache Setup
+    const savedLogs = JSON.parse(localStorage.getItem('rredco_system_logs') || '[]');
+
     // Role-Based Access Control Registry
     window.APP_PERMISSIONS = JSON.parse(localStorage.getItem('rredco_permissions') || JSON.stringify({
       "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"]
@@ -648,7 +652,7 @@
       {
         id: "gp-ledger",
         title: "Power GP Historical Ledger",
-        version: "v3.2",
+        version: "v3.3",
         description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
         icon: "database"
       },
@@ -725,10 +729,10 @@
       records: [], filteredRecords: [], locations: new Set(),
       searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '',
       multiFilters: {}, multiLogic: 'AND', currentPage: 1, pageSize: 50, selectedRecord: null, user: null,
-      systemLogs: []
+      systemLogs: savedLogs
     };
 
-    // Real-Time Firebase Logging Tracker Function (INCLUDES DEV & ADMIN ACTIONS)
+    // INSTANT DUAL-SYNC LOGGING FUNCTION (LOGS ALL USERS & ADMIN)
     function logUserActivity(eventType, details) {
       if (!window.appState.user) return;
       
@@ -742,16 +746,21 @@
         userAgent: navigator.userAgent.slice(0, 80)
       };
 
-      try {
-        const logsRef = dbRef(database, 'system_activity_logs');
-        push(logsRef, logPayload);
-      } catch (err) {
-        console.warn("Local log cache fallback:", err);
-      }
-
+      // 1. Instant local persistence
       window.appState.systemLogs.unshift(logPayload);
+      localStorage.setItem('rredco_system_logs', JSON.stringify(window.appState.systemLogs.slice(0, 500)));
+
+      // 2. Refresh System Log UI
       if (document.getElementById('log-app-screen').classList.contains('flex')) {
         renderSystemLogDashboard();
+      }
+
+      // 3. Asynchronous Realtime Database Sync
+      try {
+        const logsRef = dbRef(database, 'system_activity_logs');
+        push(logsRef, logPayload).catch(e => console.warn("Firebase RTDB Notice:", e.message));
+      } catch (err) {
+        console.warn("Local storage fallback active:", err);
       }
     }
 
@@ -808,7 +817,6 @@
         devBtn.classList.remove('flex');
       }
 
-      // Hide dev-only cards from non-dev users
       const visibleApps = window.AVAILABLE_APPS.filter(app => {
         if (app.devOnly && !isDevUser) return false;
         return true;
@@ -857,11 +865,12 @@
       else if (appId === 'system-logs') {
         if (window.appState.user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
         document.getElementById('logUserEmail').textContent = window.appState.user.email;
+        renderSystemLogDashboard();
         showScreen('log-app-screen');
       } else alert('App module starting initialization...');
     };
 
-    // System Logs Admin Dashboard Renderer (HIGHLIGHTS DEV PROFILE PROMINENTLY)
+    // System Logs Admin Dashboard Renderer
     function renderSystemLogDashboard() {
       const container = document.getElementById('user-log-profiles-container');
       const searchQuery = (document.getElementById('log-search-input').value || '').toLowerCase();
@@ -870,14 +879,26 @@
       document.getElementById('stat-log-events').textContent = `${logs.length} Events`;
 
       const userProfiles = {};
+      
+      // Ensure all registered users get a profile card even if they haven't performed a search yet
+      window.REGISTERED_USERS.forEach(email => {
+        userProfiles[email.toLowerCase()] = {
+          email: email,
+          lastActive: 'Registered Account',
+          logs: []
+        };
+      });
+
       logs.forEach(log => {
-        const email = log.email || 'unknown@rredco.com';
+        const email = (log.email || 'unknown@rredco.com').toLowerCase();
         if (!userProfiles[email]) {
           userProfiles[email] = {
             email: email,
             lastActive: log.timeFormatted,
             logs: []
           };
+        } else if (userProfiles[email].lastActive === 'Registered Account') {
+          userProfiles[email].lastActive = log.timeFormatted;
         }
         userProfiles[email].logs.push(log);
       });
@@ -906,7 +927,6 @@
 
         return `
           <div class="bg-white border ${isDev ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'} rounded-xl shadow-sm overflow-hidden">
-            <!-- User Profile Header Accordion Toggle -->
             <div onclick="window.toggleUserLogAccordion('${idx}')" class="px-5 py-4 ${isDev ? 'bg-amber-50/60 hover:bg-amber-100/50' : 'bg-slate-50 hover:bg-sky-50/50'} cursor-pointer flex items-center justify-between border-b border-slate-200 transition">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full ${isDev ? 'bg-amber-600 text-white' : 'bg-slate-800 text-white'} flex items-center justify-center font-bold font-mono text-xs shadow-sm">
@@ -927,32 +947,33 @@
               </div>
             </div>
 
-            <!-- User Activity Dropdown Timeline -->
             <div id="accordion-body-${idx}" class="p-5 border-t border-slate-100 space-y-3 bg-white">
               <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">User Session Log Timeline</h4>
               
               <div class="space-y-2">
-                ${filteredUserLogs.map(l => {
-                  let badgeStyle = "bg-slate-100 text-slate-700";
-                  if (l.type === 'LOGIN') badgeStyle = "bg-emerald-100 text-emerald-800";
-                  if (l.type === 'LOGOUT') badgeStyle = "bg-rose-100 text-rose-800";
-                  if (l.type === 'SEARCH') badgeStyle = "bg-sky-100 text-sky-800";
-                  if (l.type === 'PULL_LEDGERS') badgeStyle = "bg-purple-100 text-purple-800";
-                  if (l.type === 'PASSWORD_CHANGE') badgeStyle = "bg-amber-100 text-amber-800";
-                  if (l.type.startsWith('DEV_')) badgeStyle = "bg-amber-200 text-amber-900 font-bold";
+                ${filteredUserLogs.length === 0 ? `<p class="text-xs text-slate-400 italic">No activity logged for this account yet.</p>` : 
+                  filteredUserLogs.map(l => {
+                    let badgeStyle = "bg-slate-100 text-slate-700";
+                    if (l.type === 'LOGIN') badgeStyle = "bg-emerald-100 text-emerald-800";
+                    if (l.type === 'LOGOUT') badgeStyle = "bg-rose-100 text-rose-800";
+                    if (l.type === 'SEARCH') badgeStyle = "bg-sky-100 text-sky-800";
+                    if (l.type === 'PULL_LEDGERS') badgeStyle = "bg-purple-100 text-purple-800";
+                    if (l.type === 'PASSWORD_CHANGE') badgeStyle = "bg-amber-100 text-amber-800";
+                    if (l.type.startsWith('DEV_') || l.type.startsWith('INSPECT_')) badgeStyle = "bg-amber-200 text-amber-900 font-bold";
 
-                  return `
-                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                      <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${badgeStyle}">${l.type}</span>
-                        <span class="font-medium text-slate-800">${l.details}</span>
+                    return `
+                      <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div class="flex items-center gap-2">
+                          <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono ${badgeStyle}">${l.type}</span>
+                          <span class="font-medium text-slate-800">${l.details}</span>
+                        </div>
+                        <div class="text-[11px] font-mono text-slate-400">
+                          ${l.timeFormatted || l.timestamp}
+                        </div>
                       </div>
-                      <div class="text-[11px] font-mono text-slate-400">
-                        ${l.timeFormatted || l.timestamp}
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
+                    `;
+                  }).join('')
+                }
               </div>
             </div>
           </div>
@@ -977,9 +998,9 @@
     document.getElementById('log-search-input').addEventListener('input', renderSystemLogDashboard);
     document.getElementById('btn-clear-system-logs').addEventListener('click', () => {
       if (confirm('Clear all logged system activity events?')) {
-        logUserActivity('CLEAR_LOGS', 'Cleared all activity log history');
         try { remove(dbRef(database, 'system_activity_logs')); } catch (e) {}
         window.appState.systemLogs = [];
+        localStorage.removeItem('rredco_system_logs');
         renderSystemLogDashboard();
       }
     });
@@ -990,9 +1011,18 @@
       onValue(logsRef, (snapshot) => {
         const val = snapshot.val();
         if (val) {
-          const list = Object.values(val).reverse();
-          window.appState.systemLogs = list;
-          renderSystemLogDashboard();
+          const remoteLogs = Object.values(val).reverse();
+          const map = new Map();
+          [...remoteLogs, ...window.appState.systemLogs].forEach(item => {
+            if (item && item.timestamp && item.email) {
+              map.set(item.timestamp + '_' + item.email, item);
+            }
+          });
+          window.appState.systemLogs = Array.from(map.values()).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+          localStorage.setItem('rredco_system_logs', JSON.stringify(window.appState.systemLogs.slice(0, 500)));
+          if (document.getElementById('log-app-screen').classList.contains('flex')) {
+            renderSystemLogDashboard();
+          }
         }
       });
     } catch (e) {
@@ -1450,6 +1480,7 @@
     window.openRecordDetail = (id) => {
         const r = window.appState.records.find(rec => rec._id === id);
         if(!r) return;
+        logUserActivity('INSPECT_RECORD', `Inspected JE #${r['Journal Entry'] || 'Record'} (${r._location})`);
         document.getElementById('modal-title').textContent = `Journal Entry ${r['Journal Entry'] || 'Record'}`;
         document.getElementById('modal-badges').innerHTML = `<span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono text-[11px] font-semibold">Entity: ${r._location}</span><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-semibold">User: ${r['User Who Posted'] || 'SYSTEM'}</span>`;
         document.getElementById('modal-fields-grid').innerHTML = window.GP_TARGET_FIELDS.map(f => `<div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg"><div class="text-[10px] uppercase font-bold text-slate-500">${f}</div><div class="text-xs font-semibold text-slate-900 mt-1 break-all">${r[f] || '-'}</div></div>`).join('');
