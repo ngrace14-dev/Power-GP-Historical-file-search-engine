@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power GP Ledger Search Terminal</title>
+  <link rel="icon" type="image/png" href="RREDCO_Logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: { gp: { 50: '#f0f7ff', 100: '#e0effe', 500: '#0284c7', 600: '#0369a1', 700: '#075985', 800: '#0c4a6e', 900: '#082f49' } },
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold">
+          <i data-lucide="grid" class="w-4 h-4 text-gp-500"></i> Portal
+        </a>
+        <div class="h-6 w-px bg-slate-700 mx-1"></div>
+        <div class="h-10 px-3 rounded-lg bg-white flex items-center justify-center shadow-md">
+          <img src="RREDCO_Logo.png" alt="RREDCO Logo" class="h-7 w-auto object-contain">
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Power GP Online</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gp-700/80 text-sky-200 border border-gp-500/30 font-medium">Read-Only Search Terminal</span>
+          </div>
+          <p class="text-xs text-slate-400">Targeted & Multi-Field Search for Dynamics GP General Ledger exports</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+          <span id="userEmail" class="text-xs text-slate-300 font-medium">Loading...</span>
+          <button id="logoutBtn" class="text-rose-400 hover:text-rose-300 transition" title="Sign Out">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <button id="btn-pull-cloud" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
+          <i data-lucide="cloud-download" class="w-4 h-4"></i> Pull Ledgers From Cloud
+        </button>
+        <button id="btn-export-results" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gp-600 hover:bg-gp-500 text-white transition shadow-sm">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> Export (<span id="export-count">0</span>)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Cloud Repository Status</h3>
+        <span id="sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">In-Memory Active</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Entities Loaded</span><p id="stat-locations" class="text-xl font-bold text-slate-900 mt-1">0 / 17</p></div>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Total GL Rows</span><p id="stat-rows" class="text-xl font-bold text-slate-900 mt-1">0</p></div>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Active Matches</span><p id="stat-matches" class="text-xl font-bold text-gp-600 mt-1">0</p></div>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col justify-center">
+          <button id="btn-clear-all" class="text-rose-600 hover:text-rose-700 font-medium hover:bg-rose-50 px-3 py-2 rounded transition text-xs border border-rose-200 hidden">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5 inline mr-1"></i> Clear Local Memory
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Controls -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Search Mode:</span>
+          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
+            <button id="mode-omni" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition">Global Search</button>
+            <button id="mode-single" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Target One Field</button>
+            <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <label class="text-xs font-medium text-slate-600 whitespace-nowrap">Filter Location:</label>
+          <select id="filter-location-select" class="text-xs bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-gp-500 focus:border-gp-500 w-full sm:w-48"><option value="">All Locations / Files</option></select>
+        </div>
+      </div>
+
+      <div id="container-omni-search" class="space-y-2">
+        <div class="relative flex flex-col sm:flex-row gap-2">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 absolute inset-y-0 left-3.5 my-auto text-slate-400"></i>
+            <input type="text" id="global-search-input" placeholder='Search any field, e.g. "Contoso", JE-10492, Sales, 000-1100...' class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-gp-500 font-mono" />
+          </div>
+        </div>
+      </div>
+
+      <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+          <div class="sm:col-span-4">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Field</label>
+            <select id="single-field-target-key" class="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-medium">
+              <option value="Department">Department</option><option value="Journal Entry">Journal Entry</option><option value="Invoice Number" selected>Invoice Number</option><option value="Originating Master Name">Originating Master Name</option><option value="TRX Date">TRX Date</option><option value="Account Number">Account Number</option><option value="Account Description">Account Description</option><option value="Debit Amount">Debit Amount</option><option value="Credit Amount">Credit Amount</option><option value="Reference">Reference</option><option value="Description">Description</option><option value="Originating TRX Source">Originating TRX Source</option><option value="User Who Posted">User Who Posted</option>
+            </select>
+          </div>
+          <div class="sm:col-span-8">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Query Value</label>
+            <input type="text" id="single-field-target-value" placeholder="Enter exact or partial value..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+          </div>
+        </div>
+      </div>
+
+      <div id="container-multi-search" class="hidden space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+          <span class="text-xs font-bold text-slate-800">Combinatorial Multi-Field Search Matrix</span>
+          <div class="flex items-center gap-3 text-xs bg-white px-2 py-1 rounded border border-slate-200">
+            <label class="font-medium">Logic Mode:</label>
+            <label class="inline-flex items-center gap-1 cursor-pointer"><input type="radio" name="multi-logic" value="AND" checked class="text-gp-600"><span class="font-semibold text-slate-800">Match ALL (AND)</span></label>
+            <span class="text-slate-300">|</span>
+            <label class="inline-flex items-center gap-1 cursor-pointer"><input type="radio" name="multi-logic" value="OR" class="text-gp-600"><span class="font-semibold text-slate-800">Match ANY (OR)</span></label>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs" id="multi-input-grid"></div>
+        <div class="pt-2 flex items-center justify-end gap-2"><button id="btn-apply-multi" class="px-4 py-2 bg-gp-600 hover:bg-gp-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5"><i data-lucide="filter" class="w-3.5 h-3.5"></i> Apply Matrix Search</button></div>
+      </div>
+
+      <div id="location-badges" class="flex flex-wrap gap-2 pt-1 border-t border-slate-100"><div class="text-xs text-slate-400 py-1">Click "Pull Ledgers From Cloud" to load database.</div></div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[440px]">
+      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-700">General Ledger Results</span>
+        <div class="flex items-center gap-2"><label class="text-xs text-slate-500">Rows per page:</label><select id="pagination-page-size" class="text-xs bg-white border border-slate-200 rounded px-2 py-1"><option value="15">15</option><option value="50" selected>50</option><option value="100">100</option></select></div>
+      </div>
+      <div class="overflow-x-auto flex-1 relative" style="max-height: 560px;">
+        <table id="main-results-table" class="w-full text-left text-xs border-collapse whitespace-nowrap">
+          <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 border-b border-slate-200 font-semibold select-none">
+            <tr id="table-header-row"><th class="py-2.5 px-3 text-center w-10">#</th><th class="py-2.5 px-3">Location / Entity</th><th class="py-2.5 px-3">Department</th><th class="py-2.5 px-3">Journal Entry</th><th class="py-2.5 px-3 text-sky-700">Invoice Number</th><th class="py-2.5 px-3">Originating Master Name</th><th class="py-2.5 px-3">TRX Date</th><th class="py-2.5 px-3">Account Number</th><th class="py-2.5 px-3">Account Description</th><th class="py-2.5 px-3 text-right">Debit Amount</th><th class="py-2.5 px-3 text-right">Credit Amount</th><th class="py-2.5 px-3">Reference</th><th class="py-2.5 px-3">Description</th><th class="py-2.5 px-3">Originating TRX Source</th><th class="py-2.5 px-3">User Who Posted</th><th class="py-2.5 px-3 text-center">Action</th></tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
+            <tr><td colspan="16" class="py-16 text-center text-slate-400">No Database Records Loaded</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+        <div id="pagination-info">Showing 0 to 0 of 0 records</div>
+        <div class="flex items-center gap-1.5"><button id="btn-prev-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100">Previous</button><span id="pagination-current-page" class="font-medium px-2">1</span><button id="btn-next-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100">Next</button></div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+    import { getDatabase, ref as dbRef, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
+      authDomain: "rredco-database.firebaseapp.com",
+      databaseURL: "https://rredco-database-default-rtdb.firebaseio.com",
+      projectId: "rredco-database",
+      storageBucket: "rredco-database.firebasestorage.app",
+      messagingSenderId: "96836268607",
+      appId: "1:96836268607:web:dea3fe719d8f8d619fbe8a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const storage = getStorage(app);
+    const database = getDatabase(app);
+
+    window.COMPANY_ENTITIES = [{ code: 'E01', name: 'POMCO E01', short: 'POMCO' },{ code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },{ code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },{ code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },{ code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },{ code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },{ code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },{ code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },{ code: 'E09', name: 'RRICO E09', short: 'RRICO' },{ code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },{ code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },{ code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },{ code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },{ code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },{ code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },{ code: 'E16', name: 'WRMM E16', short: 'WRMM' },{ code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }];
+    window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
+    
+    window.FIELD_ALIASES = {
+      'Department': ['department', 'dept', 'deptnmbr', 'department_id', 'cost_center'],
+      'Journal Entry': ['journal entry', 'jrnentry', 'je', 'journal_entry'],
+      'Invoice Number': ['invoice number', 'invoice', 'invoicenbr', 'docnumbr', 'doc number', 'document number', 'doc num', 'voucher', 'voucher number', 'vchrnmbr', 'orig doc number', 'sop number', 'invoice #', 'inv #', 'doc_number', 'apply to doc num'],
+      'Originating Master Name': ['originating master name', 'ormstrnm', 'master name', 'custname', 'vendname'],
+      'TRX Date': ['trx date', 'trxdate', 'transaction date', 'docdate', 'date'],
+      'Account Number': ['account number', 'actnumst', 'gl_account', 'account'],
+      'Account Description': ['account description', 'account de', 'actdescr', 'account_name'],
+      'Debit Amount': ['debit amount', 'debitamt', 'debit', 'dr_amount', 'dr'],
+      'Credit Amount': ['credit amount', 'crdtamnt', 'credit', 'cr_amount', 'cr'],
+      'Reference': ['reference', 'refrence', 'ref'],
+      'Description': ['description', 'dscriptn', 'desc'],
+      'Originating TRX Source': ['originating trx source', 'originating', 'ortrxsrc', 'trx_source'],
+      'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by', 'username']
+    };
+
+    window.appState = { records: [], filteredRecords: [], locations: new Set(), searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '', multiFilters: {}, multiLogic: 'AND', currentPage: 1, pageSize: 50, user: null };
+
+    function formatExcelDate(val) {
+      if (val === null || val === undefined || val === '') return '';
+      const num = Number(val);
+      if (!isNaN(num) && num > 1000 && num < 100000) {
+        const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+        if (!isNaN(dateObj.getTime())) {
+          return `${String(dateObj.getUTCMonth() + 1).padStart(2, '0')}/${String(dateObj.getUTCDate()).padStart(2, '0')}/${dateObj.getUTCFullYear()}`;
+        }
+      }
+      return String(val).trim();
+    }
+
+    function logUserActivity(eventType, details) {
+      if (!window.appState.user) return;
+      const logPayload = { email: window.appState.user.email, uid: window.appState.user.uid, type: eventType, details: details, timestamp: new Date().toISOString(), timeFormatted: new Date().toLocaleString(), userAgent: navigator.userAgent.slice(0, 50) };
+      try { push(dbRef(database, 'system_activity_logs'), logPayload).catch(e=>{}); } catch (err) {}
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.email) {
+        window.appState.user = user;
+        document.getElementById('userEmail').textContent = user.email;
+        logUserActivity('LAUNCH_APP', 'Opened Ledger Search Terminal');
+      } else {
+        window.location.href = 'index.html';
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'Signed out'); signOut(auth); });
+
+    document.getElementById('btn-pull-cloud').addEventListener('click', async () => {
+      if (!window.appState.user) return;
+      const btn = document.getElementById('btn-pull-cloud');
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Downloading...`;
+      lucide.createIcons();
+      window.appState.records = []; window.appState.filteredRecords = []; window.appState.locations.clear();
+
+      logUserActivity('PULL_LEDGERS', 'Requested full cloud pull of 17 company ledger files');
+
+      try {
+        const folderRef = ref(storage, 'RREDCO Power GP');
+        const result = await listAll(folderRef);
+        for (const itemRef of result.items) {
+          if (itemRef.name.endsWith('.xlsx')) {
+            const url = await getDownloadURL(itemRef);
+            await parseExcelFromStorage(url, itemRef.name);
+          }
+        }
+      } catch (error) { alert("Error downloading ledgers. Check Storage rules."); }
+      finally {
+        btn.innerHTML = `<i data-lucide="cloud-download" class="w-4 h-4"></i> Pull Ledgers From Cloud`;
+        lucide.createIcons();
+      }
+    });
+
+    async function parseExcelFromStorage(url, filename) {
+      try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        let headerRowIndex = 0;
+        for (let i = 0; i < Math.min(15, raw2D.length); i++) {
+          const rowStr = (raw2D[i] || []).join(' ').toLowerCase();
+          if (rowStr.includes('account') || rowStr.includes('journal entry') || rowStr.includes('department')) { headerRowIndex = i; break; }
+        }
+        const headerRow = raw2D[headerRowIndex] || [];
+        const dataRows = raw2D.slice(headerRowIndex + 1);
+        const entityMatch = window.COMPANY_ENTITIES.find(e => filename.includes(e.short)) || { name: filename.split(' ')[0] };
+        const positionalMap = ['Department', 'Journal Entry', 'Originating Master Name', 'Invoice Number', 'TRX Date', 'Account Number', 'Account Description', 'Debit Amount', 'Credit Amount', 'Reference', 'Description', 'Originating TRX Source', 'User Who Posted'];
+
+        const normalized = dataRows.map((row, idx) => {
+          if (!row || row.length === 0 || row.every(cell => cell === null || cell === undefined || String(cell).trim() === '')) return null;
+          const item = { _id: `${entityMatch.name}__${idx}`, _location: entityMatch.name, _sourceFile: filename };
+          window.GP_TARGET_FIELDS.forEach(f => item[f] = '');
+
+          headerRow.forEach((rawKey, colIdx) => {
+            const rawVal = row[colIdx];
+            if (rawVal === null || rawVal === undefined || String(rawVal).trim() === '') return;
+            const cleanKey = String(rawKey || '').toLowerCase().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+            let matchedField = null;
+            for (const [targetField, aliases] of Object.entries(window.FIELD_ALIASES)) {
+              if (cleanKey === targetField.toLowerCase() || aliases.some(a => cleanKey === a.toLowerCase() || cleanKey.includes(a.toLowerCase()))) { matchedField = targetField; break; }
+            }
+            if (matchedField) item[matchedField] = (matchedField === 'TRX Date') ? formatExcelDate(rawVal) : String(rawVal).trim();
+          });
+
+          positionalMap.forEach((targetField, colIdx) => {
+            if (!item[targetField] && row[colIdx] !== undefined && row[colIdx] !== null) {
+              const val = String(row[colIdx]).trim();
+              if (val) item[targetField] = (targetField === 'TRX Date') ? formatExcelDate(val) : val;
+            }
+          });
+          return item;
+        }).filter(Boolean);
+
+        normalized.forEach(row => { window.appState.records.push(row); window.appState.locations.add(row._location); });
+        executeSearch();
+      } catch (err) {}
+    }
+
+    function executeSearch() {
+      const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiFilters, multiLogic } = window.appState;
+      let filtered = records;
+
+      if (activeLocation) filtered = filtered.filter(r => r._location === activeLocation);
+
+      if (searchMode === 'omni' && omniQuery.trim()) {
+        const q = omniQuery.trim().toLowerCase();
+        filtered = filtered.filter(r => window.GP_TARGET_FIELDS.some(f => String(r[f] || '').toLowerCase().includes(q)));
+      } else if (searchMode === 'single' && singleTargetVal.trim()) {
+        const q = singleTargetVal.trim().toLowerCase();
+        filtered = filtered.filter(r => String(r[singleTargetKey] || '').toLowerCase().includes(q));
+      } else if (searchMode === 'multi') {
+        const activeEntries = Object.entries(multiFilters).filter(([k, v]) => v && v.trim() !== '');
+        if (activeEntries.length > 0) {
+          filtered = filtered.filter(row => {
+            const logicTest = ([field, q]) => String(row[field] || '').toLowerCase().includes(q.trim().toLowerCase());
+            return multiLogic === 'AND' ? activeEntries.every(logicTest) : activeEntries.some(logicTest);
+          });
+        }
+      }
+
+      window.appState.filteredRecords = filtered;
+      window.appState.currentPage = 1;
+      renderTable();
+      document.getElementById('stat-locations').textContent = `${window.appState.locations.size} / 17`;
+      document.getElementById('stat-rows').textContent = window.appState.records.length.toLocaleString();
+      document.getElementById('stat-matches').textContent = window.appState.filteredRecords.length.toLocaleString();
+      document.getElementById('export-count').textContent = window.appState.filteredRecords.length.toLocaleString();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('table-body');
+      const { currentPage, pageSize, filteredRecords } = window.appState;
+      const start = (currentPage - 1) * pageSize;
+      const pageSlice = filteredRecords.slice(start, start + pageSize);
+
+      if (filteredRecords.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="16" class="py-14 text-center text-slate-400">No matching records found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = pageSlice.map((r, idx) => `
+        <tr class="hover:bg-sky-50/50 cursor-pointer">
+          <td class="py-2 px-3 text-center text-slate-400 text-[11px]">${start + idx + 1}</td>
+          <td class="py-2 px-3 text-[11px] font-semibold text-sky-800">${r._location}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r['Department'] || '-'}</td>
+          <td class="py-2 px-3 font-mono font-bold">${r['Journal Entry'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-sky-700 font-semibold">${r['Invoice Number'] || '-'}</td>
+          <td class="py-2 px-3 truncate max-w-[160px]">${r['Originating Master Name'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r['TRX Date'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-gp-700 text-[11px]">${r['Account Number'] || '-'}</td>
+          <td class="py-2 px-3 truncate max-w-[180px]">${r['Account Description'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-right">${r['Debit Amount'] ? '$'+parseFloat(r['Debit Amount']).toFixed(2) : '-'}</td>
+          <td class="py-2 px-3 font-mono text-right">${r['Credit Amount'] ? '$'+parseFloat(r['Credit Amount']).toFixed(2) : '-'}</td>
+          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Reference'] || '-'}</td>
+          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Description'] || '-'}</td>
+          <td class="py-2 px-3 text-[10px] text-slate-500">${r['Originating TRX Source'] || '-'}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r['User Who Posted'] || '-'}</td>
+          <td class="py-2 px-3 text-center"><button class="p-1 text-slate-400"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button></td>
+        </tr>`).join('');
+      lucide.createIcons();
+    }
+
+    document.getElementById('global-search-input').addEventListener('input', (e) => {
+      window.appState.omniQuery = e.target.value;
+      if (e.target.value.trim().length > 2) logUserActivity('SEARCH', `Global Query: "${e.target.value.trim()}"`);
+      setTimeout(executeSearch, 300);
+    });
+
+    document.getElementById('btn-export-results').addEventListener('click', () => {
+      if(window.appState.filteredRecords.length === 0) return alert('No records to export');
+      logUserActivity('EXPORT_CSV', `Exported ${window.appState.filteredRecords.length} records`);
+      const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
+        const out = { 'Entity': r._location };
+        window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
+        return out;
+      }));
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `GP_Ledger_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    });
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>
