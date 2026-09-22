@@ -648,7 +648,7 @@
       {
         id: "gp-ledger",
         title: "Power GP Historical Ledger",
-        version: "v3.1",
+        version: "v3.2",
         description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
         icon: "database"
       },
@@ -728,7 +728,7 @@
       systemLogs: []
     };
 
-    // Real-Time Firebase Logging Tracker Function
+    // Real-Time Firebase Logging Tracker Function (INCLUDES DEV & ADMIN ACTIONS)
     function logUserActivity(eventType, details) {
       if (!window.appState.user) return;
       
@@ -750,6 +750,9 @@
       }
 
       window.appState.systemLogs.unshift(logPayload);
+      if (document.getElementById('log-app-screen').classList.contains('flex')) {
+        renderSystemLogDashboard();
+      }
     }
 
     // Navigation Router
@@ -768,7 +771,7 @@
       lucide.createIcons();
     }
 
-    // Permission Check Helper (STRICT DEFAULT TO SEARCH ENGINE ONLY FOR NON-ADMINS)
+    // Permission Check Helper
     function getUserPermissions(email) {
       if (!email) return [];
       const emailLower = email.toLowerCase();
@@ -782,7 +785,7 @@
       localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
     }
 
-    // Render Portal Apps Grid (STRICTLY HIDES DEV-ONLY CARDS FROM OTHER USERS)
+    // Render Portal Apps Grid
     function renderAppPortal() {
       const user = window.appState.user;
       if (!user) return;
@@ -805,7 +808,7 @@
         devBtn.classList.remove('flex');
       }
 
-      // Filter out devOnly apps for standard users so they do not see the System Logs tile at all
+      // Hide dev-only cards from non-dev users
       const visibleApps = window.AVAILABLE_APPS.filter(app => {
         if (app.devOnly && !isDevUser) return false;
         return true;
@@ -849,7 +852,7 @@
     }
 
     window.launchApp = (appId) => {
-      logUserActivity('APP_LAUNCH', `Launched ${appId} application`);
+      logUserActivity('APP_LAUNCH', `Launched ${appId} module`);
       if (appId === 'gp-ledger') showScreen('app-screen');
       else if (appId === 'system-logs') {
         if (window.appState.user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
@@ -858,7 +861,7 @@
       } else alert('App module starting initialization...');
     };
 
-    // System Logs Admin Dashboard Renderer
+    // System Logs Admin Dashboard Renderer (HIGHLIGHTS DEV PROFILE PROMINENTLY)
     function renderSystemLogDashboard() {
       const container = document.getElementById('user-log-profiles-container');
       const searchQuery = (document.getElementById('log-search-input').value || '').toLowerCase();
@@ -892,6 +895,7 @@
 
       container.innerHTML = userEmailKeys.map((email, idx) => {
         const prof = userProfiles[email];
+        const isDev = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
         const filteredUserLogs = prof.logs.filter(l => 
           !searchQuery || 
           l.type.toLowerCase().includes(searchQuery) || 
@@ -901,24 +905,29 @@
         if (searchQuery && filteredUserLogs.length === 0) return '';
 
         return `
-          <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-            <div onclick="window.toggleUserLogAccordion('${idx}')" class="px-5 py-4 bg-slate-50 hover:bg-sky-50/50 cursor-pointer flex items-center justify-between border-b border-slate-200 transition">
+          <div class="bg-white border ${isDev ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'} rounded-xl shadow-sm overflow-hidden">
+            <!-- User Profile Header Accordion Toggle -->
+            <div onclick="window.toggleUserLogAccordion('${idx}')" class="px-5 py-4 ${isDev ? 'bg-amber-50/60 hover:bg-amber-100/50' : 'bg-slate-50 hover:bg-sky-50/50'} cursor-pointer flex items-center justify-between border-b border-slate-200 transition">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold font-mono text-xs">
+                <div class="w-10 h-10 rounded-full ${isDev ? 'bg-amber-600 text-white' : 'bg-slate-800 text-white'} flex items-center justify-center font-bold font-mono text-xs shadow-sm">
                   ${email.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <h3 class="text-xs sm:text-sm font-bold text-slate-900 font-mono">${email}</h3>
-                  <p class="text-[11px] text-slate-400">Last Session Active: ${prof.lastActive}</p>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-xs sm:text-sm font-bold text-slate-900 font-mono">${email}</h3>
+                    ${isDev ? `<span class="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-sans text-[10px] font-bold">Admin / Dev Profile</span>` : ''}
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-0.5">Last Active: ${prof.lastActive}</p>
                 </div>
               </div>
 
               <div class="flex items-center gap-3">
-                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">${filteredUserLogs.length} Actions Recorded</span>
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${isDev ? 'bg-amber-200 text-amber-900' : 'bg-sky-100 text-sky-800'}">${filteredUserLogs.length} Actions Recorded</span>
                 <i id="accordion-icon-${idx}" data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform"></i>
               </div>
             </div>
 
+            <!-- User Activity Dropdown Timeline -->
             <div id="accordion-body-${idx}" class="p-5 border-t border-slate-100 space-y-3 bg-white">
               <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">User Session Log Timeline</h4>
               
@@ -930,6 +939,7 @@
                   if (l.type === 'SEARCH') badgeStyle = "bg-sky-100 text-sky-800";
                   if (l.type === 'PULL_LEDGERS') badgeStyle = "bg-purple-100 text-purple-800";
                   if (l.type === 'PASSWORD_CHANGE') badgeStyle = "bg-amber-100 text-amber-800";
+                  if (l.type.startsWith('DEV_')) badgeStyle = "bg-amber-200 text-amber-900 font-bold";
 
                   return `
                     <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
@@ -967,6 +977,7 @@
     document.getElementById('log-search-input').addEventListener('input', renderSystemLogDashboard);
     document.getElementById('btn-clear-system-logs').addEventListener('click', () => {
       if (confirm('Clear all logged system activity events?')) {
+        logUserActivity('CLEAR_LOGS', 'Cleared all activity log history');
         try { remove(dbRef(database, 'system_activity_logs')); } catch (e) {}
         window.appState.systemLogs = [];
         renderSystemLogDashboard();
@@ -988,7 +999,7 @@
       console.warn("Realtime DB Subscription Notice:", e);
     }
 
-    // Auth Listener with Automated User Registration (NEW USERS DEFAULT TO SEARCH ENGINE ONLY)
+    // Auth Listener
     onAuthStateChanged(auth, (user) => {
         const pwdModal = document.getElementById('first-time-pwd-modal');
         
@@ -1000,7 +1011,6 @@
               window.REGISTERED_USERS.push(emailLower);
             }
 
-            // Strictly set new non-admin users to ONLY have permission for the search engine ("gp-ledger")
             if (!window.APP_PERMISSIONS[emailLower]) {
               window.APP_PERMISSIONS[emailLower] = emailLower === ADMIN_EMAIL.toLowerCase() 
                 ? ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"]
@@ -1037,6 +1047,7 @@
     document.getElementById('dev-calibration-btn').addEventListener('click', () => {
       if (!window.appState.user || window.appState.user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
       
+      logUserActivity('DEV_CALIBRATION_OPEN', 'Opened Dev Calibration settings modal');
       document.getElementById('diag-auth-uid').textContent = window.appState.user.uid;
       renderPermissionsTable();
       
@@ -1091,6 +1102,7 @@
       } else {
         window.APP_PERMISSIONS[email] = window.APP_PERMISSIONS[email].filter(a => a !== appId);
       }
+      logUserActivity('DEV_PERM_CHANGE', `${isChecked ? 'Granted' : 'Revoked'} ${appId} access for ${email}`);
       syncUserStores();
       renderAppPortal();
     };
@@ -1104,6 +1116,7 @@
       if (!window.REGISTERED_USERS.includes(email)) window.REGISTERED_USERS.push(email);
       if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = ["gp-ledger"];
 
+      logUserActivity('DEV_REGISTER_USER', `Pre-registered account: ${email}`);
       syncUserStores();
       emailInput.value = '';
       renderPermissionsTable();
@@ -1113,12 +1126,14 @@
     window.removeRegisteredUser = (email) => {
       window.REGISTERED_USERS = window.REGISTERED_USERS.filter(e => e.toLowerCase() !== email.toLowerCase());
       delete window.APP_PERMISSIONS[email.toLowerCase()];
+      logUserActivity('DEV_REMOVE_USER', `Revoked registered user profile: ${email}`);
       syncUserStores();
       renderPermissionsTable();
       renderAppPortal();
     };
 
     document.getElementById('btn-save-dev-settings').addEventListener('click', () => {
+      logUserActivity('DEV_SETTINGS_SAVED', 'Saved dev calibration configuration');
       syncUserStores();
       document.getElementById('dev-calibration-modal').classList.add('hidden');
       document.getElementById('dev-calibration-modal').classList.remove('flex');
