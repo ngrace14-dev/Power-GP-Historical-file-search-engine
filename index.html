@@ -156,7 +156,7 @@
     </main>
   </div>
 
-  <!-- 4. SYSTEM AUDIT & LIVE USER SESSION LOG APP (DEV / ADMIN ONLY) -->
+  <!-- 4. SYSTEM AUDIT & LIVE USER SESSION LOG APP (DEV ONLY) -->
   <div id="log-app-screen" class="hidden flex-col min-h-screen">
     <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -297,10 +297,9 @@
               <thead class="bg-slate-100 font-semibold border-b border-slate-200 text-slate-700">
                 <tr>
                   <th class="p-2.5">Registered Account Email</th>
-                  <th class="p-2.5 text-center w-24">Power GP</th>
+                  <th class="p-2.5 text-center w-28">Power GP Search</th>
                   <th class="p-2.5 text-center w-24">Financials</th>
                   <th class="p-2.5 text-center w-24">Asset Tracker</th>
-                  <th class="p-2.5 text-center w-24">System Logs</th>
                   <th class="p-2.5 text-right w-16">Action</th>
                 </tr>
               </thead>
@@ -617,7 +616,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, updatePassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-    import { getDatabase, ref as dbRef, push, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref as dbRef, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const ADMIN_EMAIL = "nicholas.grace@rredco.com";
 
@@ -642,15 +641,14 @@
 
     // Role-Based Access Control Registry
     window.APP_PERMISSIONS = JSON.parse(localStorage.getItem('rredco_permissions') || JSON.stringify({
-      "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"],
-      "*": ["gp-ledger"]
+      "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"]
     }));
 
     window.AVAILABLE_APPS = [
       {
         id: "gp-ledger",
         title: "Power GP Historical Ledger",
-        version: "v2.9",
+        version: "v3.1",
         description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
         icon: "database"
       },
@@ -745,14 +743,12 @@
       };
 
       try {
-        // Push directly to Firebase Realtime DB
         const logsRef = dbRef(database, 'system_activity_logs');
         push(logsRef, logPayload);
       } catch (err) {
         console.warn("Local log cache fallback:", err);
       }
 
-      // Synchronize in local array for immediate rendering
       window.appState.systemLogs.unshift(logPayload);
     }
 
@@ -772,12 +768,12 @@
       lucide.createIcons();
     }
 
-    // Permission Check Helper
+    // Permission Check Helper (STRICT DEFAULT TO SEARCH ENGINE ONLY FOR NON-ADMINS)
     function getUserPermissions(email) {
       if (!email) return [];
       const emailLower = email.toLowerCase();
       if (emailLower === ADMIN_EMAIL.toLowerCase()) return ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"];
-      return window.APP_PERMISSIONS[emailLower] || window.APP_PERMISSIONS["*"] || ["gp-ledger"];
+      return window.APP_PERMISSIONS[emailLower] || ["gp-ledger"];
     }
 
     // Save Users and Permissions
@@ -786,7 +782,7 @@
       localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
     }
 
-    // Render Portal Apps Grid
+    // Render Portal Apps Grid (STRICTLY HIDES DEV-ONLY CARDS FROM OTHER USERS)
     function renderAppPortal() {
       const user = window.appState.user;
       if (!user) return;
@@ -795,8 +791,9 @@
       const grid = document.getElementById('apps-grid-container');
       const badge = document.getElementById('access-level-badge');
       const devBtn = document.getElementById('dev-calibration-btn');
+      const isDevUser = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
-      if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      if (isDevUser) {
         badge.innerHTML = `<i data-lucide="shield-check" class="w-3.5 h-3.5 inline mr-1 text-amber-600"></i> Admin / Calibration Lead`;
         badge.className = "px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300";
         devBtn.classList.remove('hidden');
@@ -808,9 +805,14 @@
         devBtn.classList.remove('flex');
       }
 
-      grid.innerHTML = window.AVAILABLE_APPS.map(app => {
-        const isDevRestricted = app.devOnly && user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase();
-        const hasAccess = userPerms.includes(app.id) && !isDevRestricted;
+      // Filter out devOnly apps for standard users so they do not see the System Logs tile at all
+      const visibleApps = window.AVAILABLE_APPS.filter(app => {
+        if (app.devOnly && !isDevUser) return false;
+        return true;
+      });
+
+      grid.innerHTML = visibleApps.map(app => {
+        const hasAccess = userPerms.includes(app.id);
 
         return `
           <div class="bg-white border ${hasAccess ? 'border-slate-200 hover:shadow-md' : 'border-slate-200 opacity-60 bg-slate-50/50'} rounded-2xl p-6 shadow-sm transition flex flex-col justify-between group">
@@ -850,6 +852,7 @@
       logUserActivity('APP_LAUNCH', `Launched ${appId} application`);
       if (appId === 'gp-ledger') showScreen('app-screen');
       else if (appId === 'system-logs') {
+        if (window.appState.user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
         document.getElementById('logUserEmail').textContent = window.appState.user.email;
         showScreen('log-app-screen');
       } else alert('App module starting initialization...');
@@ -863,7 +866,6 @@
       const logs = window.appState.systemLogs;
       document.getElementById('stat-log-events').textContent = `${logs.length} Events`;
 
-      // Group logs by User Email
       const userProfiles = {};
       logs.forEach(log => {
         const email = log.email || 'unknown@rredco.com';
@@ -900,7 +902,6 @@
 
         return `
           <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-            <!-- User Profile Header Accordion Toggle -->
             <div onclick="window.toggleUserLogAccordion('${idx}')" class="px-5 py-4 bg-slate-50 hover:bg-sky-50/50 cursor-pointer flex items-center justify-between border-b border-slate-200 transition">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold font-mono text-xs">
@@ -918,7 +919,6 @@
               </div>
             </div>
 
-            <!-- User Activity Dropdown Timeline -->
             <div id="accordion-body-${idx}" class="p-5 border-t border-slate-100 space-y-3 bg-white">
               <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">User Session Log Timeline</h4>
               
@@ -988,7 +988,7 @@
       console.warn("Realtime DB Subscription Notice:", e);
     }
 
-    // Auth Listener with Automated User Registration
+    // Auth Listener with Automated User Registration (NEW USERS DEFAULT TO SEARCH ENGINE ONLY)
     onAuthStateChanged(auth, (user) => {
         const pwdModal = document.getElementById('first-time-pwd-modal');
         
@@ -999,8 +999,12 @@
             if (!window.REGISTERED_USERS.includes(emailLower)) {
               window.REGISTERED_USERS.push(emailLower);
             }
+
+            // Strictly set new non-admin users to ONLY have permission for the search engine ("gp-ledger")
             if (!window.APP_PERMISSIONS[emailLower]) {
-              window.APP_PERMISSIONS[emailLower] = ["gp-ledger"];
+              window.APP_PERMISSIONS[emailLower] = emailLower === ADMIN_EMAIL.toLowerCase() 
+                ? ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"]
+                : ["gp-ledger"];
             }
             syncUserStores();
 
@@ -1070,9 +1074,6 @@
             <td class="p-2.5 text-center">
               <input type="checkbox" ${isAdmin || userPerms.includes('asset-tracker') ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${emailLower}', 'asset-tracker', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4">
             </td>
-            <td class="p-2.5 text-center">
-              <input type="checkbox" ${isAdmin || userPerms.includes('system-logs') ? 'checked' : ''} ${isAdmin ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${emailLower}', 'system-logs', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4">
-            </td>
             <td class="p-2.5 text-right font-sans">
               ${isAdmin ? `<span class="text-[10px] text-slate-400">Owner</span>` : 
                 `<button onclick="window.removeRegisteredUser('${emailLower}')" class="text-rose-600 hover:text-rose-800 font-semibold text-[11px]">Remove</button>`
@@ -1084,7 +1085,7 @@
     }
 
     window.toggleUserAppPerm = (email, appId, isChecked) => {
-      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = [];
+      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = ["gp-ledger"];
       if (isChecked) {
         if (!window.APP_PERMISSIONS[email].includes(appId)) window.APP_PERMISSIONS[email].push(appId);
       } else {
