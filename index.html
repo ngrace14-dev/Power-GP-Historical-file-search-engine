@@ -50,258 +50,267 @@
   </style>
 </head>
 
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
 
-  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <!-- Custom Company Logo -->
-        <div class="h-10 px-3 rounded-lg bg-white flex items-center justify-center shadow-md">
-          <img src="RREDCO_Logo.png" alt="RREDCO Logo" class="h-7 w-auto object-contain">
-        </div>
-        
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Power GP Online</h1>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-gp-700/80 text-sky-200 border border-gp-500/30 font-medium">Read-Only Search Terminal</span>
-          </div>
-          <p class="text-xs text-slate-400">Targeted & Multi-Field Search for Dynamics GP General Ledger exports</p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2 sm:gap-3">
-        <div id="authContainer" class="flex items-center gap-3">
-            <button id="loginBtn" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-white transition shadow-sm border border-slate-600">
-                Sign In
-            </button>
-            <div id="userInfo" class="hidden flex items-center gap-3">
-                <span id="userEmail" class="text-xs text-slate-300"></span>
-                <button id="logoutBtn" class="text-rose-400 hover:text-rose-300" title="Sign Out">
-                    <i data-lucide="log-out" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </div>
-        
-        <button id="btn-pull-cloud" class="hidden inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
-          <i data-lucide="cloud-download" class="w-4 h-4"></i>
-          Pull Ledgers From Cloud
-        </button>
-
-        <button id="btn-export-results" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gp-600 hover:bg-gp-500 text-white transition shadow-sm">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          Export (<span id="export-count">0</span>)
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
-
-    <!-- Quick Metrics -->
-    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-      <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Cloud Repository Status</h3>
-        <span id="sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">In-Memory Active</span>
-      </div>
+  <!-- 1. FULL SCREEN LOGIN GATE -->
+  <div id="login-screen" class="flex flex-col items-center justify-center min-h-screen bg-slate-900 p-4">
+    <div class="bg-white p-10 rounded-2xl shadow-2xl max-w-md w-full text-center border border-slate-200">
+      <img src="RREDCO_Logo.png" alt="RREDCO Logo" class="h-20 mx-auto mb-6 object-contain">
+      <h2 class="text-2xl font-bold text-slate-800 mb-2">Power GP Online</h2>
+      <p class="text-sm text-slate-500 mb-8">Secure Read-Only Historical General Ledger Search Engine</p>
       
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-          <span class="text-xs text-slate-500 font-medium">Entities Loaded</span>
-          <p id="stat-locations" class="text-xl font-bold text-slate-900 mt-1">0 / 17</p>
+      <button id="loginBtn" class="w-full bg-gp-600 hover:bg-gp-500 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-colors shadow-md">
+        <svg class="w-5 h-5 bg-white rounded-full p-0.5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Sign in with Google
+      </button>
+      
+      <p class="text-xs text-slate-400 mt-6 mt-6">Authorized corporate accounts only.</p>
+    </div>
+  </div>
+
+  <!-- 2. MAIN APPLICATION WORKSPACE (Hidden by default) -->
+  <div id="app-screen" class="hidden flex-col min-h-screen">
+    
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="h-10 px-3 rounded-lg bg-white flex items-center justify-center shadow-md">
+            <img src="RREDCO_Logo.png" alt="RREDCO Logo" class="h-7 w-auto object-contain">
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Power GP Online</h1>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-gp-700/80 text-sky-200 border border-gp-500/30 font-medium">Read-Only Search Terminal</span>
+            </div>
+            <p class="text-xs text-slate-400">Targeted & Multi-Field Search for Dynamics GP General Ledger exports</p>
+          </div>
         </div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-          <span class="text-xs text-slate-500 font-medium">Total GL Rows</span>
-          <p id="stat-rows" class="text-xl font-bold text-slate-900 mt-1">0</p>
-        </div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-          <span class="text-xs text-slate-500 font-medium">Active Matches</span>
-          <p id="stat-matches" class="text-xl font-bold text-gp-600 mt-1">0</p>
-        </div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col justify-center">
-          <button id="btn-clear-all" class="text-rose-600 hover:text-rose-700 font-medium hover:bg-rose-50 px-3 py-2 rounded transition text-xs border border-rose-200 hidden">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5 inline mr-1"></i> Clear Local Memory
+
+        <div class="flex items-center gap-2 sm:gap-3">
+          <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+              <span id="userEmail" class="text-xs text-slate-300 font-medium"></span>
+              <button id="logoutBtn" class="text-rose-400 hover:text-rose-300 transition" title="Sign Out">
+                  <i data-lucide="log-out" class="w-4 h-4"></i>
+              </button>
+          </div>
+          
+          <button id="btn-pull-cloud" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
+            <i data-lucide="cloud-download" class="w-4 h-4"></i>
+            Pull Ledgers From Cloud
+          </button>
+
+          <button id="btn-export-results" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gp-600 hover:bg-gp-500 text-white transition shadow-sm">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            Export (<span id="export-count">0</span>)
           </button>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- Search Interfaces -->
-    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-      
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Search Mode:</span>
-          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
-            <button id="mode-omni" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition">Global Search</button>
-            <button id="mode-single" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Target One Field</button>
-            <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+      <!-- Quick Metrics -->
+      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Cloud Repository Status</h3>
+          <span id="sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">In-Memory Active</span>
+        </div>
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <span class="text-xs text-slate-500 font-medium">Entities Loaded</span>
+            <p id="stat-locations" class="text-xl font-bold text-slate-900 mt-1">0 / 17</p>
           </div>
-        </div>
-
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <label class="text-xs font-medium text-slate-600 whitespace-nowrap">Filter Location:</label>
-          <select id="filter-location-select" class="text-xs bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-gp-500 focus:border-gp-500 w-full sm:w-48">
-            <option value="">All Locations / Files</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- SECTION 1: Omni Global Search -->
-      <div id="container-omni-search" class="space-y-2">
-        <div class="relative flex flex-col sm:flex-row gap-2">
-          <div class="relative flex-1">
-            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <i data-lucide="search" class="w-4 h-4"></i>
-            </div>
-            <input type="text" id="global-search-input" placeholder='Search any field, e.g. "Contoso", JE-10492, Sales, 000-1100...' class="w-full pl-10 pr-20 py-2.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-gp-500 font-mono" />
-            <div class="absolute inset-y-0 right-0 pr-2 flex items-center">
-              <button id="btn-clear-global" class="p-1 rounded text-slate-400 hover:text-slate-600 hidden">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
+          <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <span class="text-xs text-slate-500 font-medium">Total GL Rows</span>
+            <p id="stat-rows" class="text-xl font-bold text-slate-900 mt-1">0</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <span class="text-xs text-slate-500 font-medium">Active Matches</span>
+            <p id="stat-matches" class="text-xl font-bold text-gp-600 mt-1">0</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col justify-center">
+            <button id="btn-clear-all" class="text-rose-600 hover:text-rose-700 font-medium hover:bg-rose-50 px-3 py-2 rounded transition text-xs border border-rose-200 hidden">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5 inline mr-1"></i> Clear Local Memory
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- SECTION 2: Single Targeted Field Search -->
-      <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-bold text-slate-700">Target Exactly One Field</span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div class="sm:col-span-4">
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Field</label>
-            <select id="single-field-target-key" class="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-medium">
-              <option value="Department">Department</option>
-              <option value="Journal Entry">Journal Entry</option>
-              <option value="Invoice Number" selected>Invoice Number</option>
-              <option value="Originating Master Name">Originating Master Name</option>
-              <option value="TRX Date">TRX Date</option>
-              <option value="Account Number">Account Number</option>
-              <option value="Account Description">Account Description</option>
-              <option value="Debit Amount">Debit Amount</option>
-              <option value="Credit Amount">Credit Amount</option>
-              <option value="Reference">Reference</option>
-              <option value="Description">Description</option>
-              <option value="Originating TRX Source">Originating TRX Source</option>
-              <option value="User Who Posted">User Who Posted</option>
+      <!-- Search Interfaces -->
+      <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Search Mode:</span>
+            <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
+              <button id="mode-omni" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition">Global Search</button>
+              <button id="mode-single" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Target One Field</button>
+              <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <label class="text-xs font-medium text-slate-600 whitespace-nowrap">Filter Location:</label>
+            <select id="filter-location-select" class="text-xs bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-gp-500 focus:border-gp-500 w-full sm:w-48">
+              <option value="">All Locations / Files</option>
             </select>
           </div>
-          <div class="sm:col-span-8">
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Query Value</label>
-            <div class="relative">
-              <input type="text" id="single-field-target-value" placeholder="Enter exact or partial value..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
-              <button id="btn-apply-single" class="absolute right-1 top-1 bottom-1 px-3 bg-gp-600 hover:bg-gp-500 text-white rounded text-xs font-medium">Search</button>
+        </div>
+
+        <!-- SECTION 1: Omni Global Search -->
+        <div id="container-omni-search" class="space-y-2">
+          <div class="relative flex flex-col sm:flex-row gap-2">
+            <div class="relative flex-1">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="search" class="w-4 h-4"></i>
+              </div>
+              <input type="text" id="global-search-input" placeholder='Search any field, e.g. "Contoso", JE-10492, Sales, 000-1100...' class="w-full pl-10 pr-20 py-2.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-gp-500 font-mono" />
+              <div class="absolute inset-y-0 right-0 pr-2 flex items-center">
+                <button id="btn-clear-global" class="p-1 rounded text-slate-400 hover:text-slate-600 hidden">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- SECTION 2: Single Targeted Field Search -->
+        <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div class="sm:col-span-4">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Target Field</label>
+              <select id="single-field-target-key" class="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-medium">
+                <option value="Department">Department</option>
+                <option value="Journal Entry">Journal Entry</option>
+                <option value="Invoice Number" selected>Invoice Number</option>
+                <option value="Originating Master Name">Originating Master Name</option>
+                <option value="TRX Date">TRX Date</option>
+                <option value="Account Number">Account Number</option>
+                <option value="Account Description">Account Description</option>
+                <option value="Debit Amount">Debit Amount</option>
+                <option value="Credit Amount">Credit Amount</option>
+                <option value="Reference">Reference</option>
+                <option value="Description">Description</option>
+                <option value="Originating TRX Source">Originating TRX Source</option>
+                <option value="User Who Posted">User Who Posted</option>
+              </select>
+            </div>
+            <div class="sm:col-span-8">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Target Query Value</label>
+              <div class="relative">
+                <input type="text" id="single-field-target-value" placeholder="Enter exact or partial value..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+                <button id="btn-apply-single" class="absolute right-1 top-1 bottom-1 px-3 bg-gp-600 hover:bg-gp-500 text-white rounded text-xs font-medium">Search</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: Multi-Field Search Matrix -->
+        <div id="container-multi-search" class="hidden space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+            <div>
+              <span class="text-xs font-bold text-slate-800">Combinatorial Multi-Field Search Matrix</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5 text-xs text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
+                <label class="font-medium">Logic Mode:</label>
+                <label class="inline-flex items-center gap-1 cursor-pointer">
+                  <input type="radio" name="multi-logic" value="AND" checked class="text-gp-600">
+                  <span class="font-semibold text-slate-800">Match ALL (AND)</span>
+                </label>
+                <span class="text-slate-300">|</span>
+                <label class="inline-flex items-center gap-1 cursor-pointer">
+                  <input type="radio" name="multi-logic" value="OR" class="text-gp-600">
+                  <span class="font-semibold text-slate-800">Match ANY (OR)</span>
+                </label>
+              </div>
+              <button id="btn-reset-multi" class="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded bg-white hover:bg-slate-100">Reset</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs" id="multi-input-grid">
+            <!-- Populated by JS -->
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-2">
+            <button id="btn-apply-multi" class="px-4 py-2 bg-gp-600 hover:bg-gp-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5">
+              <i data-lucide="filter" class="w-3.5 h-3.5"></i> Apply Matrix Search
+            </button>
+          </div>
+        </div>
+
+        <div id="location-badges" class="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
+          <div class="text-xs text-slate-400 py-1">Click "Pull Ledgers From Cloud" to load database.</div>
+        </div>
       </div>
 
-      <!-- SECTION 3: Multi-Field Search Matrix -->
-      <div id="container-multi-search" class="hidden space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
-          <div>
-            <span class="text-xs font-bold text-slate-800">Combinatorial Multi-Field Search Matrix</span>
-          </div>
+      <!-- Data Table -->
+      <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[440px]">
+        <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1.5 text-xs text-slate-700 bg-white px-2 py-1 rounded border border-slate-200">
-              <label class="font-medium">Logic Mode:</label>
-              <label class="inline-flex items-center gap-1 cursor-pointer">
-                <input type="radio" name="multi-logic" value="AND" checked class="text-gp-600">
-                <span class="font-semibold text-slate-800">Match ALL (AND)</span>
-              </label>
-              <span class="text-slate-300">|</span>
-              <label class="inline-flex items-center gap-1 cursor-pointer">
-                <input type="radio" name="multi-logic" value="OR" class="text-gp-600">
-                <span class="font-semibold text-slate-800">Match ANY (OR)</span>
-              </label>
-            </div>
-            <button id="btn-reset-multi" class="px-2.5 py-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded bg-white hover:bg-slate-100">Reset</button>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700">General Ledger Results</span>
+            <span id="results-count-badge" class="px-2 py-0.5 text-xs font-medium bg-slate-200 text-slate-700 rounded-full">0 rows</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-500">Rows per page:</label>
+            <select id="pagination-page-size" class="text-xs bg-white border border-slate-200 rounded px-2 py-1">
+              <option value="15">15</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </select>
           </div>
         </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs" id="multi-input-grid">
-          <!-- Populated by JS -->
-        </div>
-
-        <div class="pt-2 flex items-center justify-end gap-2">
-          <button id="btn-apply-multi" class="px-4 py-2 bg-gp-600 hover:bg-gp-500 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5">
-            <i data-lucide="filter" class="w-3.5 h-3.5"></i> Apply Matrix Search
-          </button>
-        </div>
-      </div>
-
-      <div id="location-badges" class="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
-        <div class="text-xs text-slate-400 py-1">Please sign in and pull data from cloud.</div>
-      </div>
-    </div>
-
-    <!-- Data Table -->
-    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[440px]">
-      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-700">General Ledger Results</span>
-          <span id="results-count-badge" class="px-2 py-0.5 text-xs font-medium bg-slate-200 text-slate-700 rounded-full">0 rows</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <label class="text-xs text-slate-500">Rows per page:</label>
-          <select id="pagination-page-size" class="text-xs bg-white border border-slate-200 rounded px-2 py-1">
-            <option value="15">15</option>
-            <option value="50" selected>50</option>
-            <option value="100">100</option>
-            <option value="250">250</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="overflow-x-auto flex-1 relative" style="max-height: 560px;">
-        <table id="main-results-table" class="w-full text-left text-xs border-collapse whitespace-nowrap">
-          <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 backdrop-blur border-b border-slate-200 font-semibold select-none">
-            <tr id="table-header-row">
-              <th class="py-2.5 px-3 text-center w-10">#</th>
-              <th class="py-2.5 px-3">Location / Entity</th>
-              <th class="py-2.5 px-3">Department</th>
-              <th class="py-2.5 px-3">Journal Entry</th>
-              <th class="py-2.5 px-3 text-sky-700">Invoice Number</th>
-              <th class="py-2.5 px-3">Originating Master Name</th>
-              <th class="py-2.5 px-3">TRX Date</th>
-              <th class="py-2.5 px-3">Account Number</th>
-              <th class="py-2.5 px-3">Account Description</th>
-              <th class="py-2.5 px-3 text-right">Debit Amount</th>
-              <th class="py-2.5 px-3 text-right">Credit Amount</th>
-              <th class="py-2.5 px-3">Reference</th>
-              <th class="py-2.5 px-3">Description</th>
-              <th class="py-2.5 px-3">Originating TRX Source</th>
-              <th class="py-2.5 px-3">User Who Posted</th>
-              <th class="py-2.5 px-3 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
-            <tr>
-              <td colspan="16" class="py-16 text-center text-slate-400">
-                <div class="max-w-sm mx-auto flex flex-col items-center">
-                  <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-                    <i data-lucide="cloud-download" class="w-6 h-6"></i>
+        
+        <div class="overflow-x-auto flex-1 relative" style="max-height: 560px;">
+          <table id="main-results-table" class="w-full text-left text-xs border-collapse whitespace-nowrap">
+            <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 backdrop-blur border-b border-slate-200 font-semibold select-none">
+              <tr id="table-header-row">
+                <th class="py-2.5 px-3 text-center w-10">#</th>
+                <th class="py-2.5 px-3">Location / Entity</th>
+                <th class="py-2.5 px-3">Department</th>
+                <th class="py-2.5 px-3">Journal Entry</th>
+                <th class="py-2.5 px-3 text-sky-700">Invoice Number</th>
+                <th class="py-2.5 px-3">Originating Master Name</th>
+                <th class="py-2.5 px-3">TRX Date</th>
+                <th class="py-2.5 px-3">Account Number</th>
+                <th class="py-2.5 px-3">Account Description</th>
+                <th class="py-2.5 px-3 text-right">Debit Amount</th>
+                <th class="py-2.5 px-3 text-right">Credit Amount</th>
+                <th class="py-2.5 px-3">Reference</th>
+                <th class="py-2.5 px-3">Description</th>
+                <th class="py-2.5 px-3">Originating TRX Source</th>
+                <th class="py-2.5 px-3">User Who Posted</th>
+                <th class="py-2.5 px-3 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
+              <tr>
+                <td colspan="16" class="py-16 text-center text-slate-400">
+                  <div class="max-w-sm mx-auto flex flex-col items-center">
+                    <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                      <i data-lucide="cloud-download" class="w-6 h-6"></i>
+                    </div>
+                    <p class="font-medium text-slate-700 text-sm">No Database Records Loaded</p>
+                    <p class="text-xs text-slate-400 mt-1">Click "Pull Ledgers From Cloud" to download and parse files from Storage.</p>
                   </div>
-                  <p class="font-medium text-slate-700 text-sm">No Database Records Loaded</p>
-                  <p class="text-xs text-slate-400 mt-1">Authenticate and pull master GP files from Cloud Storage.</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
-        <div id="pagination-info">Showing 0 to 0 of 0 entries</div>
-        <div class="flex items-center gap-1.5" id="pagination-controls">
-          <button id="btn-prev-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100 disabled:opacity-40">Previous</button>
-          <span id="pagination-current-page" class="font-medium px-2 text-slate-700">1</span>
-          <button id="btn-next-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100 disabled:opacity-40">Next</button>
+        <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+          <div id="pagination-info">Showing 0 to 0 of 0 entries</div>
+          <div class="flex items-center gap-1.5" id="pagination-controls">
+            <button id="btn-prev-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100 disabled:opacity-40">Previous</button>
+            <span id="pagination-current-page" class="font-medium px-2 text-slate-700">1</span>
+            <button id="btn-next-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100 disabled:opacity-40">Next</button>
+          </div>
         </div>
       </div>
-    </div>
-  </main>
+    </main>
+  </div>
 
   <!-- Record Inspector Modal -->
   <div id="detail-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
@@ -406,24 +415,29 @@
         </div>`;
     });
 
-    // Auth Listeners
+    // Auth Listeners & Gatekeeping Logic
     onAuthStateChanged(auth, (user) => {
-        const loginBtn = document.getElementById('loginBtn');
-        const userInfo = document.getElementById('userInfo');
-        const pullBtn = document.getElementById('btn-pull-cloud');
+        const loginScreen = document.getElementById('login-screen');
+        const appScreen = document.getElementById('app-screen');
         
         if (user) {
             window.appState.user = user;
-            loginBtn.classList.add('hidden');
-            userInfo.classList.remove('hidden');
-            pullBtn.classList.remove('hidden');
             document.getElementById('userEmail').textContent = user.email;
+            
+            // Hide Login Gate, Show Main App
+            loginScreen.classList.add('hidden');
+            loginScreen.classList.remove('flex');
+            appScreen.classList.remove('hidden');
+            appScreen.classList.add('flex');
         } else {
             window.appState.user = null;
-            loginBtn.classList.remove('hidden');
-            userInfo.classList.add('hidden');
-            pullBtn.classList.add('hidden');
             clearMemory();
+            
+            // Show Login Gate, Hide Main App
+            appScreen.classList.add('hidden');
+            appScreen.classList.remove('flex');
+            loginScreen.classList.remove('hidden');
+            loginScreen.classList.add('flex');
         }
     });
 
@@ -432,7 +446,7 @@
 
     // Storage Pull Logic (Excel .xlsx -> JSON mapping)
     document.getElementById('btn-pull-cloud').addEventListener('click', async () => {
-        if (!window.appState.user) return alert("Please sign in.");
+        if (!window.appState.user) return;
         const btn = document.getElementById('btn-pull-cloud');
         btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Downloading...`;
         lucide.createIcons();
