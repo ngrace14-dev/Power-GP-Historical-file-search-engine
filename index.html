@@ -1,41 +1,300 @@
-rules_version = '2';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power GP Ledger Search</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 
-service firebase.storage {
-  match /b/{bucket}/o {
+    <script>
+        // 1. Initialize global state immediately to prevent undefined errors
+        window.appState = {
+            cloudConnected: false,
+            user: null,
+            ledgerData: []
+        };
 
-    // Helper function checking whether user is an authorized RREDCO manager
-    function isAuthorizedManager() {
-      return request.auth != null && (
-        request.auth.token.email == 'nicholas.grace@rredco.com' ||
-        request.auth.token.email == 'accounting@rredco.com' ||
-        request.auth.token.email.matches('.*@rredco[.]com$')
-      );
-    }
+        // 2. Define UI icon helper before any other scripts run
+        window.safeRenderIcons = function() {
+            try {
+                // Ensure icons render correctly on dynamic updates
+                if (window.FontAwesome) {
+                    window.FontAwesome.dom.i2svg();
+                }
+            } catch (e) {
+                console.warn("Icon rendering skipped:", e);
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
 
-    // Helper verifying user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
+    <!-- Top Navigation -->
+    <header class="bg-slate-800 text-white p-4 shadow-md flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-bold"><i class="fa-solid fa-book-open mr-2"></i> Power GP Historical Ledger</h1>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+            <!-- Pull Action (Read Only) -->
+            <button id="pullBtn" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm font-medium transition hidden">
+                <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Pull From Cloud
+            </button>
+            
+            <div id="authContainer" class="text-sm">
+                <button id="loginBtn" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded transition">Sign In</button>
+                <div id="userInfo" class="hidden flex items-center space-x-3">
+                    <span id="userEmail" class="text-gray-300"></span>
+                    <button id="logoutBtn" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
+            </div>
+        </div>
+    </header>
 
-    // Dedicated rule for Power GP Excel & CSV Ledger exports in "RREDCO Power GP" and "master_csvs"
-    // Using {folder} wildcard because literal path match segments cannot contain spaces
-    match /{folder}/{allPaths=**} {
-      // Managers can read the data to populate the search engine
-      allow read: if isAuthorizedManager() && (folder == 'RREDCO Power GP' || folder == 'master_csvs');
-      
-      // Completely disable writes from the web application to protect master files
-      allow write: if false;
-    }
+    <!-- Main Content -->
+    <main class="flex-grow p-6">
+        
+        <!-- Controls & Filters -->
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-wrap gap-4 items-center justify-between">
+            <div class="flex items-center space-x-4 flex-grow max-w-2xl">
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-magnifying-glass text-gray-400"></i>
+                    </div>
+                    <input type="text" id="searchInput" placeholder="Search accounts, journal entries, or descriptions..." class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                </div>
+                <select id="entityFilter" class="block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
+                    <option value="ALL">All Entities</option>
+                    <option value="POMCO">POMCO</option>
+                    <option value="RREDCO">RREDCO</option>
+                    <option value="RRCSCO">RRCSCO</option>
+                    <option value="WRGCC">WRGCC</option>
+                </select>
+            </div>
+            
+            <div class="flex space-x-2">
+                <button id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium transition">
+                    <i class="fa-solid fa-file-csv mr-1"></i> Export CSV
+                </button>
+            </div>
+        </div>
 
-    // General assets, invoices, promo receipts, and PDF documentation
-    match /{allPaths=**} {
-      // Authenticated users can read non-restricted bucket assets
-      allow read: if isAuthenticated();
+        <!-- Data Table -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto max-h-[70vh]">
+                <table class="min-w-full divide-y divide-gray-200 relative">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trx Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Journal Entry</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Number</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Debit</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Credit</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                <i class="fa-solid fa-cloud-arrow-down text-4xl mb-3 text-gray-300 block"></i>
+                                Click "Pull From Cloud" to load General Ledger data.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
 
-      // Authenticated users can upload receipts, photos, and PDFs up to 10MB
-      allow write: if isAuthenticated()
-        && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*|application/pdf');
-    }
-  }
-}
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+        // REPLACE THIS WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "rredco-database.firebaseapp.com",
+            projectId: "rredco-database",
+            storageBucket: "rredco-database.firebasestorage.app",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // UI Elements
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const pullBtn = document.getElementById('pullBtn');
+        const userInfo = document.getElementById('userInfo');
+        const userEmail = document.getElementById('userEmail');
+        const searchInput = document.getElementById('searchInput');
+        const tableBody = document.getElementById('tableBody');
+
+        // Auth Listeners
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.appState.user = user;
+                loginBtn.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                pullBtn.classList.remove('hidden');
+                userEmail.textContent = user.email;
+            } else {
+                window.appState.user = null;
+                loginBtn.classList.remove('hidden');
+                userInfo.classList.add('hidden');
+                pullBtn.classList.add('hidden');
+                tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center">Please sign in to view ledger data.</td></tr>';
+            }
+        });
+
+        loginBtn.addEventListener('click', () => {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider).catch(error => alert('Login failed: ' + error.message));
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth);
+            window.appState.ledgerData = [];
+        });
+
+        // Pull Data from Storage
+        pullBtn.addEventListener('click', async () => {
+            if (!window.appState.user) return alert("Please sign in first.");
+            
+            pullBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Pulling...';
+            tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-gray-500"><i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i><br>Downloading and parsing files from cloud...</td></tr>';
+            window.appState.ledgerData = [];
+
+            try {
+                const folderRef = ref(storage, 'RREDCO Power GP');
+                const result = await listAll(folderRef);
+                
+                for (const itemRef of result.items) {
+                    if (itemRef.name.endsWith('.xlsx')) {
+                        const url = await getDownloadURL(itemRef);
+                        await parseExcelFromUrl(url, itemRef.name);
+                    }
+                }
+                
+                renderTable();
+                
+            } catch (error) {
+                console.error("Storage pull error:", error);
+                alert("Failed to pull data. Ensure CORS is configured and rules are published.");
+                tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Error loading data. See console.</td></tr>';
+            } finally {
+                pullBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down mr-1"></i> Pull From Cloud';
+            }
+        });
+
+        // Parse GP Excel Files bypassing Title rows
+        async function parseExcelFromUrl(url, filename) {
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                // Find actual header row (usually contains "Journal Entry" or "Account")
+                let headerRowIndex = 0;
+                for (let i = 0; i < Math.min(15, jsonData.length); i++) {
+                    const rowStr = (jsonData[i] || []).join(' ').toLowerCase();
+                    if (rowStr.includes('account') || rowStr.includes('journal entry')) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+
+                const headers = jsonData[headerRowIndex];
+                
+                // Map data rows
+                for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (!row || row.length === 0 || !row[0]) continue;
+                    
+                    // Simple entity extraction from filename (e.g., "POMCO GL Detail..." -> "POMCO")
+                    const entity = filename.split(' ')[0]; 
+
+                    // Map columns (adjust indexes based on your exact Excel layout)
+                    window.appState.ledgerData.push({
+                        entity: entity,
+                        trxDate: row[0] || '', // Adjust based on your GP export
+                        journalEntry: row[1] || '',
+                        accountNumber: row[2] || '',
+                        description: row[3] || '',
+                        debit: parseFloat(row[4]) || 0,
+                        credit: parseFloat(row[5]) || 0
+                    });
+                }
+            } catch (err) {
+                console.error("Error parsing " + filename, err);
+            }
+        }
+
+        // Render Table logic
+        function renderTable() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filterEntity = document.getElementById('entityFilter').value;
+            
+            const filtered = window.appState.ledgerData.filter(row => {
+                const matchesSearch = Object.values(row).join(' ').toLowerCase().includes(searchTerm);
+                const matchesEntity = filterEntity === 'ALL' || row.entity === filterEntity;
+                return matchesSearch && matchesEntity;
+            });
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No records found.</td></tr>';
+                return;
+            }
+
+            // Render first 500 rows to prevent browser freeze
+            tableBody.innerHTML = filtered.slice(0, 500).map(row => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-2 text-sm text-gray-900">${row.entity}</td>
+                    <td class="px-6 py-2 text-sm text-gray-500">${row.trxDate}</td>
+                    <td class="px-6 py-2 text-sm text-gray-500">${row.journalEntry}</td>
+                    <td class="px-6 py-2 text-sm font-medium text-blue-600">${row.accountNumber}</td>
+                    <td class="px-6 py-2 text-sm text-gray-500 truncate max-w-xs">${row.description}</td>
+                    <td class="px-6 py-2 text-sm text-gray-900 text-right">${row.debit > 0 ? '$' + row.debit.toFixed(2) : '-'}</td>
+                    <td class="px-6 py-2 text-sm text-gray-900 text-right">${row.credit > 0 ? '$' + row.credit.toFixed(2) : '-'}</td>
+                </tr>
+            `).join('');
+            window.safeRenderIcons();
+        }
+
+        searchInput.addEventListener('input', renderTable);
+        document.getElementById('entityFilter').addEventListener('change', renderTable);
+
+        // CSV Export
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
+            if (window.appState.ledgerData.length === 0) return alert("No data to export.");
+            const csv = Papa.unparse(window.appState.ledgerData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "ledger_export.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
+</body>
+</html>
