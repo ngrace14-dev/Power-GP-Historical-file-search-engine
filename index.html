@@ -122,96 +122,113 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
-          <span id="portalUserEmail" class="text-xs text-slate-300 font-medium"></span>
-          <button id="portalLogoutBtn" class="text-rose-400 hover:text-rose-300 transition" title="Sign Out">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
+        <div class="flex items-center gap-3">
+          <!-- DEV CALIBRATION BUTTON (Only rendered for nicholas.grace@rredco.com) -->
+          <button id="dev-calibration-btn" class="hidden px-3 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold items-center gap-1.5 transition">
+            <i data-lucide="sliders" class="w-3.5 h-3.5"></i> Dev Calibration
           </button>
+
+          <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+            <span id="portalUserEmail" class="text-xs text-slate-300 font-medium"></span>
+            <button id="portalLogoutBtn" class="text-rose-400 hover:text-rose-300 transition" title="Sign Out">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
         </div>
       </div>
     </header>
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div class="mb-8">
-        <h2 class="text-2xl font-bold text-slate-900">Application Workspace</h2>
-        <p class="text-sm text-slate-500 mt-1">Select an authorized application to launch.</p>
+      <div class="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Application Workspace</h2>
+          <p class="text-sm text-slate-500 mt-1">Select an authorized application to launch.</p>
+        </div>
+        <div id="access-level-badge" class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-200 text-slate-700 self-start sm:self-auto">
+          Checking Permissions...
+        </div>
       </div>
 
-      <!-- APPS GRID -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        <!-- App 1: Power GP Search Terminal -->
-        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between group">
-          <div>
-            <div class="flex items-center justify-between mb-4">
-              <div class="w-12 h-12 rounded-xl bg-gp-600 text-white flex items-center justify-center shadow-md shadow-gp-600/30">
-                <i data-lucide="database" class="w-6 h-6"></i>
-              </div>
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">Active</span>
-            </div>
-            <h3 class="text-lg font-bold text-slate-900 group-hover:text-gp-600 transition">Power GP Historical Ledger</h3>
-            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
-              Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.
-            </p>
-          </div>
-
-          <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span class="text-[11px] font-mono text-slate-400">v2.6 • Read-Only</span>
-            <button id="launch-gp-app" class="px-4 py-2 rounded-lg bg-gp-600 hover:bg-gp-500 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
-              Launch App <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </button>
-          </div>
-        </div>
-
-        <!-- App 2: Placeholder -->
-        <div class="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-6 flex flex-col justify-between opacity-75">
-          <div>
-            <div class="flex items-center justify-between mb-4">
-              <div class="w-12 h-12 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center">
-                <i data-lucide="line-chart" class="w-6 h-6"></i>
-              </div>
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 uppercase tracking-wider">Coming Soon</span>
-            </div>
-            <h3 class="text-lg font-bold text-slate-700">Financial Reporting Suite</h3>
-            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-              Consolidated balance sheets, executive income statements, and entity trial balance reports.
-            </p>
-          </div>
-
-          <div class="mt-6 pt-4 border-t border-slate-200/60 flex items-center justify-between text-slate-400 text-xs">
-            <span class="text-[11px] font-mono">Planned App</span>
-            <span class="italic text-[11px]">In Development</span>
-          </div>
-        </div>
-
-        <!-- App 3: Placeholder -->
-        <div class="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-6 flex flex-col justify-between opacity-75">
-          <div>
-            <div class="flex items-center justify-between mb-4">
-              <div class="w-12 h-12 rounded-xl bg-slate-200 text-slate-500 flex items-center justify-center">
-                <i data-lucide="building-2" class="w-6 h-6"></i>
-              </div>
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 uppercase tracking-wider">Coming Soon</span>
-            </div>
-            <h3 class="text-lg font-bold text-slate-700">Corporate Asset Tracker</h3>
-            <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-              Fixed assets register, depreciation schedules, and multi-location asset management.
-            </p>
-          </div>
-
-          <div class="mt-6 pt-4 border-t border-slate-200/60 flex items-center justify-between text-slate-400 text-xs">
-            <span class="text-[11px] font-mono">Planned App</span>
-            <span class="italic text-[11px]">In Development</span>
-          </div>
-        </div>
-
+      <!-- DYNAMIC APPS GRID -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="apps-grid-container">
+        <!-- Rendered via JS based on permission settings -->
       </div>
     </main>
   </div>
 
-  <!-- 4. POWER GP SEARCH APPLICATION WORKSPACE -->
+  <!-- 4. DEV CALIBRATION MODAL (EXCLUSIVELY FOR ADMIN) -->
+  <div id="dev-calibration-modal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-alert" class="w-5 h-5 text-amber-400"></i>
+          <h3 class="text-base font-bold">System Dev Calibration & RBAC Settings</h3>
+        </div>
+        <button id="btn-close-dev-modal" class="text-slate-400 hover:text-white p-1 rounded transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-6 text-xs">
+        <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-amber-900">
+          <span class="font-bold">Admin Active:</span> Signed in as <code class="font-mono font-semibold">nicholas.grace@rredco.com</code>. Modifications apply immediately to the runtime permission engine.
+        </div>
+
+        <!-- Permission Matrix Manager -->
+        <div>
+          <h4 class="font-bold text-slate-800 text-sm mb-2 uppercase tracking-wider">User Application Access Matrix</h4>
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex gap-2">
+              <input type="email" id="dev-grant-email" placeholder="user@rredco.com" class="flex-1 p-2 bg-white border border-slate-300 rounded font-mono" />
+              <select id="dev-grant-app" class="p-2 bg-white border border-slate-300 rounded font-medium">
+                <option value="gp-ledger">Power GP Historical Ledger</option>
+                <option value="fin-reporting">Financial Reporting Suite</option>
+                <option value="asset-tracker">Corporate Asset Tracker</option>
+              </select>
+              <button id="btn-add-permission" class="px-3 py-2 bg-gp-600 hover:bg-gp-500 text-white rounded font-semibold transition">Grant Access</button>
+            </div>
+
+            <div class="mt-3">
+              <table class="w-full text-left bg-white rounded border border-slate-200">
+                <thead class="bg-slate-100 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th class="p-2">Target Email</th>
+                    <th class="p-2">Authorized Apps</th>
+                    <th class="p-2 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="permissions-table-body" class="divide-y divide-slate-100">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Diagnostics -->
+        <div>
+          <h4 class="font-bold text-slate-800 text-sm mb-2 uppercase tracking-wider">System State Diagnostics</h4>
+          <div class="grid grid-cols-2 gap-3 font-mono">
+            <div class="p-3 bg-slate-100 rounded border border-slate-200">
+              <span class="text-slate-500 text-[10px] block">FIREBASE AUTH UID</span>
+              <span id="diag-auth-uid" class="font-bold text-slate-800 truncate block"></span>
+            </div>
+            <div class="p-3 bg-slate-100 rounded border border-slate-200">
+              <span class="text-slate-500 text-[10px] block">CLOUD STORAGE BUCKET</span>
+              <span id="diag-storage-bucket" class="font-bold text-slate-800 truncate block">rredco-database.firebasestorage.app</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <button id="btn-save-dev-settings" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded text-xs transition">Save Calibration</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. POWER GP SEARCH APPLICATION WORKSPACE -->
   <div id="app-screen" class="hidden flex-col min-h-screen">
-    
     <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -495,6 +512,8 @@
     import { getAuth, signInWithEmailAndPassword, updatePassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
+    const ADMIN_EMAIL = "nicholas.grace@rredco.com";
+
     const firebaseConfig = {
         apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
         authDomain: "rredco-database.firebaseapp.com",
@@ -507,6 +526,39 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const storage = getStorage(app);
+
+    // Initial Role-Based Access Control Registry
+    window.APP_PERMISSIONS = JSON.parse(localStorage.getItem('rredco_permissions') || JSON.stringify({
+      "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker"],
+      "*": ["gp-ledger"] // Default permissions for authorized team members
+    }));
+
+    window.AVAILABLE_APPS = [
+      {
+        id: "gp-ledger",
+        title: "Power GP Historical Ledger",
+        version: "v2.7",
+        description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
+        icon: "database",
+        active: true
+      },
+      {
+        id: "fin-reporting",
+        title: "Financial Reporting Suite",
+        version: "v1.0 (Dev)",
+        description: "Consolidated balance sheets, executive income statements, and entity trial balance reports.",
+        icon: "line-chart",
+        active: false
+      },
+      {
+        id: "asset-tracker",
+        title: "Corporate Asset Tracker",
+        version: "v1.0 (Dev)",
+        description: "Fixed assets register, depreciation schedules, and multi-location asset management.",
+        icon: "building-2",
+        active: false
+      }
+    ];
 
     window.COMPANY_ENTITIES = [
       { code: 'E01', name: 'POMCO E01', short: 'POMCO' },
@@ -530,7 +582,6 @@
 
     window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
     
-    // Explicit Aliases matching raw Dynamics GP Excel header outputs
     window.FIELD_ALIASES = {
       'Department': ['department', 'dept', 'deptnmbr', 'department_id', 'cost_center'],
       'Journal Entry': ['journal entry', 'jrnentry', 'je', 'journal_entry'],
@@ -560,7 +611,7 @@
       multiFilters: {}, multiLogic: 'AND', currentPage: 1, pageSize: 50, selectedRecord: null, user: null
     };
 
-    // Build Multi-Field HTML dynamically
+    // Build Multi-Field Matrix UI
     const multiGrid = document.getElementById('multi-input-grid');
     window.GP_TARGET_FIELDS.forEach(field => {
       multiGrid.innerHTML += `
@@ -570,7 +621,7 @@
         </div>`;
     });
 
-    // Navigation Screens Router
+    // Navigation Router
     function showScreen(screenId) {
       const screens = ['login-screen', 'home-screen', 'app-screen'];
       screens.forEach(id => {
@@ -586,7 +637,77 @@
       lucide.createIcons();
     }
 
-    // Auth Listeners & Gatekeeping Logic
+    // Permission Check Helper
+    function getUserPermissions(email) {
+      if (!email) return [];
+      if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return ["gp-ledger", "fin-reporting", "asset-tracker"];
+      return window.APP_PERMISSIONS[email.toLowerCase()] || window.APP_PERMISSIONS["*"] || ["gp-ledger"];
+    }
+
+    // Render Portal Apps Grid based on User Role
+    function renderAppPortal() {
+      const user = window.appState.user;
+      if (!user) return;
+
+      const userPerms = getUserPermissions(user.email);
+      const grid = document.getElementById('apps-grid-container');
+      const badge = document.getElementById('access-level-badge');
+      const devBtn = document.getElementById('dev-calibration-btn');
+
+      if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+        badge.innerHTML = `<i data-lucide="shield-check" class="w-3.5 h-3.5 inline mr-1 text-amber-600"></i> Admin / Calibration Lead`;
+        badge.className = "px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300";
+        devBtn.classList.remove('hidden');
+        devBtn.classList.add('flex');
+      } else {
+        badge.textContent = "Standard User";
+        badge.className = "px-3 py-1 rounded-full text-xs font-semibold bg-slate-200 text-slate-700";
+        devBtn.classList.add('hidden');
+        devBtn.classList.remove('flex');
+      }
+
+      grid.innerHTML = window.AVAILABLE_APPS.map(app => {
+        const hasAccess = userPerms.includes(app.id);
+        return `
+          <div class="bg-white border ${hasAccess ? 'border-slate-200 hover:shadow-md' : 'border-slate-200 opacity-60 bg-slate-50/50'} rounded-2xl p-6 shadow-sm transition flex flex-col justify-between group">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-xl ${hasAccess ? 'bg-gp-600 text-white shadow-md shadow-gp-600/30' : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
+                  <i data-lucide="${app.icon}" class="w-6 h-6"></i>
+                </div>
+                ${hasAccess ? 
+                  `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">Authorized</span>` : 
+                  `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 uppercase tracking-wider"><i data-lucide="lock" class="w-3 h-3 inline mr-0.5"></i> Restricted</span>`
+                }
+              </div>
+              <h3 class="text-lg font-bold text-slate-900 ${hasAccess ? 'group-hover:text-gp-600' : ''} transition">${app.title}</h3>
+              <p class="text-xs text-slate-500 mt-2 leading-relaxed">${app.description}</p>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+              <span class="text-[11px] font-mono text-slate-400">${app.version}</span>
+              ${hasAccess ? 
+                `<button onclick="window.launchApp('${app.id}')" class="px-4 py-2 rounded-lg bg-gp-600 hover:bg-gp-500 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+                  Launch App <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>` :
+                `<button disabled class="px-4 py-2 rounded-lg bg-slate-200 text-slate-400 text-xs font-semibold cursor-not-allowed">
+                  Locked
+                </button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    window.launchApp = (appId) => {
+      if (appId === 'gp-ledger') showScreen('app-screen');
+      else alert('App module starting initialization...');
+    };
+
+    // Auth Listener
     onAuthStateChanged(auth, (user) => {
         const pwdModal = document.getElementById('first-time-pwd-modal');
         
@@ -604,6 +725,7 @@
             } else {
                 pwdModal.classList.add('hidden');
                 pwdModal.classList.remove('flex');
+                renderAppPortal();
                 showScreen('home-screen');
             }
         } else {
@@ -615,7 +737,71 @@
         }
     });
 
-    // First-Time Password Reset Form
+    // Dev Calibration Modal Setup
+    document.getElementById('dev-calibration-btn').addEventListener('click', () => {
+      if (!window.appState.user || window.appState.user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return;
+      
+      document.getElementById('diag-auth-uid').textContent = window.appState.user.uid;
+      renderPermissionsTable();
+      
+      const devModal = document.getElementById('dev-calibration-modal');
+      devModal.classList.remove('hidden');
+      devModal.classList.add('flex');
+      lucide.createIcons();
+    });
+
+    document.getElementById('btn-close-dev-modal').addEventListener('click', () => {
+      document.getElementById('dev-calibration-modal').classList.add('hidden');
+      document.getElementById('dev-calibration-modal').classList.remove('flex');
+    });
+
+    function renderPermissionsTable() {
+      const tbody = document.getElementById('permissions-table-body');
+      tbody.innerHTML = Object.entries(window.APP_PERMISSIONS).map(([email, apps]) => `
+        <tr>
+          <td class="p-2 font-mono text-slate-800 font-semibold">${email}</td>
+          <td class="p-2 text-slate-600">${apps.join(', ')}</td>
+          <td class="p-2 text-right">
+            ${email === ADMIN_EMAIL ? `<span class="text-[10px] text-amber-600 font-bold">Owner</span>` : 
+              `<button onclick="window.revokePermission('${email}')" class="text-rose-600 hover:text-rose-800 font-semibold text-[11px]">Revoke</button>`
+            }
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('btn-add-permission').addEventListener('click', () => {
+      const emailInput = document.getElementById('dev-grant-email');
+      const appSelect = document.getElementById('dev-grant-app');
+      const email = emailInput.value.trim().toLowerCase();
+      const appId = appSelect.value;
+
+      if (!email || !email.includes('@')) return alert('Enter a valid email.');
+
+      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = [];
+      if (!window.APP_PERMISSIONS[email].includes(appId)) window.APP_PERMISSIONS[email].push(appId);
+
+      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+      emailInput.value = '';
+      renderPermissionsTable();
+      renderAppPortal();
+    });
+
+    window.revokePermission = (email) => {
+      delete window.APP_PERMISSIONS[email];
+      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+      renderPermissionsTable();
+      renderAppPortal();
+    };
+
+    document.getElementById('btn-save-dev-settings').addEventListener('click', () => {
+      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+      document.getElementById('dev-calibration-modal').classList.add('hidden');
+      document.getElementById('dev-calibration-modal').classList.remove('flex');
+      renderAppPortal();
+    });
+
+    // Password First-Time Setup
     document.getElementById('pwdChangeForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const newPwd = document.getElementById('newPassword').value;
@@ -635,6 +821,7 @@
             
             document.getElementById('first-time-pwd-modal').classList.add('hidden');
             document.getElementById('first-time-pwd-modal').classList.remove('flex');
+            renderAppPortal();
             showScreen('home-screen');
         } catch (error) {
             errDiv.textContent = 'Failed to update password: ' + error.message;
@@ -657,10 +844,8 @@
             });
     });
 
-    // Portal Navigation Listeners
-    document.getElementById('launch-gp-app').addEventListener('click', () => showScreen('app-screen'));
-    document.getElementById('btn-back-portal').addEventListener('click', () => showScreen('home-screen'));
-
+    // Navigation Listeners
+    document.getElementById('btn-back-portal').addEventListener('click', () => { renderAppPortal(); showScreen('home-screen'); });
     document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
     document.getElementById('portalLogoutBtn').addEventListener('click', () => signOut(auth));
 
@@ -722,7 +907,6 @@
                 const item = { _id: `${entityMatch.name}__${idx}`, _location: entityMatch.name, _sourceFile: filename, _rowIndex: idx + 1 };
                 window.GP_TARGET_FIELDS.forEach(f => item[f] = '');
 
-                // Method A: Header Alias Matching
                 headerRow.forEach((rawKey, colIdx) => {
                     const rawVal = row[colIdx];
                     if (rawVal === null || rawVal === undefined || String(rawVal).trim() === '') return;
@@ -740,7 +924,6 @@
                     if (matchedField) item[matchedField] = String(rawVal).trim();
                 });
 
-                // Method B: Positional Fallback for unlabelled/blank headers (e.g. Column 4 Invoice Numbers)
                 positionalMap.forEach((targetField, colIdx) => {
                     if (!item[targetField] && row[colIdx] !== undefined && row[colIdx] !== null) {
                         const val = String(row[colIdx]).trim();
@@ -872,7 +1055,7 @@
         updateLocationFilterUI(); executeSearch();
     }
 
-    // Event Listeners for UI interaction
+    // Controls listeners
     document.getElementById('btn-clear-all').addEventListener('click', clearMemory);
     document.getElementById('btn-prev-page').addEventListener('click', () => { if(window.appState.currentPage > 1) { window.appState.currentPage--; renderTable(); }});
     document.getElementById('btn-next-page').addEventListener('click', () => { if(window.appState.currentPage < Math.ceil(window.appState.filteredRecords.length / window.appState.pageSize)) { window.appState.currentPage++; renderTable(); }});
