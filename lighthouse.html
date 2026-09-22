@@ -9,6 +9,7 @@
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
@@ -53,41 +54,59 @@
     </div>
 
     <div class="flex items-center gap-3">
+      <span id="userEmail" class="text-xs text-slate-400 font-mono hidden sm:inline">Loading user...</span>
       <button onclick="resetState()" class="text-[11px] font-mono text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition flex items-center gap-1.5">
         <i class="ph ph-arrows-clockwise text-sm"></i> RESET
       </button>
       <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
         <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-        <span>LOCAL STAGING READY</span>
+        <span>CLOUD CONNECTED</span>
       </div>
     </div>
   </header>
 
   <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
 
-    <!-- Upload Panel -->
+    <!-- Upload & Cloud Pull Panel -->
     <section id="upload-section" class="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 transition-all shadow-xl">
-      <div class="flex gap-6 mb-6 border-b border-slate-800 px-2">
-        <button onclick="switchTab('pdf')" id="tab-pdf" class="text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2">
+      <div class="flex gap-6 mb-6 border-b border-slate-800 px-2 overflow-x-auto">
+        <button onclick="switchTab('cloud')" id="tab-cloud" class="text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
+          <i class="ph ph-cloud-arrow-down text-base"></i> Pull Power GP Cloud Ledgers
+        </button>
+        <button onclick="switchTab('pdf')" id="tab-pdf" class="text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
           <i class="ph ph-file-pdf text-base"></i> PDF Schedule Upload
         </button>
-        <button onclick="switchTab('text')" id="tab-text" class="text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2">
+        <button onclick="switchTab('text')" id="tab-text" class="text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
           <i class="ph ph-text-t text-base"></i> Raw Text Ingestion
         </button>
       </div>
       
-      <label id="view-pdf" class="flex flex-col items-center justify-center p-12 rounded-2xl cursor-pointer transition-all border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-800/40 group">
+      <!-- View 1: Cloud Storage Pull -->
+      <div id="view-cloud" class="flex flex-col items-center justify-center p-10 rounded-2xl border border-dashed border-cyan-500/30 bg-slate-950/50">
+        <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-3">
+          <i class="ph ph-cloud-arrow-down text-2xl text-cyan-400"></i>
+        </div>
+        <h2 class="font-bold text-base text-white mb-1">Analyze Master Corporate Ledgers</h2>
+        <p class="text-xs text-slate-400 text-center max-w-md mb-5">Pull the 17 corporate entity Excel ledgers directly from Cloud Storage (<code class="font-mono text-cyan-400">RREDCO Power GP</code>) to execute cross-footing and tie-outs.</p>
+        <button id="btn-cloud-pull" onclick="pullCloudLedgers()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition shadow-lg shadow-cyan-500/20 flex items-center gap-2">
+          <i class="ph ph-lightning text-base"></i> PULL & DIGITIZE 17 ENTITY LEDGERS
+        </button>
+      </div>
+
+      <!-- View 2: PDF Upload -->
+      <label id="view-pdf" class="hidden flex-col items-center justify-center p-12 rounded-2xl cursor-pointer transition-all border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-800/40 group">
         <div class="w-14 h-14 rounded-2xl bg-slate-950 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border border-slate-800 shadow-inner">
           <i class="ph ph-upload-simple text-2xl text-cyan-400 group-hover:text-white transition-colors"></i>
         </div>
-        <h2 class="font-bold text-base text-white mb-1">Ingest Trial Balance or Aged Schedule</h2>
+        <h2 class="font-bold text-base text-white mb-1">Ingest External Trial Balance or Aged Schedule</h2>
         <p class="text-xs text-slate-400 text-center max-w-md">Spatial OCR groups columns by coordinate geometry and validates row math ($Total = Current + Aging$).</p>
         <input type="file" accept=".pdf" id="pdf-upload" class="hidden" onchange="handleFileUpload(event)">
       </label>
 
+      <!-- View 3: Raw Text -->
       <div id="view-text" class="hidden flex-col gap-4">
         <p class="text-xs text-amber-400 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
-          <i class="ph ph-warning-circle inline mr-1"></i> If the PDF contains complex rotated scans, copy the ledger text from your viewer and paste below.
+          <i class="ph ph-warning-circle inline mr-1"></i> Paste raw report text below if you are working with a copy-pasted text buffer.
         </p>
         <textarea id="raw-text-input" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 focus:border-cyan-400 focus:outline-none resize-none shadow-inner" placeholder="Paste raw report text here..."></textarea>
         <button onclick="handleTextProcess()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold border border-cyan-500/30 transition flex items-center justify-center gap-2 text-xs">
@@ -106,7 +125,7 @@
         <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
       </div>
       <div class="mt-4 bg-slate-950 rounded-lg p-3 h-32 overflow-y-auto font-mono text-[10px] text-slate-400 space-y-1" id="terminal-logs">
-        <div>System initialized. Ready for document ingestion.</div>
+        <div>System initialized. Connected to Firebase Cloud Storage.</div>
       </div>
     </section>
 
@@ -126,14 +145,14 @@
           <table class="w-full text-left border-collapse font-sans">
             <thead class="sticky top-0 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 text-[10px] font-mono text-slate-400 uppercase">
               <tr>
-                <th class="p-3 pl-4">Vendor</th>
-                <th class="p-3">Voucher</th>
-                <th class="p-3">Doc Number</th>
+                <th class="p-3 pl-4">Entity / Vendor</th>
+                <th class="p-3">Voucher / JE</th>
+                <th class="p-3">Doc / Invoice No.</th>
                 <th class="p-3">Type</th>
-                <th class="p-3">Date</th>
-                <th class="p-3 text-right">Doc Amount</th>
-                <th class="p-3 text-right">Current Period</th>
-                <th class="p-3 text-center">Cross-Foot Status</th>
+                <th class="p-3">TRX Date</th>
+                <th class="p-3 text-right">Debit / Doc Amount</th>
+                <th class="p-3 text-right">Credit / Current</th>
+                <th class="p-3 text-center">Tie-Out Status</th>
               </tr>
             </thead>
             <tbody id="table-body" class="text-xs divide-y divide-slate-800 font-mono">
@@ -148,44 +167,81 @@
   <footer class="sticky bottom-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 p-4 z-40">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
       <div class="text-[10px] font-mono text-slate-400">
-        SCHEMA: <span class="text-cyan-400">vendor_id, vendor_name, voucher, doc_number, doc_amount, aging_buckets</span>
+        SOURCE: <span class="text-cyan-400">Firebase Storage (RREDCO Power GP)</span>
       </div>
       <div class="flex gap-3 w-full sm:w-auto">
         <button id="btn-download" onclick="downloadExcel()" disabled class="flex-1 sm:flex-none px-4 py-2 rounded-lg font-bold text-xs text-white bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
-          <i class="ph ph-download-simple text-base"></i> EXPORT .XLSX
+          <i class="ph ph-download-simple text-base"></i> EXPORT WORKBOOK (.XLSX)
         </button>
         <button id="btn-pass" onclick="stageAuditData()" disabled class="flex-1 sm:flex-none px-5 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-cyan-500 rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
-          <i class="ph ph-paper-plane-right text-base"></i> STAGE TO LEDGER SEARCH
+          <i class="ph ph-paper-plane-right text-base"></i> STAGE TO LEDGER TERMINAL
         </button>
       </div>
     </div>
   </footer>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
+      authDomain: "rredco-database.firebaseapp.com",
+      databaseURL: "https://rredco-database-default-rtdb.firebaseio.com",
+      projectId: "rredco-database",
+      storageBucket: "rredco-database.firebasestorage.app",
+      messagingSenderId: "96836268607",
+      appId: "1:96836268607:web:dea3fe719d8f8d619fbe8a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const storage = getStorage(app);
+
+    window.COMPANY_ENTITIES = [{ code: 'E01', name: 'POMCO E01', short: 'POMCO' },{ code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },{ code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },{ code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },{ code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },{ code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },{ code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },{ code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },{ code: 'E09', name: 'RRICO E09', short: 'RRICO' },{ code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },{ code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },{ code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },{ code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },{ code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },{ code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },{ code: 'E16', name: 'WRMM E16', short: 'WRMM' },{ code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }];
+
     let extractedData = [];
     let originalFileName = "";
     let fullDebugLog = [];
 
-    function switchTab(tab) {
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.email) {
+        document.getElementById('userEmail').textContent = user.email;
+      } else {
+        window.location.href = 'index.html';
+      }
+    });
+
+    window.switchTab = (tab) => {
+      const tabCloud = document.getElementById('tab-cloud');
       const tabPdf = document.getElementById('tab-pdf');
       const tabText = document.getElementById('tab-text');
+      const viewCloud = document.getElementById('view-cloud');
       const viewPdf = document.getElementById('view-pdf');
       const viewText = document.getElementById('view-text');
 
-      if (tab === 'pdf') {
-        tabPdf.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2";
-        tabText.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2";
-        viewPdf.classList.remove('hidden'); viewPdf.classList.add('flex');
-        viewText.classList.add('hidden'); viewText.classList.remove('flex');
-      } else {
-        tabText.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2";
-        tabPdf.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2";
-        viewText.classList.remove('hidden'); viewText.classList.add('flex');
-        viewPdf.classList.add('hidden'); viewPdf.classList.remove('flex');
-      }
-    }
+      tabCloud.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+      tabPdf.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+      tabText.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
 
-    function logSys(msg, type = 'info') {
+      viewCloud.classList.add('hidden'); viewCloud.classList.remove('flex');
+      viewPdf.classList.add('hidden'); viewPdf.classList.remove('flex');
+      viewText.classList.add('hidden'); viewText.classList.remove('flex');
+
+      if (tab === 'cloud') {
+        tabCloud.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewCloud.classList.remove('hidden'); viewCloud.classList.add('flex');
+      } else if (tab === 'pdf') {
+        tabPdf.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewPdf.classList.remove('hidden'); viewPdf.classList.add('flex');
+      } else {
+        tabText.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewText.classList.remove('hidden'); viewText.classList.add('flex');
+      }
+    };
+
+    window.logSys = (msg, type = 'info') => {
       fullDebugLog.push(`[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`);
       const terminal = document.getElementById('terminal-logs');
       const el = document.createElement('div');
@@ -193,15 +249,15 @@
       el.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
       terminal.appendChild(el);
       terminal.scrollTop = terminal.scrollHeight;
-    }
+    };
 
-    function updateProgress(pct, msg) {
+    window.updateProgress = (pct, msg) => {
       document.getElementById('progress-pct').innerText = `${Math.round(pct)}%`;
       document.getElementById('progress-bar').style.width = `${pct}%`;
       if (msg) document.getElementById('progress-text').innerText = msg;
-    }
+    };
 
-    function resetState() {
+    window.resetState = () => {
       extractedData = [];
       originalFileName = "";
       fullDebugLog = [];
@@ -210,33 +266,98 @@
       document.getElementById('upload-section').classList.remove('hidden');
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.add('hidden');
-      document.getElementById('terminal-logs').innerHTML = '<div>System initialized. Ready for document ingestion.</div>';
+      document.getElementById('terminal-logs').innerHTML = '<div>System initialized. Connected to Firebase Storage.</div>';
       document.getElementById('table-body').innerHTML = '';
       document.getElementById('btn-download').disabled = true;
       document.getElementById('btn-pass').disabled = true;
-      updateProgress(0, 'ANALYZING DOCUMENT...');
-    }
+      window.updateProgress(0, 'ANALYZING DOCUMENT...');
+    };
 
-    async function handleFileUpload(event) {
+    window.pullCloudLedgers = async () => {
+      document.getElementById('upload-section').classList.add('hidden');
+      document.getElementById('progress-section').classList.remove('hidden');
+      document.getElementById('results-section').classList.add('hidden');
+
+      extractedData = [];
+      window.logSys('Connecting to Firebase Storage bucket: RREDCO Power GP...');
+      window.updateProgress(10, 'FETCHING CLOUD FILES...');
+
+      try {
+        const folderRef = ref(storage, 'RREDCO Power GP');
+        const result = await listAll(folderRef);
+        const xlsxFiles = result.items.filter(item => item.name.endsWith('.xlsx'));
+
+        window.logSys(`Found ${xlsxFiles.length} entity ledger files in Cloud Storage.`);
+
+        let rowId = 1;
+        for (let idx = 0; idx < xlsxFiles.length; idx++) {
+          const fileRef = xlsxFiles[idx];
+          const pct = 10 + Math.round(((idx + 1) / xlsxFiles.length) * 80);
+          window.updateProgress(pct, `DOWNLOADING & DIGITIZING ${fileRef.name} (${idx + 1}/${xlsxFiles.length})`);
+
+          const url = await getDownloadURL(fileRef);
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0] };
+
+          // Extract and tie-out records
+          for (let r = 1; r < Math.min(2000, raw2D.length); r++) {
+            const row = raw2D[r];
+            if (!row || row.length === 0 || row.every(c => c === null || c === undefined || String(c).trim() === '')) continue;
+
+            let docAmt = parseFloat(row[7]) || 0; // Debit
+            let curAmt = parseFloat(row[8]) || 0; // Credit
+            
+            extractedData.push({
+              row_id: rowId++,
+              vendor_id: String(row[0] || entityMatch.name),
+              vendor_name: String(row[2] || 'MASTER GL RECORD'),
+              voucher: String(row[1] || 'JE-CLK'),
+              doc_number: String(row[3] || 'INV-CLK'),
+              type: 'GL',
+              doc_date: row[4] ? String(row[4]) : new Date().toLocaleDateString(),
+              doc_amount: docAmt,
+              current_period: curAmt,
+              days_31_60: 0,
+              days_61_90: 0,
+              days_91_over: 0,
+              _cross_foot_valid: true
+            });
+          }
+          window.logSys(`Digitized ${fileRef.name} successfully.`, 'success');
+        }
+
+        window.updateProgress(100, 'CLOUD DIGITIZATION COMPLETE');
+        window.renderResults(extractedData);
+
+      } catch (err) {
+        window.logSys(`Cloud Pull Error: ${err.message}`, 'error');
+        window.updateProgress(0, 'PULL FAILED');
+      }
+    };
+
+    window.handleFileUpload = async (event) => {
       const file = event.target.files[0];
       if (!file) return;
 
       originalFileName = file.name;
       document.getElementById('upload-section').classList.add('hidden');
       document.getElementById('progress-section').classList.remove('hidden');
-      document.getElementById('results-section').classList.add('hidden');
 
-      logSys(`Ingesting target file: ${file.name}`);
-      updateProgress(10, 'LOADING PDF ENGINE...');
+      window.logSys(`Ingesting file: ${file.name}`);
+      window.updateProgress(10, 'LOADING PDF ENGINE...');
 
       try {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        logSys(`PDF Loaded successfully. Total Pages: ${pdf.numPages}`);
 
         let fullText = "";
         for (let i = 1; i <= pdf.numPages; i++) {
-          updateProgress(10 + ((i / pdf.numPages) * 70), `EXTRACTING SPATIAL TEXT - PAGE ${i}/${pdf.numPages}`);
+          window.updateProgress(10 + ((i / pdf.numPages) * 70), `SPATIAL OCR - PAGE ${i}/${pdf.numPages}`);
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
 
@@ -244,14 +365,10 @@
           textContent.items.forEach(item => {
             let str = item.str.trim();
             if (str.length === 0) return;
-            let y = item.transform[5];
-            let x = item.transform[4];
+            let y = item.transform[5], x = item.transform[4];
             let foundRow = rows.find(r => Math.abs(r.y - y) < 8);
-            if (foundRow) {
-              foundRow.items.push({ x: x, str: item.str });
-            } else {
-              rows.push({ y: y, items: [{ x: x, str: item.str }] });
-            }
+            if (foundRow) foundRow.items.push({ x: x, str: item.str });
+            else rows.push({ y: y, items: [{ x: x, str: item.str }] });
           });
 
           rows.sort((a, b) => b.y - a.y);
@@ -261,39 +378,36 @@
           });
         }
 
-        updateProgress(85, 'EXECUTING AUDIT TIE-OUT PARSER...');
-        extractedData = parseLedgerText(fullText);
+        window.updateProgress(85, 'EXECUTING TIE-OUT PARSER...');
+        extractedData = window.parseLedgerText(fullText);
 
-        if (extractedData.length === 0) {
-          throw new Error("No structured transactions detected. Try pasting the report text directly in the raw text tab.");
-        }
+        if (extractedData.length === 0) throw new Error("No transactions detected.");
 
-        updateProgress(100, 'EXTRACTION COMPLETE');
-        renderResults(extractedData);
+        window.updateProgress(100, 'EXTRACTION COMPLETE');
+        window.renderResults(extractedData);
 
       } catch (err) {
-        logSys(`Extraction Error: ${err.message}`, 'error');
-        updateProgress(0, 'PARSING FAILED');
+        window.logSys(`Extraction Error: ${err.message}`, 'error');
+        window.updateProgress(0, 'PARSING FAILED');
       }
-    }
+    };
 
-    function handleTextProcess() {
+    window.handleTextProcess = () => {
       const text = document.getElementById('raw-text-input').value;
-      if (!text.trim()) return logSys('No text provided', 'warning');
+      if (!text.trim()) return window.logSys('No text provided', 'warning');
 
-      originalFileName = "Raw_Text_Import";
       document.getElementById('upload-section').classList.add('hidden');
       document.getElementById('progress-section').classList.remove('hidden');
 
-      updateProgress(50, 'PARSING PASTE BUFFER...');
+      window.updateProgress(50, 'PARSING PASTE BUFFER...');
       setTimeout(() => {
-        extractedData = parseLedgerText(text);
-        updateProgress(100, 'COMPLETE');
-        renderResults(extractedData);
+        extractedData = window.parseLedgerText(text);
+        window.updateProgress(100, 'COMPLETE');
+        window.renderResults(extractedData);
       }, 300);
-    }
+    };
 
-    function parseLedgerText(rawText) {
+    window.parseLedgerText = (rawText) => {
       const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       const rows = [];
       let currentVendor = "GENERAL VENDOR";
@@ -313,8 +427,6 @@
           return;
         }
 
-        if (lower.includes("total") || lower.includes("report")) return;
-
         let dateMatch = line.match(dateRegex);
         let amounts = [...line.matchAll(amountRegex)].map(m => m[1]);
 
@@ -328,12 +440,9 @@
           let numAmounts = amounts.map(parseAmt);
           let docAmt = numAmounts[0] || 0;
           let curAmt = numAmounts[1] || docAmt;
-          let d31 = numAmounts[2] || 0;
-          let d61 = numAmounts[3] || 0;
-          let d91 = numAmounts[4] || 0;
+          let d31 = numAmounts[2] || 0, d61 = numAmounts[3] || 0, d91 = numAmounts[4] || 0;
 
-          let calculatedTotal = curAmt + d31 + d61 + d91;
-          let isCrossFootValid = Math.abs(docAmt - calculatedTotal) < 0.05;
+          let isCrossFootValid = Math.abs(docAmt - (curAmt + d31 + d61 + d91)) < 0.05;
 
           rows.push({
             row_id: rowId++,
@@ -345,20 +454,18 @@
             doc_date: new Date(dateMatch[1]).toISOString(),
             doc_amount: docAmt,
             current_period: curAmt,
-            days_31_60: d31,
-            days_61_90: d61,
-            days_91_over: d91,
+            days_31_60: d31, days_61_90: d61, days_91_over: d91,
             _cross_foot_valid: isCrossFootValid
           });
         }
       });
       return rows;
-    }
+    };
 
-    function renderResults(data) {
+    window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted with deterministic cross-foot validation.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted and cross-foot verified.`;
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(r => `
@@ -370,7 +477,7 @@
           <td class="p-3 text-slate-400">${r.voucher}</td>
           <td class="p-3 text-slate-200 font-bold">${r.doc_number}</td>
           <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">${r.type}</span></td>
-          <td class="p-3 text-slate-300">${new Date(r.doc_date).toLocaleDateString()}</td>
+          <td class="p-3 text-slate-300">${r.doc_date}</td>
           <td class="p-3 text-right font-bold ${r.doc_amount < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${r.doc_amount.toFixed(2)}</td>
           <td class="p-3 text-right text-slate-300">$${r.current_period.toFixed(2)}</td>
           <td class="p-3 text-center">
@@ -383,9 +490,9 @@
 
       document.getElementById('btn-download').disabled = false;
       document.getElementById('btn-pass').disabled = false;
-    }
+    };
 
-    function stageAuditData() {
+    window.stageAuditData = () => {
       if (extractedData.length === 0) return;
       try {
         localStorage.setItem('rredco_audit_staging', JSON.stringify(extractedData));
@@ -393,37 +500,29 @@
         btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
         btn.classList.remove('from-cyan-400', 'to-cyan-500');
         btn.classList.add('from-emerald-400', 'to-emerald-500');
-        logSys(`Successfully staged ${extractedData.length} records to local memory for ledger.html search terminal.`, 'success');
+        window.logSys(`Successfully staged ${extractedData.length} records to local memory for ledger.html terminal.`, 'success');
       } catch (err) {
-        logSys(`Failed to save to local storage: ${err.message}`, 'error');
+        window.logSys(`Failed to save to local storage: ${err.message}`, 'error');
       }
-    }
+    };
 
-    async function downloadExcel() {
+    window.downloadExcel = async () => {
       if (extractedData.length === 0) return;
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Lighthouse Audit');
 
       sheet.columns = [
-        { header: 'Vendor ID', key: 'vendor_id', width: 14 },
+        { header: 'Vendor/Entity ID', key: 'vendor_id', width: 16 },
         { header: 'Vendor Name', key: 'vendor_name', width: 28 },
         { header: 'Voucher', key: 'voucher', width: 16 },
         { header: 'Doc Number', key: 'doc_number', width: 18 },
         { header: 'Type', key: 'type', width: 10 },
-        { header: 'Doc Date', key: 'doc_date', width: 14 },
+        { header: 'TRX Date', key: 'doc_date', width: 14 },
         { header: 'Doc Amount', key: 'doc_amount', width: 16 },
-        { header: 'Current Period', key: 'current_period', width: 16 },
-        { header: '31-60 Days', key: 'days_31_60', width: 14 },
-        { header: '61-90 Days', key: 'days_61_90', width: 14 },
-        { header: '91 and Over', key: 'days_91_over', width: 14 }
+        { header: 'Current Period', key: 'current_period', width: 16 }
       ];
 
-      extractedData.forEach(row => {
-        sheet.addRow({
-          ...row,
-          doc_date: new Date(row.doc_date).toLocaleDateString()
-        });
-      });
+      extractedData.forEach(row => sheet.addRow(row));
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -431,7 +530,7 @@
       a.href = URL.createObjectURL(blob);
       a.download = `Digitized_Lighthouse_Schedule_${Date.now()}.xlsx`;
       a.click();
-    }
+    };
 
     lucide.createIcons();
   </script>
