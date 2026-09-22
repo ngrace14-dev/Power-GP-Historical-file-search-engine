@@ -156,7 +156,7 @@
           </div>
 
           <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span class="text-[11px] font-mono text-slate-400">v2.5 • Read-Only</span>
+            <span class="text-[11px] font-mono text-slate-400">v2.6 • Read-Only</span>
             <button id="launch-gp-app" class="px-4 py-2 rounded-lg bg-gp-600 hover:bg-gp-500 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
               Launch App <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
             </button>
@@ -530,7 +530,7 @@
 
     window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
     
-    // Expanded Aliases for Dynamics GP Document / Invoice Numbers
+    // Explicit Aliases matching raw Dynamics GP Excel header outputs
     window.FIELD_ALIASES = {
       'Department': ['department', 'dept', 'deptnmbr', 'department_id', 'cost_center'],
       'Journal Entry': ['journal entry', 'jrnentry', 'je', 'journal_entry'],
@@ -540,17 +540,17 @@
         'voucher number', 'vchrnmbr', 'orig doc number', 'originating doc number',
         'originating document number', 'sop number', 'sopnumbe', 'invoice #',
         'inv #', 'inv no', 'inv number', 'doc_number', 'document_number',
-        'invoice_number', 'apply to doc num', 'aptodcct', 'origdocnum'
+        'invoice_number', 'apply to doc num', 'aptodcct', 'origdocnum', '__empty'
       ],
       'Originating Master Name': ['originating master name', 'ormstrnm', 'master name', 'custname', 'vendname', 'entity_name'],
       'TRX Date': ['trx date', 'trxdate', 'transaction date', 'docdate', 'posteddt', 'date'],
       'Account Number': ['account number', 'actnumst', 'gl_account', 'account', 'actindx'],
-      'Account Description': ['account description', 'actdescr', 'account_name', 'account_desc'],
+      'Account Description': ['account description', 'account de', 'actdescr', 'account_name', 'account_desc'],
       'Debit Amount': ['debit amount', 'debitamt', 'debit', 'dr_amount', 'dr'],
       'Credit Amount': ['credit amount', 'crdtamnt', 'credit', 'cr_amount', 'cr'],
       'Reference': ['reference', 'refrence', 'ref', 'batch_ref'],
       'Description': ['description', 'dscriptn', 'desc', 'line_desc'],
-      'Originating TRX Source': ['originating trx source', 'ortrxsrc', 'trx_source', 'source'],
+      'Originating TRX Source': ['originating trx source', 'originating', 'ortrxsrc', 'trx_source', 'source'],
       'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by', 'username']
     };
 
@@ -595,16 +595,13 @@
             document.getElementById('userEmail').textContent = user.email;
             document.getElementById('portalUserEmail').textContent = user.email;
             
-            // Check if user needs to set a permanent password
             const hasUpdatedPwd = localStorage.getItem('pwd_updated_' + user.uid);
 
             if (!hasUpdatedPwd) {
-                // First-time sign-in -> Show Password Reset Modal
                 showScreen('login-screen');
                 pwdModal.classList.remove('hidden');
                 pwdModal.classList.add('flex');
             } else {
-                // Verified Sign-in -> Go to Home App Navigator Portal
                 pwdModal.classList.add('hidden');
                 pwdModal.classList.remove('flex');
                 showScreen('home-screen');
@@ -667,7 +664,7 @@
     document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
     document.getElementById('portalLogoutBtn').addEventListener('click', () => signOut(auth));
 
-    // Storage Pull Logic (Excel .xlsx -> JSON mapping with robust header cleaning)
+    // Storage Pull Logic (Dual-Method Parser for 100% Data Extraction)
     document.getElementById('btn-pull-cloud').addEventListener('click', async () => {
         if (!window.appState.user) return;
         const btn = document.getElementById('btn-pull-cloud');
@@ -700,40 +697,59 @@
             const workbook = XLSX.read(arrayBuffer, { type: 'array' });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             
-            const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1 });
             let headerRowIndex = 0;
-            for (let i = 0; i < Math.min(15, rawData.length); i++) {
-                const rowStr = (rawData[i] || []).join(' ').toLowerCase();
-                if (rowStr.includes('account') || rowStr.includes('journal entry') || rowStr.includes('invoice') || rowStr.includes('document')) {
+            for (let i = 0; i < Math.min(15, raw2D.length); i++) {
+                const rowStr = (raw2D[i] || []).join(' ').toLowerCase();
+                if (rowStr.includes('account') || rowStr.includes('journal entry') || rowStr.includes('department') || rowStr.includes('trx date')) {
                     headerRowIndex = i; break;
                 }
             }
             
-            const dataObjects = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
+            const headerRow = raw2D[headerRowIndex] || [];
+            const dataRows = raw2D.slice(headerRowIndex + 1);
             const entityMatch = window.COMPANY_ENTITIES.find(e => filename.includes(e.short)) || { name: filename.split(' ')[0] };
             
-            const normalized = dataObjects.map((row, idx) => {
+            const positionalMap = [
+              'Department', 'Journal Entry', 'Originating Master Name', 'Invoice Number',
+              'TRX Date', 'Account Number', 'Account Description', 'Debit Amount',
+              'Credit Amount', 'Reference', 'Description', 'Originating TRX Source', 'User Who Posted'
+            ];
+
+            const normalized = dataRows.map((row, idx) => {
+                if (!row || row.length === 0 || row.every(cell => cell === null || cell === undefined || String(cell).trim() === '')) return null;
+
                 const item = { _id: `${entityMatch.name}__${idx}`, _location: entityMatch.name, _sourceFile: filename, _rowIndex: idx + 1 };
                 window.GP_TARGET_FIELDS.forEach(f => item[f] = '');
 
-                for (const [rawKey, rawVal] of Object.entries(row)) {
-                    let standardKey = rawKey;
-                    // Clean linebreaks, extra spaces, special chars from raw headers
-                    const cleanKey = String(rawKey).toLowerCase().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+                // Method A: Header Alias Matching
+                headerRow.forEach((rawKey, colIdx) => {
+                    const rawVal = row[colIdx];
+                    if (rawVal === null || rawVal === undefined || String(rawVal).trim() === '') return;
 
-                    for (const [key, aliases] of Object.entries(window.FIELD_ALIASES)) {
-                        if (cleanKey === key.toLowerCase() || aliases.some(a => cleanKey === a.toLowerCase() || cleanKey.includes(a.toLowerCase()))) {
-                            standardKey = key;
+                    const cleanKey = String(rawKey || '').toLowerCase().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    let matchedField = null;
+
+                    for (const [targetField, aliases] of Object.entries(window.FIELD_ALIASES)) {
+                        if (cleanKey === targetField.toLowerCase() || aliases.some(a => cleanKey === a.toLowerCase() || cleanKey.includes(a.toLowerCase()))) {
+                            matchedField = targetField;
                             break;
                         }
                     }
 
-                    if (window.GP_TARGET_FIELDS.includes(standardKey)) {
-                        item[standardKey] = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : '';
+                    if (matchedField) item[matchedField] = String(rawVal).trim();
+                });
+
+                // Method B: Positional Fallback for unlabelled/blank headers (e.g. Column 4 Invoice Numbers)
+                positionalMap.forEach((targetField, colIdx) => {
+                    if (!item[targetField] && row[colIdx] !== undefined && row[colIdx] !== null) {
+                        const val = String(row[colIdx]).trim();
+                        if (val) item[targetField] = val;
                     }
-                }
+                });
+
                 return item;
-            });
+            }).filter(Boolean);
 
             normalized.forEach(row => {
                 window.appState.records.push(row);
