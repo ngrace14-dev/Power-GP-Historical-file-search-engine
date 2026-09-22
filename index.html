@@ -156,9 +156,10 @@
               <thead class="bg-slate-100 font-semibold border-b border-slate-200 text-slate-700">
                 <tr>
                   <th class="p-2.5">Registered Account Email</th>
-                  <th class="p-2.5 text-center w-28">Power GP Search</th>
-                  <th class="p-2.5 text-center w-24">Financials</th>
-                  <th class="p-2.5 text-center w-24">Asset Tracker</th>
+                  <th class="p-2.5 text-center w-24">Power GP</th>
+                  <th class="p-2.5 text-center w-24">Lighthouse</th>
+                  <th class="p-2.5 text-center w-20">Financials</th>
+                  <th class="p-2.5 text-center w-20">Assets</th>
                   <th class="p-2.5 text-right w-16">Action</th>
                 </tr>
               </thead>
@@ -199,7 +200,7 @@
     try { savedRegistered = JSON.parse(localStorage.getItem('rredco_registered_users') || '[]'); } catch(e){}
     window.REGISTERED_USERS = Array.from(new Set([...defaultRegistered, ...savedRegistered]));
 
-    let initialPerms = { "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"] };
+    let initialPerms = { "nicholas.grace@rredco.com": ["gp-ledger", "lighthouse", "fin-reporting", "asset-tracker", "system-logs"] };
     try {
       const storedP = localStorage.getItem('rredco_permissions');
       if (storedP) initialPerms = JSON.parse(storedP);
@@ -208,6 +209,7 @@
 
     window.AVAILABLE_APPS = [
       { id: "gp-ledger", title: "Power GP Historical Ledger", version: "v3.6", description: "Read-only multi-entity search engine for 17 corporate General Ledger exports.", icon: "database", url: "ledger.html" },
+      { id: "lighthouse", title: "Lighthouse", version: "v1.0 (Dev)", description: "Enterprise operations, analytics, and executive intelligence platform.", icon: "compass", url: "#" },
       { id: "system-logs", title: "System Audit & Live Session Logs", version: "v1.0 (Admin)", description: "Real-time user session tracking, query history, audit logs across instances.", icon: "activity", devOnly: true, url: "audit-logs.html" },
       { id: "fin-reporting", title: "Financial Reporting Suite", version: "v1.0 (Dev)", description: "Consolidated balance sheets, executive income statements, and trial balance reports.", icon: "line-chart", url: "#" },
       { id: "asset-tracker", title: "Corporate Asset Tracker", version: "v1.0 (Dev)", description: "Fixed assets register, depreciation schedules, and asset management.", icon: "building-2", url: "#" }
@@ -237,7 +239,7 @@
       if (!user) return;
       const emailLower = user.email.toLowerCase();
       const isDevUser = emailLower === ADMIN_EMAIL.toLowerCase();
-      const userPerms = isDevUser ? ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"] : (window.APP_PERMISSIONS[emailLower] || ["gp-ledger"]);
+      const userPerms = isDevUser ? ["gp-ledger", "lighthouse", "fin-reporting", "asset-tracker", "system-logs"] : (window.APP_PERMISSIONS[emailLower] || ["gp-ledger"]);
 
       const grid = document.getElementById('apps-grid-container');
       const badge = document.getElementById('access-level-badge');
@@ -281,7 +283,7 @@
     window.launchApp = (appId, targetUrl) => {
       logUserActivity('APP_LAUNCH', `Navigated to ${appId} module`);
       if (targetUrl && targetUrl !== '#') window.location.href = targetUrl;
-      else alert('Module in active development.');
+      else alert(`${appId.toUpperCase()} module in active development.`);
     };
 
     onAuthStateChanged(auth, (user) => {
@@ -293,7 +295,7 @@
         window.appState.user = user;
         const emailLower = user.email.toLowerCase();
         if (!window.REGISTERED_USERS.includes(emailLower)) window.REGISTERED_USERS.push(emailLower);
-        if (!window.APP_PERMISSIONS[emailLower]) window.APP_PERMISSIONS[emailLower] = emailLower === ADMIN_EMAIL.toLowerCase() ? ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"] : ["gp-ledger"];
+        if (!window.APP_PERMISSIONS[emailLower]) window.APP_PERMISSIONS[emailLower] = emailLower === ADMIN_EMAIL.toLowerCase() ? ["gp-ledger", "lighthouse", "fin-reporting", "asset-tracker", "system-logs"] : ["gp-ledger"];
         syncUserStores();
 
         document.getElementById('portalUserEmail').textContent = user.email;
@@ -353,6 +355,7 @@
         return `<tr class="hover:bg-slate-50">
           <td class="p-2.5 font-mono text-slate-800 font-semibold truncate max-w-[180px]">${email} ${isA ? `<span class="ml-1 px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px]">Admin</span>` : ''}</td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('gp-ledger') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'gp-ledger', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
+          <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('lighthouse') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'lighthouse', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('fin-reporting') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'fin-reporting', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('asset-tracker') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'asset-tracker', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
           <td class="p-2.5 text-right">${isA ? `<span class="text-[10px] text-slate-400">Owner</span>` : `<button onclick="window.removeRegisteredUser('${eL}')" class="text-rose-600 font-semibold text-[11px]">Remove</button>`}</td>
