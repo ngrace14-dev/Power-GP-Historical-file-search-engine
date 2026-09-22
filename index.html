@@ -498,7 +498,7 @@
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs" id="multi-input-grid">
-            <!-- Populated by JS -->
+            <!-- Populated dynamically via initMultiSearchGrid() -->
           </div>
 
           <div class="pt-2 flex items-center justify-end gap-2">
@@ -652,7 +652,7 @@
       {
         id: "gp-ledger",
         title: "Power GP Historical Ledger",
-        version: "v3.3",
+        version: "v3.4",
         description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
         icon: "database"
       },
@@ -732,7 +732,27 @@
       systemLogs: savedLogs
     };
 
-    // INSTANT DUAL-SYNC LOGGING FUNCTION (LOGS ALL USERS & ADMIN)
+    // MULTI-FIELD MATRIX BUILDER & DELEGATED EVENT LISTENER
+    function initMultiSearchGrid() {
+      const multiGrid = document.getElementById('multi-input-grid');
+      if (!multiGrid) return;
+      
+      multiGrid.innerHTML = window.GP_TARGET_FIELDS.map(field => `
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">${field}</label>
+          <input type="text" data-field="${field}" class="multi-field-input w-full p-2 border border-slate-200 rounded bg-white focus:ring-1 focus:ring-gp-500 text-xs font-mono" placeholder="Filter ${field}..." />
+        </div>
+      `).join('');
+
+      multiGrid.addEventListener('input', (e) => {
+        if (e.target && e.target.classList.contains('multi-field-input')) {
+          const field = e.target.getAttribute('data-field');
+          window.appState.multiFilters[field] = e.target.value;
+        }
+      });
+    }
+
+    // INSTANT DUAL-SYNC LOGGING FUNCTION
     function logUserActivity(eventType, details) {
       if (!window.appState.user) return;
       
@@ -746,16 +766,13 @@
         userAgent: navigator.userAgent.slice(0, 80)
       };
 
-      // 1. Instant local persistence
       window.appState.systemLogs.unshift(logPayload);
       localStorage.setItem('rredco_system_logs', JSON.stringify(window.appState.systemLogs.slice(0, 500)));
 
-      // 2. Refresh System Log UI
       if (document.getElementById('log-app-screen').classList.contains('flex')) {
         renderSystemLogDashboard();
       }
 
-      // 3. Asynchronous Realtime Database Sync
       try {
         const logsRef = dbRef(database, 'system_activity_logs');
         push(logsRef, logPayload).catch(e => console.warn("Firebase RTDB Notice:", e.message));
@@ -880,7 +897,6 @@
 
       const userProfiles = {};
       
-      // Ensure all registered users get a profile card even if they haven't performed a search yet
       window.REGISTERED_USERS.forEach(email => {
         userProfiles[email.toLowerCase()] = {
           email: email,
@@ -1222,7 +1238,7 @@
     document.getElementById('portalLogoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'User signed out'); signOut(auth); });
     document.getElementById('logLogoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'User signed out'); signOut(auth); });
 
-    // Storage Pull Logic (Dual-Method Parser for 100% Data Extraction)
+    // Storage Pull Logic
     document.getElementById('btn-pull-cloud').addEventListener('click', async () => {
         if (!window.appState.user) return;
         const btn = document.getElementById('btn-pull-cloud');
@@ -1430,6 +1446,9 @@
         updateLocationFilterUI(); executeSearch();
     }
 
+    // Initialize Multi-Field Search Grid
+    initMultiSearchGrid();
+
     // Controls listeners
     document.getElementById('btn-clear-all').addEventListener('click', clearMemory);
     document.getElementById('btn-prev-page').addEventListener('click', () => { if(window.appState.currentPage > 1) { window.appState.currentPage--; renderTable(); }});
@@ -1468,12 +1487,15 @@
       setTimeout(executeSearch, 300); 
     });
 
-    document.querySelectorAll('.multi-field-input').forEach(input => input.addEventListener('input', (e) => { window.appState.multiFilters[e.target.getAttribute('data-field')] = e.target.value; }));
     document.getElementById('btn-apply-multi').addEventListener('click', () => {
       logUserActivity('SEARCH', 'Executed combinatorial multi-field search matrix');
       executeSearch();
     });
-    document.getElementById('btn-reset-multi').addEventListener('click', () => { document.querySelectorAll('.multi-field-input').forEach(i => i.value = ''); window.appState.multiFilters = {}; executeSearch(); });
+    document.getElementById('btn-reset-multi').addEventListener('click', () => { 
+      document.querySelectorAll('.multi-field-input').forEach(i => i.value = ''); 
+      window.appState.multiFilters = {}; 
+      executeSearch(); 
+    });
     document.getElementById('filter-location-select').addEventListener('change', (e) => window.setLocationFilter(e.target.value));
 
     // Modal Logic
