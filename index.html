@@ -663,7 +663,7 @@
       {
         id: "gp-ledger",
         title: "Power GP Historical Ledger",
-        version: "v3.5",
+        version: "v3.6",
         description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
         icon: "database"
       },
@@ -743,6 +743,22 @@
       systemLogs: savedLogs
     };
 
+    // Helper: Formats Excel Serial Date Numbers to MM/DD/YYYY
+    function formatExcelDate(val) {
+      if (val === null || val === undefined || val === '') return '';
+      const num = Number(val);
+      if (!isNaN(num) && num > 1000 && num < 100000) {
+        const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+        if (!isNaN(dateObj.getTime())) {
+          const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(dateObj.getUTCDate()).padStart(2, '0');
+          const year = dateObj.getUTCFullYear();
+          return `${month}/${day}/${year}`;
+        }
+      }
+      return String(val).trim();
+    }
+
     // MULTI-FIELD MATRIX BUILDER & DELEGATED EVENT LISTENER
     function initMultiSearchGrid() {
       const multiGrid = document.getElementById('multi-input-grid');
@@ -780,7 +796,7 @@
       // 1. Update In-Memory State
       window.appState.systemLogs.unshift(logPayload);
 
-      // 2. Safe LocalStorage Persinement capped strictly at 50 items
+      // 2. Safe LocalStorage Persistence capped strictly at 50 items
       try {
         const trimmedLogs = window.appState.systemLogs.slice(0, 50);
         localStorage.setItem('rredco_system_logs', JSON.stringify(trimmedLogs));
@@ -1344,13 +1360,17 @@
                         }
                     }
 
-                    if (matchedField) item[matchedField] = String(rawVal).trim();
+                    if (matchedField) {
+                      item[matchedField] = (matchedField === 'TRX Date') ? formatExcelDate(rawVal) : String(rawVal).trim();
+                    }
                 });
 
                 positionalMap.forEach((targetField, colIdx) => {
                     if (!item[targetField] && row[colIdx] !== undefined && row[colIdx] !== null) {
                         const val = String(row[colIdx]).trim();
-                        if (val) item[targetField] = val;
+                        if (val) {
+                          item[targetField] = (targetField === 'TRX Date') ? formatExcelDate(val) : val;
+                        }
                     }
                 });
 
