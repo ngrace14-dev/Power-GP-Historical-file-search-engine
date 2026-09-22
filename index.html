@@ -10,6 +10,8 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <!-- PapaParse for fast CSV parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- SheetJS (xlsx) for reading .xlsx workbooks from Firebase Storage -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <script>
     tailwind.config = {
@@ -148,9 +150,13 @@
           <span class="hidden md:inline">Save Locations to</span> Cloud
         </button>
 
-        <button id="btn-pull-cloud-header" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <button id="btn-pull-cloud-header" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-sky-700 hover:bg-sky-600 text-white shadow-sm transition">
           <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-          <span class="hidden sm:inline">Sync From</span> Cloud
+          <span>Pull From Cloud</span>
+        </button>
+
+        <button id="btn-open-diagnostics" class="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Cloud Sync Diagnostics">
+          <i data-lucide="activity" class="w-3.5 h-3.5 text-amber-400"></i>
         </button>
 
         <button id="btn-export-results" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gp-600 hover:bg-gp-500 text-white transition shadow-sm">
@@ -579,605 +585,56 @@
     </div>
   </div>
 
-  <script>
-    function safeRenderIcons() {
-      try {
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-          window.lucide.createIcons();
-        }
-      } catch (e) {
-        console.warn('Lucide render warning:', e);
-      }
-    }
-
-    // 17 Corporate Entities for RREDCO group
-    window.COMPANY_ENTITIES = [
-      { code: 'E01', name: 'POMCO E01', short: 'POMCO' },
-      { code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },
-      { code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },
-      { code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },
-      { code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },
-      { code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },
-      { code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },
-      { code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },
-      { code: 'E09', name: 'RRICO E09', short: 'RRICO' },
-      { code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },
-      { code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },
-      { code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },
-      { code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },
-      { code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },
-      { code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },
-      { code: 'E16', name: 'WRMM E16', short: 'WRMM' },
-      { code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }
-    ];
-
-    // Standardized 13 Power GP Dynamics Columns
-    window.GP_TARGET_FIELDS = [
-      'Department',
-      'Journal Entry',
-      'Invoice Number',
-      'Originating Master Name',
-      'TRX Date',
-      'Account Number',
-      'Account Description',
-      'Debit Amount',
-      'Credit Amount',
-      'Reference',
-      'Description',
-      'Originating TRX Source',
-      'User Who Posted'
-    ];
-
-    window.FIELD_ALIASES = {
-      'Department': ['department', 'dept', 'deptnmbr', 'department_id', 'cost_center'],
-      'Journal Entry': ['journal entry', 'jrnentry', 'je', 'journal_entry', 'docnumbr_gl'],
-      'Invoice Number': ['invoice number', 'invoice', 'invoicenbr', 'invoice_num', 'invoice_no', 'inv_number', 'inv_no', 'docnumbr', 'vchrnmbr', 'sopnumbe', 'aptodcct', 'origdocnum', 'inv_id'],
-      'Originating Master Name': ['originating master name', 'ormstrnm', 'master name', 'custname', 'vendname', 'entity_name'],
-      'TRX Date': ['trx date', 'trxdate', 'transaction date', 'docdate', 'posteddt', 'date'],
-      'Account Number': ['account number', 'actnumst', 'actindx', 'gl_account', 'account'],
-      'Account Description': ['account description', 'actdescr', 'account_desc', 'account_name'],
-      'Debit Amount': ['debit amount', 'debitamt', 'debit', 'dr_amount', 'dr'],
-      'Credit Amount': ['credit amount', 'crdtamnt', 'credit', 'cr_amount', 'cr'],
-      'Reference': ['reference', 'refrence', 'ref', 'batch_ref'],
-      'Description': ['description', 'dscriptn', 'desc', 'line_desc', 'trx_desc'],
-      'Originating TRX Source': ['originating trx source', 'ortrxsrc', 'trx_source', 'source', 'sourcdoc'],
-      'User Who Posted': ['user who posted', 'uswhpstd', 'posted_by', 'username', 'user_id']
-    };
-
-    // Clean initial state with NO mock data
-    window.appState = {
-      records: [],
-      filteredRecords: [],
-      locations: new Set(),
-      searchMode: 'omni',
-      activeLocation: '',
-      omniQuery: '',
-      singleTargetKey: 'Invoice Number',
-      singleTargetVal: '',
-      multiFilters: {},
-      multiLogic: 'AND',
-      currentPage: 1,
-      pageSize: 50,
-      selectedRecord: null,
-      cloudConnected: false
-    };
-
-    function matchStandardField(rawHeader) {
-      if (!rawHeader) return '';
-      const clean = String(rawHeader).toLowerCase().trim();
-      const aliasesMap = window.FIELD_ALIASES || {};
-
-      for (const [standardKey, aliases] of Object.entries(aliasesMap)) {
-        if (clean === standardKey.toLowerCase()) return standardKey;
-        if (Array.isArray(aliases) && aliases.some(alias => clean === alias || clean.includes(alias))) {
-          return standardKey;
-        }
-      }
-      return rawHeader;
-    }
-
-    function detectEntityFromFileName(filename) {
-      if (!filename) return null;
-      const upper = filename.toUpperCase();
-
-      for (const ent of window.COMPANY_ENTITIES) {
-        const codePattern = new RegExp(`(^|[^A-Z0-9])${ent.code}([^A-Z0-9]|$)`, 'i');
-        if (codePattern.test(upper)) {
-          return ent.name;
-        }
-        const cleanShort = ent.short.replace(/[^A-Z0-9]/gi, '');
-        const cleanUpper = upper.replace(/[^A-Z0-9]/gi, '');
-        if (cleanUpper.includes(cleanShort)) {
-          return ent.name;
-        }
-      }
-      return null;
-    }
-
-    function parseAndIngestCSV(locationName, csvContent, fileName) {
-      if (!window.Papa) {
-        showToast('CSV parsing library is not ready.', 'error');
-        return;
-      }
-
-      Papa.parse(csvContent, {
-        header: true,
-        skipEmptyLines: 'greedy',
-        complete: function(results) {
-          if (!results.data || results.data.length === 0) {
-            showToast('The provided CSV contains no rows.', 'error');
-            return;
-          }
-
-          const rawRows = results.data;
-          const headers = results.meta.fields || [];
-
-          const headerMap = {};
-          headers.forEach(h => {
-            headerMap[h] = matchStandardField(h);
-          });
-
-          const normalized = rawRows.map((row, idx) => {
-            const item = {
-              _id: `${locationName}__${fileName || 'csv'}__${idx}__${Math.random().toString(36).substring(2, 7)}`,
-              _location: locationName,
-              _sourceFile: fileName || `${locationName}.csv`,
-              _rowIndex: idx + 1
-            };
-
-            window.GP_TARGET_FIELDS.forEach(field => {
-              item[field] = '';
-            });
-
-            for (const [rawKey, rawVal] of Object.entries(row)) {
-              const mapped = headerMap[rawKey] || rawKey;
-              item[mapped] = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : '';
-            }
-
-            return item;
-          });
-
-          integrateIncomingRecords(normalized, locationName);
-          showToast(`Imported ${normalized.length} records into ${locationName}`, 'success');
-        },
-        error: function(err) {
-          showToast(`Error parsing CSV: ${err.message}`, 'error');
-        }
-      });
-    }
-
-    function integrateIncomingRecords(incoming, locTag) {
-      const existingIds = new Set(window.appState.records.map(r => r._id));
-
-      incoming.forEach(row => {
-        if (!existingIds.has(row._id)) {
-          window.appState.records.push(row);
-          if (row._location) window.appState.locations.add(row._location);
-        }
-      });
-
-      updateLocationFilterUI();
-      executeSearch();
-      updateMetrics();
-    }
-
-    function executeSearch() {
-      const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiFilters, multiLogic } = window.appState;
-
-      let filtered = records;
-
-      if (activeLocation) {
-        filtered = filtered.filter(r => r._location === activeLocation);
-      }
-
-      if (searchMode === 'omni') {
-        const q = (omniQuery || '').trim().toLowerCase();
-        if (q) {
-          filtered = filtered.filter(row => {
-            for (const field of window.GP_TARGET_FIELDS) {
-              const val = String(row[field] || '').toLowerCase();
-              if (val.includes(q)) return true;
-            }
-            if (row._location && row._location.toLowerCase().includes(q)) return true;
-            return false;
-          });
-        }
-      } else if (searchMode === 'single') {
-        const queryVal = (singleTargetVal || '').trim().toLowerCase();
-        if (queryVal && singleTargetKey) {
-          filtered = filtered.filter(row => {
-            const cell = String(row[singleTargetKey] || '').toLowerCase();
-            return cell.includes(queryVal);
-          });
-        }
-      } else if (searchMode === 'multi') {
-        const activeFieldEntries = Object.entries(multiFilters).filter(([k, v]) => v && v.trim() !== '');
-
-        if (activeFieldEntries.length > 0) {
-          filtered = filtered.filter(row => {
-            if (multiLogic === 'AND') {
-              return activeFieldEntries.every(([field, queryVal]) => matchFieldCondition(row[field], queryVal));
-            } else {
-              return activeFieldEntries.some(([field, queryVal]) => matchFieldCondition(row[field], queryVal));
-            }
-          });
-        }
-      }
-
-      window.appState.filteredRecords = filtered;
-      window.appState.currentPage = 1;
-      renderTable();
-      updateMetrics();
-    }
-
-    function matchFieldCondition(cellValue, condition) {
-      if (!cellValue) return false;
-      const strCell = String(cellValue).trim().toLowerCase();
-      const strCond = String(condition).trim().toLowerCase();
-
-      if (strCond.startsWith('>') || strCond.startsWith('<')) {
-        const numCell = parseFloat(strCell.replace(/[^0-9.-]+/g, ''));
-        if (isNaN(numCell)) return false;
-
-        if (strCond.startsWith('>=')) {
-          return numCell >= parseFloat(strCond.slice(2));
-        } else if (strCond.startsWith('>')) {
-          return numCell > parseFloat(strCond.slice(1));
-        } else if (strCond.startsWith('<=')) {
-          return numCell <= parseFloat(strCond.slice(2));
-        } else if (strCond.startsWith('<')) {
-          return numCell < parseFloat(strCond.slice(1));
-        }
-      }
-
-      return strCell.includes(strCond);
-    }
-
-    function renderTable() {
-      const tbody = document.getElementById('table-body');
-      if (!tbody) return;
-
-      const { currentPage, pageSize, filteredRecords, records } = window.appState;
-      const startIdx = (currentPage - 1) * pageSize;
-      const endIdx = startIdx + pageSize;
-      const pageSlice = filteredRecords.slice(startIdx, endIdx);
-
-      if (records.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="16" class="py-16 text-center text-slate-400">
-              <div class="max-w-sm mx-auto flex flex-col items-center">
-                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-                  <i data-lucide="cloud-off" class="w-6 h-6 text-slate-400"></i>
-                </div>
-                <p class="font-medium text-slate-700 text-sm">No Dynamics GP Records in Repository</p>
-                <p class="text-xs text-slate-400 mt-1">Upload CSV files above or sync from the cloud to view and search records.</p>
-              </div>
-            </td>
-          </tr>
-        `;
-        safeRenderIcons();
-        updatePaginationInfo(0, 0, 0);
-        return;
-      }
-
-      if (filteredRecords.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="16" class="py-14 text-center text-slate-400">
-              <div class="flex flex-col items-center justify-center">
-                <i data-lucide="search-x" class="w-8 h-8 text-slate-300 mb-2"></i>
-                <p class="font-semibold text-slate-700 text-sm">No Matching Records Found</p>
-                <p class="text-xs text-slate-400 mt-1">Try clearing filters or selecting another location.</p>
-              </div>
-            </td>
-          </tr>
-        `;
-        safeRenderIcons();
-        updatePaginationInfo(0, 0, 0);
-        return;
-      }
-
-      let html = '';
-      pageSlice.forEach((r, idx) => {
-        const rowNum = startIdx + idx + 1;
-        const entityLabel = r._location || 'General';
-        const entityCodeMatch = entityLabel.match(/E\d\d?/i);
-        const entityBadge = entityCodeMatch ? entityCodeMatch[0].toUpperCase() : 'GP';
-
-        html += `
-          <tr class="cursor-pointer" onclick="window.openRecordDetail('${r._id}')">
-            <td class="text-center font-mono text-slate-400 text-[11px]">${rowNum}</td>
-            
-            <td>
-              <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-200">
-                <span class="px-1 py-0.2 rounded bg-sky-200 text-sky-900 font-mono text-[10px]">${entityBadge}</span>
-                ${escapeHTML(entityLabel)}
-              </span>
-            </td>
-
-            <td class="font-mono text-[11px] font-medium text-slate-700">${highlightCell(r['Department'])}</td>
-            <td class="font-mono font-bold text-slate-900">${highlightCell(r['Journal Entry'])}</td>
-            <td class="font-mono text-sky-700 font-semibold">${highlightCell(r['Invoice Number'])}</td>
-            <td class="font-semibold text-slate-800 truncate max-w-[160px]" title="${escapeHTML(r['Originating Master Name'])}">${highlightCell(r['Originating Master Name'])}</td>
-            <td class="font-mono text-slate-600 text-[11px]">${highlightCell(r['TRX Date'])}</td>
-            <td class="font-mono text-[11px] text-gp-700 font-semibold">${highlightCell(r['Account Number'])}</td>
-            <td class="text-slate-700 truncate max-w-[180px]" title="${escapeHTML(r['Account Description'])}">${highlightCell(r['Account Description'])}</td>
-            <td class="font-mono font-semibold text-right ${formatAmountColor(r['Debit Amount'])}">${formatMoney(r['Debit Amount'])}</td>
-            <td class="font-mono font-semibold text-right ${formatAmountColor(r['Credit Amount'])}">${formatMoney(r['Credit Amount'])}</td>
-            <td class="text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Reference'])}">${highlightCell(r['Reference'])}</td>
-            <td class="text-slate-600 text-[11px] truncate max-w-[140px]" title="${escapeHTML(r['Description'])}">${highlightCell(r['Description'])}</td>
-            <td class="font-mono text-[10px] text-slate-500">${highlightCell(r['Originating TRX Source'])}</td>
-            <td class="font-mono text-[11px] text-slate-600">${highlightCell(r['User Who Posted'])}</td>
-
-            <td class="text-center">
-              <button onclick="event.stopPropagation(); window.openRecordDetail('${r._id}')" class="p-1 text-slate-400 hover:text-gp-600 hover:bg-sky-50 rounded" title="Inspect Record">
-                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-              </button>
-            </td>
-          </tr>
-        `;
-      });
-
-      tbody.innerHTML = html;
-      safeRenderIcons();
-      updatePaginationInfo(startIdx + 1, Math.min(endIdx, filteredRecords.length), filteredRecords.length);
-    }
-
-    function formatMoney(val) {
-      if (!val || val === '-' || val === '0.00' || val === '0') return '<span class="text-slate-300 font-normal">-</span>';
-      const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
-      if (isNaN(num)) return escapeHTML(val);
-      return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-    }
-
-    function formatAmountColor(val) {
-      const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
-      if (isNaN(num) || num === 0) return 'text-slate-400';
-      return 'text-slate-900';
-    }
-
-    function highlightCell(str) {
-      if (!str) return '<span class="text-slate-300">-</span>';
-      const clean = escapeHTML(String(str));
-      const { searchMode, omniQuery, singleTargetVal } = window.appState;
-      let needle = '';
-
-      if (searchMode === 'omni' && omniQuery && omniQuery.length > 1) needle = omniQuery.trim();
-      else if (searchMode === 'single' && singleTargetVal && singleTargetVal.length > 1) needle = singleTargetVal.trim();
-
-      if (!needle) return clean;
-      const safeNeedle = needle.replace(/[*^$+?()[\]{}]/g, '');
-      const regex = new RegExp(`(${safeNeedle})`, 'gi');
-      return clean.replace(regex, '<mark class="mark-highlight">$1</mark>');
-    }
-
-    function escapeHTML(str) {
-      if (str === null || str === undefined) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function updateMetrics() {
-      const total = window.appState.records.length;
-      const matched = window.appState.filteredRecords.length;
-      const locCount = window.appState.locations.size;
-
-      const locEl = document.getElementById('stat-locations');
-      const rowsEl = document.getElementById('stat-rows');
-      const matchesEl = document.getElementById('stat-matches');
-      const countBadge = document.getElementById('results-count-badge');
-      const exportBadge = document.getElementById('export-count');
-      const clearBtn = document.getElementById('btn-clear-all');
-
-      if (locEl) locEl.textContent = `${locCount} / 17`;
-      if (rowsEl) rowsEl.textContent = total.toLocaleString();
-      if (matchesEl) matchesEl.textContent = matched.toLocaleString();
-      if (countBadge) countBadge.textContent = `${matched.toLocaleString()} rows`;
-      if (exportBadge) exportBadge.textContent = matched.toLocaleString();
-
-      if (clearBtn) {
-        if (total > 0) clearBtn.classList.remove('hidden');
-        else clearBtn.classList.add('hidden');
-      }
-
-      renderLocationChips();
-    }
-
-    function renderLocationChips() {
-      const container = document.getElementById('location-badges');
-      if (!container) return;
-
-      const { activeLocation, records } = window.appState;
-
-      let html = `
-        <button onclick="window.setLocationFilter('')" class="px-2.5 py-1 text-xs rounded-md font-semibold transition ${!activeLocation ? 'bg-gp-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
-          All 17 Entities (${records.length})
+  <!-- Cloud Diagnostics Modal -->
+  <div id="diagnostics-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <div class="flex items-center gap-2 text-slate-900 font-bold text-sm">
+          <i data-lucide="activity" class="w-4 h-4 text-gp-600"></i>
+          Cloud Connection & Sync Diagnostics
+        </div>
+        <button id="btn-close-diagnostics" class="text-slate-400 hover:text-slate-600 p-1 rounded">
+          <i data-lucide="x" class="w-4 h-4"></i>
         </button>
-      `;
+      </div>
 
-      window.COMPANY_ENTITIES.forEach(ent => {
-        const count = records.filter(r => r._location === ent.name).length;
-        const isActive = activeLocation === ent.name;
-        const hasRecords = count > 0;
+      <div class="space-y-3 text-xs">
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div class="font-semibold text-slate-700 mb-1">Authentication State</div>
+          <div id="diag-auth-user" class="font-mono text-slate-600">Checking...</div>
+        </div>
 
-        html += `
-          <button 
-            onclick="window.setLocationFilter('${escapeHTML(ent.name)}')" 
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border transition ${
-              isActive 
-                ? 'bg-sky-50 text-gp-800 border-gp-500 font-bold shadow-xs' 
-                : hasRecords 
-                  ? 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 font-medium' 
-                  : 'bg-slate-50/60 hover:bg-slate-100 text-slate-400 border-slate-200 opacity-60'
-            }"
-            title="${ent.name}: ${count} records"
-          >
-            <span class="px-1 py-0.5 rounded text-[10px] font-mono ${isActive ? 'bg-gp-600 text-white' : hasRecords ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-400'}">${ent.code}</span>
-            <span>${ent.short}</span>
-            <span class="text-[10px] ${hasRecords ? 'text-slate-500 font-semibold' : 'text-slate-300'}">(${count})</span>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div class="font-semibold text-slate-700 mb-1">Firestore Database (<code class="text-sky-700">/powerGP</code>)</div>
+          <div id="diag-firestore-status" class="font-mono text-slate-600">Not tested</div>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div class="font-semibold text-slate-700 mb-1">Firebase Storage (<code class="text-sky-700">RREDCO Power GP/</code>)</div>
+          <div id="diag-storage-status" class="font-mono text-slate-600">Not tested</div>
+          <div id="diag-storage-files" class="mt-2 text-[11px] text-slate-500 font-mono space-y-1"></div>
+        </div>
+
+        <div class="pt-2 flex justify-between items-center">
+          <button id="btn-run-diag" class="px-3 py-1.5 bg-gp-600 hover:bg-gp-500 text-white rounded font-medium inline-flex items-center gap-1.5">
+            <i data-lucide="play" class="w-3 h-3"></i> Run Full Health Check
           </button>
-        `;
-      });
+          <button id="btn-diag-dismiss" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      container.innerHTML = html;
-      safeRenderIcons();
-    }
-
-    function updateLocationFilterUI() {
-      const select = document.getElementById('filter-location-select');
-      if (!select) return;
-
-      const currentVal = select.value;
-      select.innerHTML = '<option value="">All 17 Entities</option>';
-
-      window.COMPANY_ENTITIES.forEach(ent => {
-        const count = window.appState.records.filter(r => r._location === ent.name).length;
-        const opt = document.createElement('option');
-        opt.value = ent.name;
-        opt.textContent = `${ent.code} - ${ent.name} (${count} rows)`;
-        select.appendChild(opt);
-      });
-
-      select.value = currentVal;
-    }
-
-    window.setLocationFilter = function(loc) {
-      window.appState.activeLocation = loc;
-      const select = document.getElementById('filter-location-select');
-      if (select) select.value = loc;
-      executeSearch();
-    };
-
-    function updatePaginationInfo(start, end, total) {
-      const infoEl = document.getElementById('pagination-info');
-      const pageEl = document.getElementById('pagination-current-page');
-      const prevBtn = document.getElementById('btn-prev-page');
-      const nextBtn = document.getElementById('btn-next-page');
-
-      if (infoEl) infoEl.textContent = `Showing ${start} to ${end} of ${total.toLocaleString()} records`;
-      if (pageEl) pageEl.textContent = `${window.appState.currentPage} / ${Math.max(1, Math.ceil(total / window.appState.pageSize))}`;
-      if (prevBtn) prevBtn.disabled = window.appState.currentPage <= 1;
-      if (nextBtn) nextBtn.disabled = window.appState.currentPage >= Math.ceil(total / window.appState.pageSize);
-    }
-
-    window.openRecordDetail = function(id) {
-      const record = window.appState.records.find(r => r._id === id);
-      if (!record) return;
-
-      window.appState.selectedRecord = record;
-      const modal = document.getElementById('detail-modal');
-      const title = document.getElementById('modal-title');
-      const subtitle = document.getElementById('modal-subtitle');
-      const badges = document.getElementById('modal-badges');
-      const grid = document.getElementById('modal-fields-grid');
-      const rawJson = document.getElementById('modal-raw-json');
-
-      if (title) title.textContent = `Journal Entry ${record['Journal Entry'] || 'Record'}`;
-      if (subtitle) subtitle.textContent = `Entity: ${record._location || 'General'} | Source: ${record._sourceFile} (Row ${record._rowIndex})`;
-
-      if (badges) {
-        badges.innerHTML = `
-          <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono text-[11px] font-semibold">Entity: ${record._location || 'General'}</span>
-          <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-[11px]">Source: ${record['Originating TRX Source'] || 'GL'}</span>
-          <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-semibold">User: ${record['User Who Posted'] || 'SYSTEM'}</span>
-        `;
-      }
-
-      if (grid) {
-        let gridHtml = '';
-        window.GP_TARGET_FIELDS.forEach(field => {
-          const isAmt = field.includes('Amount');
-          const formatted = isAmt ? formatMoney(record[field]) : escapeHTML(record[field]);
-          gridHtml += `
-            <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-              <div class="text-[10px] uppercase font-bold text-slate-500">${field}</div>
-              <div class="text-xs font-semibold text-slate-900 mt-1 break-all">${formatted || '<span class="text-slate-300 italic font-normal">empty</span>'}</div>
-            </div>
-          `;
-        });
-        grid.innerHTML = gridHtml;
-      }
-
-      if (rawJson) {
-        const cleanDump = { ...record };
-        delete cleanDump._id;
-        rawJson.textContent = JSON.stringify(cleanDump, null, 2);
-      }
-
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-      safeRenderIcons();
-    };
-
-    function closeModal() {
-      const modal = document.getElementById('detail-modal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
-    }
-
-    function exportFilteredCSV() {
-      if (window.appState.filteredRecords.length === 0) {
-        showToast('No matching records to export.', 'info');
-        return;
-      }
-
-      const exportCols = ['_location', ...window.GP_TARGET_FIELDS];
-      const rows = window.appState.filteredRecords.map(r => {
-        const rowData = {};
-        exportCols.forEach(c => rowData[c === '_location' ? 'Entity' : c] = r[c] || '');
-        return rowData;
-      });
-
-      const csv = Papa.unparse(rows);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `PowerGP_GL_Export_${window.appState.activeLocation ? window.appState.activeLocation.replace(/\s+/g, '_') : 'All_Entities'}_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast(`Exported ${window.appState.filteredRecords.length} records to CSV`, 'success');
-    }
-
-    function showToast(message, type = 'info') {
-      const existing = document.getElementById('gp-toast');
-      if (existing) existing.remove();
-
-      const toast = document.createElement('div');
-      toast.id = 'gp-toast';
-      toast.className = `fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-lg shadow-lg border text-xs font-semibold flex items-center gap-2 transition-all transform duration-200 ${
-        type === 'success' ? 'bg-emerald-800 text-white border-emerald-700' :
-        type === 'error' ? 'bg-rose-800 text-white border-rose-700' :
-        'bg-slate-900 text-white border-slate-700'
-      }`;
-
-      const iconName = type === 'success' ? 'check-circle-2' : type === 'error' ? 'alert-triangle' : 'info';
-      toast.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4"></i> <span>${escapeHTML(message)}</span>`;
-      document.body.appendChild(toast);
-      safeRenderIcons();
-
-      setTimeout(() => {
-        if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 3500);
-    }
-  </script>
-
+  <script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getStorage, ref as fbStorageRef, listAll, getDownloadURL, uploadString } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-    let app, db, auth, currentUser;
+    let app, db, auth, storage, currentUser;
 
     const defaultFirebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -1209,8 +666,9 @@
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
+        storage = getStorage(app);
 
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
           currentUser = user;
           const userEmail = user?.email?.toLowerCase() || '';
 
@@ -1231,6 +689,8 @@
               authActionBtn.className = "inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition shadow-sm";
             }
             listenToCloudLocations();
+            // Automatically attempt dual cloud pull on manager login
+            window.pullLocationsFromCloud(true);
           } else {
             window.appState.cloudConnected = false;
             if (cloudDot) cloudDot.className = "w-2 h-2 rounded-full bg-amber-400";
@@ -1250,30 +710,38 @@
           }
         });
       } catch (err) {
-        console.warn("Firestore connection warning:", err);
+        console.warn("Firebase connection warning:", err);
       }
     }
 
     function listenToCloudLocations() {
       if (!db || !auth.currentUser) return;
-      // Target the authorized powerGP collection matching Firestore security rules
       const locCollectionRef = collection(db, 'powerGP');
 
-      onSnapshot(locCollectionRef, (snapshot) => {
-        const cloudRecords = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          if (data && data.records && Array.isArray(data.records)) {
-            data.records.forEach(r => cloudRecords.push(r));
-          }
-        });
+      try {
+        onSnapshot(locCollectionRef, (snapshot) => {
+          const cloudRecords = [];
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data && data.records && Array.isArray(data.records)) {
+              data.records.forEach(r => cloudRecords.push(r));
+            } else if (data && typeof data === 'object') {
+              if (data['Journal Entry'] || data['Invoice Number'] || data['Account Number']) {
+                cloudRecords.push({ _id: docSnap.id, ...data });
+              }
+            }
+          });
 
-        if (cloudRecords.length > 0) {
-          integrateIncomingRecords(cloudRecords, 'Cloud Firestore');
-        }
-      }, (error) => {
-        console.error("Firestore onSnapshot error:", error);
-      });
+          if (cloudRecords.length > 0) {
+            integrateIncomingRecords(cloudRecords, 'Cloud Firestore');
+          }
+        }, (error) => {
+          // Non-fatal warning if Firestore collection is not initialized yet
+          console.warn("Firestore live listener standby (Storage pull remains primary):", error.code);
+        });
+      } catch (err) {
+        console.warn("Firestore snapshot initialization skipped:", err);
+      }
     }
 
     window.saveLocationsToCloud = async function() {
@@ -1308,6 +776,7 @@
           locationGroups[loc].push(rec);
         });
 
+        // 1. Save to Firestore /powerGP collection
         for (const [locationName, recordsList] of Object.entries(locationGroups)) {
           const safeId = locationName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
           const docRef = doc(db, 'powerGP', safeId);
@@ -1319,6 +788,22 @@
             recordCount: recordsList.length,
             records: recordsList.slice(0, 1500)
           });
+        }
+
+        // 2. Also save consolidated master CSV to Firebase Storage master_csvs/
+        try {
+          const exportCols = ['_location', ...window.GP_TARGET_FIELDS];
+          const rows = window.appState.records.map(r => {
+            const rowData = {};
+            exportCols.forEach(c => rowData[c === '_location' ? 'Location' : c] = r[c] || '');
+            return rowData;
+          });
+          const csvText = Papa.unparse(rows);
+          const currentMonth = new Date().toISOString().slice(0, 7).replace('-', '_');
+          const fileRef = fbStorageRef(storage, `master_csvs/${currentMonth}_master.csv`);
+          await uploadString(fileRef, csvText, 'raw', { contentType: 'text/csv' });
+        } catch (storageSaveErr) {
+          console.warn("Storage CSV backup warning:", storageSaveErr);
         }
 
         showToast(`Saved ${window.appState.records.length} records across ${Object.keys(locationGroups).length} entities to Cloud!`, 'success');
@@ -1334,13 +819,92 @@
       }
     };
 
-    window.pullLocationsFromCloud = async function() {
+    window.pullLocationsFromCloud = async function(isSilent = false) {
       if (!auth?.currentUser) {
-        openAuthModal();
-        showToast('Please sign in as an authorized manager first.', 'error');
+        if (!isSilent) {
+          openAuthModal();
+          showToast('Please sign in as an authorized manager first.', 'error');
+        }
         return;
       }
 
+      const pullBtn = document.getElementById('btn-pull-cloud-header');
+      if (pullBtn && !isSilent) {
+        pullBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Checking Cloud...`;
+        safeRenderIcons();
+      }
+
+      let totalRetrieved = 0;
+      let storageFileCount = 0;
+
+      // A. Pull from Firebase Storage ("RREDCO Power GP" & fallback "master_csvs") - PRIMARY SOURCE
+      const targetFolders = ['RREDCO Power GP', 'master_csvs'];
+      for (const folderName of targetFolders) {
+        try {
+          const storageFolderRef = fbStorageRef(storage, folderName);
+          const fileList = await listAll(storageFolderRef);
+
+          for (const itemRef of fileList.items) {
+            try {
+              const url = await getDownloadURL(itemRef);
+              const resp = await fetch(url);
+              const entityName = detectEntityFromFileName(itemRef.name) || 'General';
+
+              if (itemRef.name.toLowerCase().endsWith('.xlsx') || itemRef.name.toLowerCase().endsWith('.xls')) {
+                // Parse Excel binary buffer with SheetJS
+                const arrayBuffer = await resp.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+                if (rawRows && rawRows.length > 0) {
+                  const headers = Object.keys(rawRows[0]);
+                  const headerMap = {};
+                  headers.forEach(h => {
+                    headerMap[h] = matchStandardField(h);
+                  });
+
+                  const normalized = rawRows.map((row, idx) => {
+                    const item = {
+                      _id: `${entityName}__${itemRef.name}__${idx}__${Math.random().toString(36).substring(2, 7)}`,
+                      _location: entityName,
+                      _sourceFile: itemRef.name,
+                      _rowIndex: idx + 1
+                    };
+                    window.GP_TARGET_FIELDS.forEach(field => {
+                      item[field] = '';
+                    });
+                    for (const [rawKey, rawVal] of Object.entries(row)) {
+                      const mapped = headerMap[rawKey] || rawKey;
+                      item[mapped] = rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : '';
+                    }
+                    return item;
+                  });
+
+                  integrateIncomingRecords(normalized, entityName);
+                  totalRetrieved += normalized.length;
+                  storageFileCount++;
+                }
+              } else {
+                // Parse plaintext CSV with PapaParse
+                const csvData = await resp.text();
+                if (csvData && csvData.length > 10) {
+                  parseAndIngestCSV(entityName, csvData, itemRef.name);
+                  totalRetrieved++;
+                  storageFileCount++;
+                }
+              }
+            } catch (fileErr) {
+              console.warn(`Could not load storage file ${itemRef.name}:`, fileErr);
+            }
+          }
+        } catch (storageErr) {
+          console.info(`Storage folder check for "${folderName}":`, storageErr.message);
+        }
+      }
+
+      // B. Optional pull from Firestore (/powerGP collection)
       try {
         const collectionRef = collection(db, 'powerGP');
         const snapshot = await getDocs(collectionRef);
@@ -1349,19 +913,85 @@
           const data = d.data();
           if (data && data.records && Array.isArray(data.records)) {
             fetched.push(...data.records);
+          } else if (data && typeof data === 'object') {
+            if (data['Journal Entry'] || data['Invoice Number'] || data['Account Number']) {
+              fetched.push({ _id: d.id, ...data });
+            }
           }
         });
 
         if (fetched.length > 0) {
-          integrateIncomingRecords(fetched, 'Cloud Sync');
-          showToast(`Retrieved ${fetched.length} records from Firestore!`, 'success');
-        } else {
-          showToast('No records found in Cloud powerGP collection yet.', 'info');
+          integrateIncomingRecords(fetched, 'Cloud Firestore');
+          totalRetrieved += fetched.length;
         }
       } catch (err) {
-        console.error("Firestore pull error:", err);
-        showToast(`Cloud fetch failed: ${err.message}`, 'error');
+        // Firestore is secondary; do not break if rules or collection are pending
+        console.warn("Firestore sync check skipped:", err.message);
       }
+
+      if (pullBtn && !isSilent) {
+        pullBtn.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span>Pull From Cloud</span>`;
+        safeRenderIcons();
+      }
+
+      if (!isSilent) {
+        if (totalRetrieved > 0) {
+          showToast(`Loaded ${totalRetrieved.toLocaleString()} records from ${storageFileCount} Cloud workbook(s)!`, 'success');
+        } else {
+          showToast('No files could be read from Cloud Storage. Check Storage permissions or sign-in state.', 'info');
+        }
+      }
+    };
+
+    window.runCloudDiagnostics = async function() {
+      const userEl = document.getElementById('diag-auth-user');
+      const fsEl = document.getElementById('diag-firestore-status');
+      const stEl = document.getElementById('diag-storage-status');
+      const stFiles = document.getElementById('diag-storage-files');
+
+      if (userEl) {
+        if (auth?.currentUser) {
+          userEl.innerHTML = `<span class="text-emerald-700 font-bold">Authenticated</span>: ${auth.currentUser.email} (UID: ${auth.currentUser.uid.slice(0, 8)}...)`;
+        } else {
+          userEl.innerHTML = `<span class="text-rose-600 font-bold">Not Logged In</span>. Click Sign In in the header to authenticate.`;
+        }
+      }
+
+      if (!auth?.currentUser) {
+        if (fsEl) fsEl.innerHTML = `<span class="text-amber-600">Skipped (Requires Sign In)</span>`;
+        if (stEl) stEl.innerHTML = `<span class="text-amber-600">Skipped (Requires Sign In)</span>`;
+        return;
+      }
+
+      // Test Firestore
+      if (fsEl) fsEl.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin inline"></i> Checking collection /powerGP...`;
+      safeRenderIcons();
+      try {
+        const snap = await getDocs(collection(db, 'powerGP'));
+        fsEl.innerHTML = `<span class="text-emerald-700 font-bold">Connected</span>. Found ${snap.size} entity document(s).`;
+      } catch (e) {
+        fsEl.innerHTML = `<span class="text-rose-600 font-bold">Error:</span> ${e.message}`;
+      }
+
+      // Test Storage in RREDCO Power GP
+      if (stEl) stEl.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin inline"></i> Checking folder "RREDCO Power GP"...`;
+      safeRenderIcons();
+      try {
+        const folderRef = fbStorageRef(storage, 'RREDCO Power GP');
+        const list = await listAll(folderRef);
+        stEl.innerHTML = `<span class="text-emerald-700 font-bold">Connected</span>. Found ${list.items.length} Excel/CSV workbook(s).`;
+        if (stFiles) {
+          if (list.items.length > 0) {
+            stFiles.innerHTML = list.items.map(it => `• 📊 <strong>${it.name}</strong>`).join('<br>');
+          } else {
+            stFiles.innerHTML = '<span class="italic text-slate-400">Folder exists, but no files detected.</span>';
+          }
+        }
+      } catch (e) {
+        stEl.innerHTML = `<span class="text-rose-600 font-bold">Error:</span> ${e.message}`;
+        if (stFiles) stFiles.innerHTML = '';
+      }
+      safeRenderIcons();
     };
 
     window.managerSignIn = async function(email, password) {
@@ -1411,12 +1041,41 @@
       }
     }
 
+    function openDiagnosticsModal() {
+      const modal = document.getElementById('diagnostics-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        if (window.runCloudDiagnostics) window.runCloudDiagnostics();
+      }
+    }
+
+    function closeDiagnosticsModal() {
+      const modal = document.getElementById('diagnostics-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
     function initializeAppUI() {
       safeRenderIcons();
 
       const authBtn = document.getElementById('btn-auth-action');
       const closeAuthBtn = document.getElementById('btn-close-auth-modal');
       const authForm = document.getElementById('auth-form');
+
+      const diagBtn = document.getElementById('btn-open-diagnostics');
+      const closeDiagBtn = document.getElementById('btn-close-diagnostics');
+      const dismissDiagBtn = document.getElementById('btn-diag-dismiss');
+      const runDiagBtn = document.getElementById('btn-run-diag');
+
+      if (diagBtn) diagBtn.addEventListener('click', openDiagnosticsModal);
+      if (closeDiagBtn) closeDiagBtn.addEventListener('click', closeDiagnosticsModal);
+      if (dismissDiagBtn) dismissDiagBtn.addEventListener('click', closeDiagnosticsModal);
+      if (runDiagBtn) runDiagBtn.addEventListener('click', () => {
+        if (window.runCloudDiagnostics) window.runCloudDiagnostics();
+      });
 
       if (authBtn) {
         authBtn.addEventListener('click', () => {
