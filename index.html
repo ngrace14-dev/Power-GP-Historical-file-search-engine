@@ -637,22 +637,33 @@
 
     // Initial Registered Users Storage Setup
     const defaultRegistered = ["nicholas.grace@rredco.com"];
-    const savedRegistered = JSON.parse(localStorage.getItem('rredco_registered_users') || '[]');
+    let savedRegistered = [];
+    try {
+      savedRegistered = JSON.parse(localStorage.getItem('rredco_registered_users') || '[]');
+    } catch(e) {}
     window.REGISTERED_USERS = Array.from(new Set([...defaultRegistered, ...savedRegistered]));
 
     // System Logs Initial Local Cache Setup
-    const savedLogs = JSON.parse(localStorage.getItem('rredco_system_logs') || '[]');
+    let savedLogs = [];
+    try {
+      savedLogs = JSON.parse(localStorage.getItem('rredco_system_logs') || '[]');
+    } catch(e) {}
 
     // Role-Based Access Control Registry
-    window.APP_PERMISSIONS = JSON.parse(localStorage.getItem('rredco_permissions') || JSON.stringify({
+    let initialPerms = {
       "nicholas.grace@rredco.com": ["gp-ledger", "fin-reporting", "asset-tracker", "system-logs"]
-    }));
+    };
+    try {
+      const storedP = localStorage.getItem('rredco_permissions');
+      if (storedP) initialPerms = JSON.parse(storedP);
+    } catch(e) {}
+    window.APP_PERMISSIONS = initialPerms;
 
     window.AVAILABLE_APPS = [
       {
         id: "gp-ledger",
         title: "Power GP Historical Ledger",
-        version: "v3.4",
+        version: "v3.5",
         description: "Read-only multi-entity search engine for 17 corporate General Ledger exports. Includes multi-field combinatorial matrix, journal entry lookup, and CSV export.",
         icon: "database"
       },
@@ -752,7 +763,7 @@
       });
     }
 
-    // INSTANT DUAL-SYNC LOGGING FUNCTION
+    // INSTANT DUAL-SYNC LOGGING FUNCTION WITH SAFE QUOTA HANDLING
     function logUserActivity(eventType, details) {
       if (!window.appState.user) return;
       
@@ -763,21 +774,33 @@
         details: details,
         timestamp: new Date().toISOString(),
         timeFormatted: new Date().toLocaleString(),
-        userAgent: navigator.userAgent.slice(0, 80)
+        userAgent: navigator.userAgent.slice(0, 50)
       };
 
+      // 1. Update In-Memory State
       window.appState.systemLogs.unshift(logPayload);
-      localStorage.setItem('rredco_system_logs', JSON.stringify(window.appState.systemLogs.slice(0, 500)));
 
+      // 2. Safe LocalStorage Persinement capped strictly at 50 items
+      try {
+        const trimmedLogs = window.appState.systemLogs.slice(0, 50);
+        localStorage.setItem('rredco_system_logs', JSON.stringify(trimmedLogs));
+      } catch (err) {
+        console.warn("Storage quota limit detected; clearing local cached log history.");
+        window.appState.systemLogs = window.appState.systemLogs.slice(0, 20);
+        try { localStorage.removeItem('rredco_system_logs'); } catch(e){}
+      }
+
+      // 3. Refresh Dashboard UI
       if (document.getElementById('log-app-screen').classList.contains('flex')) {
         renderSystemLogDashboard();
       }
 
+      // 4. Async Realtime Database Push
       try {
         const logsRef = dbRef(database, 'system_activity_logs');
         push(logsRef, logPayload).catch(e => console.warn("Firebase RTDB Notice:", e.message));
       } catch (err) {
-        console.warn("Local storage fallback active:", err);
+        console.warn("Firebase Push notice:", err);
       }
     }
 
@@ -805,10 +828,14 @@
       return window.APP_PERMISSIONS[emailLower] || ["gp-ledger"];
     }
 
-    // Save Users and Permissions
+    // Save Users and Permissions Safely
     function syncUserStores() {
-      localStorage.setItem('rredco_registered_users', JSON.stringify(window.REGISTERED_USERS));
-      localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+      try {
+        localStorage.setItem('rredco_registered_users', JSON.stringify(window.REGISTERED_USERS));
+        localStorage.setItem('rredco_permissions', JSON.stringify(window.APP_PERMISSIONS));
+      } catch(e) {
+        console.warn("Storage sync notice:", e);
+      }
     }
 
     // Render Portal Apps Grid
@@ -1016,7 +1043,7 @@
       if (confirm('Clear all logged system activity events?')) {
         try { remove(dbRef(database, 'system_activity_logs')); } catch (e) {}
         window.appState.systemLogs = [];
-        localStorage.removeItem('rredco_system_logs');
+        try { localStorage.removeItem('rredco_system_logs'); } catch(e){}
         renderSystemLogDashboard();
       }
     });
@@ -1035,7 +1062,9 @@
             }
           });
           window.appState.systemLogs = Array.from(map.values()).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-          localStorage.setItem('rredco_system_logs', JSON.stringify(window.appState.systemLogs.slice(0, 500)));
+          try {
+            localStorage.setItem('rredco_system_logs', JSON.stringify(window.appState.systemLogs.slice(0, 50)));
+          } catch(e){}
           if (document.getElementById('log-app-screen').classList.contains('flex')) {
             renderSystemLogDashboard();
           }
@@ -1067,7 +1096,10 @@
             document.getElementById('userEmail').textContent = user.email;
             document.getElementById('portalUserEmail').textContent = user.email;
             
-            const hasUpdatedPwd = localStorage.getItem('pwd_updated_' + user.uid);
+            let hasUpdatedPwd = false;
+            try {
+              hasUpdatedPwd = localStorage.getItem('pwd_updated_' + user.uid);
+            } catch(e){}
 
             if (!hasUpdatedPwd) {
                 showScreen('login-screen');
@@ -1202,7 +1234,7 @@
 
         try {
             await updatePassword(auth.currentUser, newPwd);
-            localStorage.setItem('pwd_updated_' + auth.currentUser.uid, 'true');
+            try { localStorage.setItem('pwd_updated_' + auth.currentUser.uid, 'true'); } catch(e){}
             logUserActivity('PASSWORD_CHANGE', 'Updated permanent account password');
             
             document.getElementById('first-time-pwd-modal').classList.add('hidden');
