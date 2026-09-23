@@ -184,7 +184,8 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-    import { ProvenanceEngine } from './modules/provenance-engine.js'; // <-- NEW GOVERNANCE MODULE
+    import { ProvenanceEngine } from './modules/provenance-engine.js'; 
+    import { EvidenceStateEngine } from './modules/evidence-state-engine.js'; // <-- NEW GOVERNANCE MODULE
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -344,17 +345,26 @@
               _cross_foot_valid: true
             };
 
-            // 2. Map through Governance Engine
+            // 2. Map through Governance Engine (which deeply freezes _provenance and data)
             const stampedRecord = ProvenanceEngine.stampRecord({
               sourceFile: fileRef.name,
               sourceSystem: "Firebase_Storage",
-              sourceType: "NATIVE_EXPORT", // Level 1 Trust
+              sourceType: "NATIVE_EXPORT", 
               entityContext: entityMatch.short || "UNKNOWN", 
               processedBy: "Lighthouse Engine v2 (Cloud Pull)",
               extractedData: rawRecord
             });
 
-            extractedData.push(stampedRecord);
+            // 3. Construct the final record with Evidence State added alongside the frozen chunks
+            const finalRecord = {
+                _provenance: stampedRecord._provenance,
+                data: stampedRecord.data,
+                _evidenceState: EvidenceStateEngine.initializeState({
+                    hasVariance: !rawRecord._cross_foot_valid
+                })
+            };
+
+            extractedData.push(finalRecord);
           }
           window.logSys(`Digitized ${fileRef.name} successfully.`, 'success');
         }
@@ -415,14 +425,22 @@
         const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
 
         extractedData = parsedRows.map(row => {
-            return ProvenanceEngine.stampRecord({
+            const stampedRecord = ProvenanceEngine.stampRecord({
               sourceFile: originalFileName,
               sourceSystem: "Local_Upload",
-              sourceType: "SOURCE_PDF", // Level 3 Trust
+              sourceType: "SOURCE_PDF", 
               entityContext: userSelectedEntity.toUpperCase(),
               processedBy: "Lighthouse Engine v2 (Spatial OCR)",
               extractedData: row
             });
+            
+            return {
+                _provenance: stampedRecord._provenance,
+                data: stampedRecord.data,
+                _evidenceState: EvidenceStateEngine.initializeState({
+                    hasVariance: !row._cross_foot_valid
+                })
+            };
         });
 
         window.updateProgress(100, 'EXTRACTION COMPLETE');
@@ -450,14 +468,22 @@
             const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
             
             extractedData = parsedRows.map(row => {
-                return ProvenanceEngine.stampRecord({
+                const stampedRecord = ProvenanceEngine.stampRecord({
                   sourceFile: "Pasted_Buffer.txt",
                   sourceSystem: "Manual_Text_Entry",
-                  sourceType: "OCR_EXTRACTION", // Level 4 Trust
+                  sourceType: "OCR_EXTRACTION", 
                   entityContext: userSelectedEntity.toUpperCase(),
                   processedBy: "Lighthouse Engine v2 (Text Parser)",
                   extractedData: row
                 });
+                
+                return {
+                    _provenance: stampedRecord._provenance,
+                    data: stampedRecord.data,
+                    _evidenceState: EvidenceStateEngine.initializeState({
+                        hasVariance: !row._cross_foot_valid
+                    })
+                };
             });
         } else {
             extractedData = [];
@@ -526,16 +552,17 @@
     window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted, cross-foot verified, and locked with provenance.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, cross-foot verified, and locked with provenance & evidence states.`;
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
         // Governance Extraction Wrapper
         const r = record.data; 
         const prov = record._provenance;
+        const state = record._evidenceState;
 
         return `
-        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile} | Trust Level: ${prov.trustLevel}">
+        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile} | Trust Level: ${prov.trustLevel} | State: ${state.status}">
           <td class="p-3 pl-4">
             <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext} | ${r.vendor_id}</span>
             ${r.vendor_name}
@@ -591,12 +618,17 @@
         { header: 'Type', key: 'type', width: 10 },
         { header: 'TRX Date', key: 'doc_date', width: 14 },
         { header: 'Doc Amount', key: 'doc_amount', width: 16 },
-        { header: 'Current Period', key: 'current_period', width: 16 }
+        { header: 'Current Period', key: 'current_period', width: 16 },
+        { header: 'Evidence State', key: 'evidence_state', width: 16 }
       ];
 
       extractedData.forEach(record => {
         // Flatten the record slightly for the Excel export
-        const exportRow = { ...record.data, entity_context: record._provenance.entityContext };
+        const exportRow = { 
+            ...record.data, 
+            entity_context: record._provenance.entityContext,
+            evidence_state: record._evidenceState.status 
+        };
         sheet.addRow(exportRow);
       });
 
