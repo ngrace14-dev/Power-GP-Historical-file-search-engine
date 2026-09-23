@@ -1,73 +1,62 @@
-// modules/provenance-engine.js
+// modules/confidence-engine.js
 
 /**
- * Provenance Engine
- * Enforces RREDCO System Governance Charter v5.0
- * Primary Directive: Preserve evidence traceability and entity isolation.
+ * Confidence Engine
+ * Enforces RREDCO System Governance Charter v5.0 - Rule 6
+ * Calculates probabilistic confidence scores for extraction and parsing.
  */
 
-const VALID_ENTITIES = new Set(['POMCO', 'RREDCO', 'RRCSCO', 'WRGCC']);
-
-const SOURCE_TRUST_LEVELS = {
-    'NATIVE_EXPORT': 1, // Dynamics GP Export, Bank Data
-    'ORIGINAL_DOC': 2,  // Native electronic invoice/file
-    'SOURCE_PDF': 3,    // Scanned or flattened PDF
-    'OCR_EXTRACTION': 4, // Raw text from OCR
-    'AI_INTERPRETATION': 5 // LLM or Heuristic output
-};
-
-export class ProvenanceEngine {
+export class ConfidenceEngine {
     
     /**
-     * Generates a frozen, immutable provenance wrapper for extracted data.
-     * @param {Object} params 
-     * @returns {Object} Immutable record with _provenance stamp
+     * Calculates combined confidence metrics for a given record.
+     * @param {Object} params - Contains sourceType, rawText (optional), and the parsedRecord
+     * @returns {Object} { ocrConfidence, parsingConfidence }
      */
-    static stampRecord(params) {
-        this.#validateEntity(params.entityContext);
-        
-        const trustLevel = SOURCE_TRUST_LEVELS[params.sourceType] || 5;
+    static calculateScores(params) {
+        let ocrConfidence = 100.0;
+        let parsingConfidence = 0.0; // FIXED: Default to 0, not 100, for missing records.
 
-        const provenanceData = {
-            sourceFile: params.sourceFile,
-            sourceSystem: params.sourceSystem,
-            trustLevel: trustLevel,
-            entityContext: params.entityContext,
-            retrievedAt: new Date().toISOString(),
-            processedBy: params.processedBy || "Lighthouse Engine v2",
-            confidenceMetrics: {
-                ocrConfidence: params.ocrConfidence || null,
-                parsingConfidence: params.parsingConfidence || null
+        // 1. OCR / Text Extraction Quality
+        if (params.sourceType === 'NATIVE_EXPORT') {
+            ocrConfidence = 100.0; // Native Excel exports have perfect "OCR" confidence
+        } else if (params.rawText) {
+            // Heuristic: Penalize for high presence of garbled or unexpected characters
+            const totalChars = params.rawText.length;
+            
+            // FIXED: Moved hyphen to the end of the character class to avoid regex range errors
+            const badChars = (params.rawText.match(/[^a-zA-Z0-9\s.,$():/-]/g) || []).length;
+            
+            if (totalChars > 0) {
+                const penalty = (badChars / totalChars) * 150; // Weighted penalty
+                ocrConfidence = Math.max(0, 100 - penalty);
             }
+        } else {
+            ocrConfidence = 85.0; // Baseline for unknown unstructured text
+        }
+
+        // 2. Parsing Structural Integrity
+        if (params.parsedRecord) {
+            let requiredFieldsScore = 0;
+            const r = params.parsedRecord;
+            
+            // Validate core forensic fields (20 points each)
+            if (r.vendor_id && r.vendor_id !== "UNKNOWN") requiredFieldsScore += 20;
+            if (r.doc_date && r.doc_date !== "Invalid Date") requiredFieldsScore += 20;
+            
+            // FIXED: Added !isNaN checks because typeof NaN is 'number' in JS
+            if (typeof r.doc_amount === 'number' && !isNaN(r.doc_amount)) requiredFieldsScore += 20;
+            if (typeof r.current_period === 'number' && !isNaN(r.current_period)) requiredFieldsScore += 20;
+            
+            // Validate mathematical integrity (20 points)
+            if (r._cross_foot_valid === true) requiredFieldsScore += 20;
+
+            parsingConfidence = requiredFieldsScore;
+        }
+
+        return {
+            ocrConfidence: parseFloat(ocrConfidence.toFixed(1)),
+            parsingConfidence: parseFloat(parsingConfidence.toFixed(1))
         };
-
-        // Create the final record payload
-        const stampedRecord = {
-            _provenance: provenanceData,
-            data: params.extractedData
-        };
-
-        // Enforce Immutability (Governance v5.0 - Data Integrity Precedence)
-        return this.#deepFreeze(stampedRecord);
-    }
-
-    static #validateEntity(entity) {
-        if (!entity) {
-            throw new Error("Governance Violation: Entity Context is required. Records may not be merged or processed without an entity domain.");
-        }
-        if (!VALID_ENTITIES.has(entity)) {
-            console.warn(`Warning: '${entity}' is not in the standard strict entity list, but isolation will be enforced.`);
-        }
-    }
-
-    static #deepFreeze(object) {
-        const propNames = Object.getOwnPropertyNames(object);
-        for (const name of propNames) {
-            const value = object[name];
-            if (value && typeof value === "object") {
-                this.#deepFreeze(value);
-            }
-        }
-        return Object.freeze(object);
     }
 }
