@@ -156,6 +156,7 @@
                 <th class="p-3">TRX Date</th>
                 <th class="p-3 text-right">Amount</th>
                 <th class="p-3">Relational Graph Links</th>
+                <th class="p-3 text-center">Phase 1 Materiality Risk</th>
                 <th class="p-3 text-center">Phase 4 Validation Status</th>
               </tr>
             </thead>
@@ -180,12 +181,9 @@
       </div>
       
       <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
-        <!-- PRIMARY REFERENCE RECORD (ANCHOR CONTEXT) -->
         <div class="bg-cyan-950/40 border border-cyan-500/40 rounded-xl p-3.5 shadow-inner">
           <span class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider block mb-1">Primary Reference Record (Clicked Line Item)</span>
-          <div id="graph-modal-primary" class="font-mono text-slate-100 font-semibold">
-            <!-- Dynamically populated with clicked record entity, vendor, amount, and matching edge -->
-          </div>
+          <div id="graph-modal-primary" class="font-mono text-slate-100 font-semibold"></div>
         </div>
 
         <div>
@@ -251,6 +249,7 @@
     import { ValidationEngine } from './validation-engine.js';
     import { RelationshipEngine } from './relationship-engine.js';
     import { GeminiService } from './gemini-service.js';
+    import { MaterialityEngine } from './materiality-engine.js'; // Phase 1 Import
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -304,7 +303,6 @@
       const invNum = r.invoiceNumber || r.doc_number || r['Invoice Number'] || '-';
       const voucherNum = r.voucherNumber || r.voucher || r['Journal Entry'] || '-';
       
-      // ANCHOR HEADER POPULATION
       document.getElementById('graph-modal-primary').innerHTML = `
         <div class="flex justify-between items-center text-sm">
           <span class="text-cyan-300 font-bold">${record._provenance?.entityContext || 'ENTITY'} | ${r.vendor || r.vendor_name || r['Originating Master Name'] || 'Vendor'}</span>
@@ -552,8 +550,13 @@
           });
         }
 
+        // Phase 5 Relationship Engine Discovery
         extractedData = RelationshipEngine.buildRelationships(extractedData);
-        window.logSys('Phase 5 Relationship Graph created. Relational links mapped across invoices, vendors, and journal entries.', 'success');
+        
+        // Phase 1 Materiality Evaluation
+        const materialityRes = MaterialityEngine.evaluateDataset(extractedData);
+        extractedData = materialityRes.records;
+        window.logSys(`Phase 1 Materiality Evaluation complete. Flagged ${materialityRes.totalMaterialCount} material audit variances.`, materialityRes.totalMaterialCount > 0 ? 'warning' : 'success');
 
         window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
         window.renderResults(extractedData);
@@ -651,6 +654,7 @@
         });
 
         extractedData = RelationshipEngine.buildRelationships(extractedData);
+        extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
 
         window.updateProgress(100, 'EXTRACTION & GRAPH MAPPING COMPLETE');
         window.renderResults(extractedData);
@@ -717,6 +721,7 @@
             });
 
             extractedData = RelationshipEngine.buildRelationships(extractedData);
+            extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
         } else {
             extractedData = [];
         }
@@ -784,7 +789,7 @@
     window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted, normalized, validated, and relationship graph mapped.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, normalized, validated, and materiality evaluated.`;
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
@@ -792,9 +797,19 @@
         const prov = record._provenance || {};
         const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
         const rel = record._relationships || { hasLinks: false, totalConnectedRecords: 0 };
+        const mat = record._materiality || { materialityLevel: 'IMMATERIAL', isMaterial: false, reason: '' };
         const recId = record._id || r.row_id;
 
         const scoreColor = (prov.confidenceMetrics?.parsingConfidence || 100) < 70 ? 'text-amber-400' : 'text-emerald-400';
+
+        let materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400 border border-slate-700">Immaterial</span>`;
+        if (mat.materialityLevel === 'CRITICAL') {
+          materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold" title="${mat.reason}">CRITICAL VAR</span>`;
+        } else if (mat.materialityLevel === 'ELEVATED') {
+          materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold" title="${mat.reason}">ELEVATED VAR</span>`;
+        } else if (mat.materialityLevel === 'HIGH_EXPOSURE') {
+          materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold" title="${mat.reason}">HIGH SCOPE</span>`;
+        }
 
         return `
         <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile || 'Local'} | Connected Links: ${rel.totalConnectedRecords}">
@@ -814,6 +829,7 @@
               ? `<button onclick="viewGraphLinks('${recId}')" class="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 font-bold flex items-center gap-1 transition shadow-xs cursor-pointer"><i class="ph ph-tree-structure text-xs"></i> ${rel.totalConnectedRecords} Links</button>` 
               : `<span class="text-slate-500 text-[10px]">Unlinked</span>`}
           </td>
+          <td class="p-3 text-center">${materialityBadge}</td>
           <td class="p-3 text-center">
             ${val.tieOutStatus === 'PASS' 
               ? `<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">PASS</span>`
@@ -867,6 +883,7 @@
         { header: 'TRX Date', key: 'transactionDate', width: 14 },
         { header: 'Amount', key: 'amount', width: 16 },
         { header: 'Connected Links', key: 'links_count', width: 16 },
+        { header: 'Materiality Risk', key: 'materiality_risk', width: 16 },
         { header: 'Tie-Out Status', key: 'tie_out_status', width: 14 },
         { header: 'Variance', key: 'variance', width: 12 },
         { header: 'Evidence State', key: 'evidence_state', width: 16 },
@@ -879,6 +896,7 @@
             ...r, 
             entity_context: record._provenance?.entityContext || 'ENTITY',
             links_count: record._relationships?.totalConnectedRecords || 0,
+            materiality_risk: record._materiality?.materialityLevel || 'IMMATERIAL',
             tie_out_status: record._validation?.tieOutStatus || 'PASS',
             variance: record._validation?.variance || 0,
             evidence_state: record._evidenceState?.status || 'Accepted',
