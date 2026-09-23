@@ -76,6 +76,28 @@
       </div>
     </div>
 
+    <!-- Active Investigation Panel (Hidden by default) -->
+    <div id="investigation-panel" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-5 shadow-sm">
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-bold text-indigo-900" id="inv-title">Active Investigation</h3>
+            <span id="inv-state" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200 text-indigo-800 uppercase tracking-wide">Open</span>
+          </div>
+          <p class="text-xs text-indigo-700">Entity Boundary: <span id="inv-entity" class="font-mono font-bold"></span> | Case ID: <span id="inv-id" class="font-mono"></span></p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-xs font-semibold text-indigo-800 bg-indigo-100/50 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <i data-lucide="paperclip" class="w-4 h-4"></i>
+            Attached Evidence: <span id="inv-count" class="font-bold text-indigo-600 text-sm">0</span>
+          </div>
+          <button onclick="saveAndCloseInvestigation()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i> Save Case
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Search Controls -->
     <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
@@ -87,11 +109,16 @@
             <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
           </div>
         </div>
-        <div class="flex items-center gap-2 w-full sm:w-auto bg-amber-50 p-1.5 rounded-lg border border-amber-200">
-          <label class="text-xs font-bold text-amber-800 whitespace-nowrap"><i data-lucide="lock" class="w-3 h-3 inline mr-1"></i> Entity Domain:</label>
-          <select id="filter-location-select" class="text-xs bg-white border border-amber-300 rounded-md px-2.5 py-1.5 focus:ring-amber-500 focus:border-amber-500 w-full sm:w-48 font-bold text-slate-800">
-            <option value="">--- REQUIRED: Select Entity ---</option>
-          </select>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <button id="btn-start-case" onclick="startInvestigation()" class="hidden px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="briefcase" class="w-3.5 h-3.5"></i> Start Investigation
+          </button>
+          <div class="flex items-center gap-2 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
+            <label class="text-xs font-bold text-amber-800 whitespace-nowrap"><i data-lucide="lock" class="w-3 h-3 inline mr-1"></i> Entity Domain:</label>
+            <select id="filter-location-select" class="text-xs bg-white border border-amber-300 rounded-md px-2.5 py-1.5 focus:ring-amber-500 focus:border-amber-500 w-full sm:w-48 font-bold text-slate-800">
+              <option value="">--- REQUIRED: Select Entity ---</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -133,6 +160,7 @@
         <table id="main-results-table" class="w-full text-left text-xs border-collapse whitespace-nowrap">
           <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 border-b border-slate-200 font-semibold select-none">
             <tr id="table-header-row">
+              <th class="py-2.5 px-3">Action</th>
               <th class="py-2.5 px-3">Explainability (State / Trust / Provenance)</th>
               <th class="py-2.5 px-3">Location / Entity</th>
               <th class="py-2.5 px-3">Department</th>
@@ -151,7 +179,7 @@
             </tr>
           </thead>
           <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
-            <tr><td colspan="15" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
+            <tr><td colspan="16" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
           </tbody>
         </table>
       </div>
@@ -167,6 +195,9 @@
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     import { getDatabase, ref as dbRef, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    
+    // GOVERNANCE MODULE
+    import { InvestigationEngine } from './modules/investigation-engine.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -186,9 +217,9 @@
     window.COMPANY_ENTITIES = [{ code: 'E01', name: 'POMCO E01', short: 'POMCO' },{ code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },{ code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },{ code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },{ code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },{ code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },{ code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },{ code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },{ code: 'E09', name: 'RRICO E09', short: 'RRICO' },{ code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },{ code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },{ code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },{ code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },{ code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },{ code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },{ code: 'E16', name: 'WRMM E16', short: 'WRMM' },{ code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }];
     window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
     
-    window.appState = { records: [], filteredRecords: [], locations: new Set(), searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '', currentPage: 1, pageSize: 50, user: null };
+    window.appState = { records: [], filteredRecords: [], locations: new Set(), searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '', currentPage: 1, pageSize: 50, user: null, activeInvestigation: null };
 
-    // INDEXEDDB STAGING READ (Phase 2 Update)
+    // INDEXEDDB STAGING READ
     function openAuditDB() {
       return new Promise((resolve, reject) => {
         const req = indexedDB.open('RREDCO_Audit_Store', 1);
@@ -211,7 +242,6 @@
 
           let addedCount = 0;
           stagingData.forEach((row, idx) => {
-            // Unpack Governance Payload
             const prov = row._provenance || {};
             const state = row._evidenceState || {};
             const data = row.data || {};
@@ -273,8 +303,85 @@
 
     document.getElementById('filter-location-select').addEventListener('change', (e) => {
       window.appState.activeLocation = e.target.value;
+      const btnStart = document.getElementById('btn-start-case');
+      if (window.appState.activeLocation && !window.appState.activeInvestigation) {
+          btnStart.classList.remove('hidden');
+      } else {
+          btnStart.classList.add('hidden');
+      }
       executeSearch();
     });
+
+    // INVESTIGATION WORKFLOW
+    window.startInvestigation = () => {
+        const title = prompt("Enter a title for this Investigation Case:");
+        if (!title) return;
+        
+        window.appState.activeInvestigation = InvestigationEngine.createInvestigation(
+            title, 
+            window.appState.activeLocation, 
+            window.appState.user.email
+        );
+        
+        document.getElementById('btn-start-case').classList.add('hidden');
+        renderInvestigationPanel();
+        renderTable(); // Re-render to show plus icons
+        logUserActivity('CASE_OPENED', `Started case: ${title}`);
+    };
+
+    window.attachToCase = (recordId) => {
+        const inv = window.appState.activeInvestigation;
+        if (!inv) return;
+
+        const record = window.appState.records.find(r => r._id === recordId);
+        if (!record) return;
+
+        if (inv.evidenceLog.some(log => log.recordId === record._id)) {
+            return alert("This record is already attached to the active investigation.");
+        }
+
+        const rationale = prompt("Why are you attaching this evidence? (Required by Governance)");
+        if (!rationale) return alert("Governance Violation: Link rationale is required.");
+
+        // Construct proxy provenance object for the engine
+        const evidenceProxy = {
+            _provenance: { entityContext: record._location, sourceFile: record._sourceFile },
+            data: { row_id: record._id }
+        };
+
+        try {
+            InvestigationEngine.attachEvidence(inv, evidenceProxy, rationale);
+            renderInvestigationPanel();
+            logUserActivity('EVIDENCE_ATTACHED', `Attached ${record._id} to Case ${inv.caseId}`);
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    window.saveAndCloseInvestigation = () => {
+        if (!window.appState.activeInvestigation) return;
+        alert(`Case ${window.appState.activeInvestigation.caseId} saved securely to audit logs.`);
+        window.appState.activeInvestigation = null;
+        document.getElementById('investigation-panel').classList.add('hidden');
+        document.getElementById('btn-start-case').classList.remove('hidden');
+        renderTable();
+    };
+
+    function renderInvestigationPanel() {
+        const inv = window.appState.activeInvestigation;
+        const panel = document.getElementById('investigation-panel');
+        if (!inv) {
+            panel.classList.add('hidden');
+            return;
+        }
+        
+        panel.classList.remove('hidden');
+        document.getElementById('inv-title').textContent = inv.title;
+        document.getElementById('inv-state').textContent = inv.state;
+        document.getElementById('inv-entity').textContent = inv.entityContext;
+        document.getElementById('inv-id').textContent = inv.caseId;
+        document.getElementById('inv-count').textContent = inv.evidenceLog.length;
+    }
 
     function logUserActivity(eventType, details) {
       if (!window.appState.user) return;
@@ -299,9 +406,8 @@
       const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal } = window.appState;
       const tbody = document.getElementById('table-body');
 
-      // Rule 4: Entity Isolation Enforcement
       if (!activeLocation) {
-        tbody.innerHTML = `<tr><td colspan="15" class="py-14 text-center">
+        tbody.innerHTML = `<tr><td colspan="16" class="py-14 text-center">
             <i data-lucide="shield-alert" class="w-8 h-8 mx-auto text-amber-500 mb-2"></i>
             <p class="text-slate-800 font-bold text-sm">Entity Context Required (Governance Rule 4)</p>
             <p class="text-slate-500 text-xs mt-1">Cross-entity merging is strictly prohibited. Please select an Entity Domain above.</p>
@@ -335,22 +441,34 @@
 
     function renderTable() {
       const tbody = document.getElementById('table-body');
-      const { currentPage, pageSize, filteredRecords } = window.appState;
+      const { currentPage, pageSize, filteredRecords, activeInvestigation } = window.appState;
       const start = (currentPage - 1) * pageSize;
       const pageSlice = filteredRecords.slice(start, start + pageSize);
 
       if (filteredRecords.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="15" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="16" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = pageSlice.map((r, idx) => {
         // Explainability Layer Generation
         const stateColor = r._state === 'Accepted' ? 'text-emerald-600 bg-emerald-100' : (r._state === 'Unresolved' ? 'text-rose-600 bg-rose-100' : 'text-slate-600 bg-slate-100');
-        const trustBadge = `<span class="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[9px] text-slate-500 mr-1" title="Trust Level ${r._trustLevel}">Lv.${r._trustLevel}</span>`;
+        const trustBadge = `<span class="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[9px] text-slate-500 mr-1" title="Trust Level ${r._trustLevel}">Lv.${r._trustLevel || '?'}</span>`;
         
+        // Investigation Action Generator
+        let actionBtn = `<button class="p-1 text-slate-300 cursor-not-allowed" title="Start Case to Attach"><i data-lucide="minus" class="w-4 h-4"></i></button>`;
+        if (activeInvestigation) {
+            const isAttached = activeInvestigation.evidenceLog.some(log => log.recordId === r._id);
+            if (isAttached) {
+                actionBtn = `<button class="p-1 text-emerald-500 rounded bg-emerald-50" title="Attached"><i data-lucide="check-circle" class="w-4 h-4"></i></button>`;
+            } else {
+                actionBtn = `<button onclick="attachToCase('${r._id}')" class="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition" title="Attach to Case"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>`;
+            }
+        }
+
         return `
-        <tr class="hover:bg-sky-50/50 cursor-pointer border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
+        <tr class="hover:bg-sky-50/50 border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
+          <td class="py-2 px-3 text-center border-r border-slate-100">${actionBtn}</td>
           <td class="py-2 px-3 text-[10px]">
             <div class="flex flex-col gap-1">
                 <div>${trustBadge} <span class="px-1.5 py-0.5 rounded font-bold ${stateColor}">${r._state || 'Unknown'}</span></div>
