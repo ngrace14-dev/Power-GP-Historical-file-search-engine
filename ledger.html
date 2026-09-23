@@ -123,10 +123,6 @@
           </div>
         </div>
         <div class="flex items-center gap-3 w-full sm:w-auto">
-          <button onclick="askAiAssistant()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 transition shadow-sm flex items-center gap-1.5">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI Audit Assistant
-          </button>
-          
           <button id="btn-start-case" onclick="startInvestigation()" class="hidden px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="briefcase" class="w-3.5 h-3.5"></i> Start Investigation
           </button>
@@ -166,7 +162,7 @@
         </div>
       </div>
 
-      <!-- MULTI-FIELD TARGETED SEARCH CONTAINER (RESTORED) -->
+      <!-- MULTI-FIELD TARGETED SEARCH CONTAINER -->
       <div id="container-multi-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <div>
@@ -258,25 +254,6 @@
     </div>
   </div>
 
-  <!-- AI Assistant Reasoning Modal (Phase 7) -->
-  <div id="modal-ai-result" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white border border-purple-200 rounded-xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden">
-      <div class="px-5 py-3 border-b border-purple-200 bg-gradient-to-r from-purple-900 to-indigo-900 text-white flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i data-lucide="sparkles" class="w-4 h-4 text-purple-300"></i>
-          <h3 class="text-xs font-bold uppercase tracking-wider">AI Financial Reasoning Engine</h3>
-        </div>
-        <button onclick="closeAiModal()" class="text-purple-300 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-sm text-slate-700 font-sans leading-relaxed" id="ai-response-content">
-        Loading...
-      </div>
-      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-        <button onclick="closeAiModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Report</button>
-      </div>
-    </div>
-  </div>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -287,7 +264,6 @@
     import { InvestigationEngine } from './investigation-engine.js';
     import { ContradictionEngine } from './contradiction-engine.js';
     import { RelationshipEngine } from './relationship-engine.js'; 
-    import { GeminiService } from './gemini-service.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -511,51 +487,6 @@
       }
     }
 
-    window.askAiAssistant = async () => {
-        if (!window.appState.activeLocation) {
-            return alert("Governance Rule 4: Please select an Entity Domain to scope the AI reasoning.");
-        }
-
-        const userQuery = prompt("Ask AI Assistant (e.g. 'Identify any missing journal entries for Vendor X' or 'Explain variance on DOC-123'):");
-        if (!userQuery) return;
-
-        const modal = document.getElementById('modal-ai-result');
-        const content = document.getElementById('ai-response-content');
-        
-        modal.classList.remove('hidden');
-        content.innerHTML = '<div class="flex items-center gap-3 text-purple-600 font-bold justify-center py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Securely routing query to AI reasoning engine. Please wait...</div>';
-        lucide.createIcons();
-
-        try {
-            const gemini = new GeminiService();
-            const activeEntity = window.appState.activeLocation;
-            
-            logUserActivity('AI_QUERY', `Executed AI Audit Query: "${userQuery}"`);
-
-            const responseText = await gemini.queryEvidence(
-                userQuery, 
-                window.appState.filteredRecords, 
-                activeEntity
-            );
-
-            let formattedHtml = responseText
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/\n/g, '<br/>')
-                .replace(/- /g, '&bull; ');
-
-            content.innerHTML = `<div class="bg-purple-50 p-4 rounded-lg mb-4 text-purple-900 border border-purple-100 font-bold text-xs"><i data-lucide="message-square-text" class="w-4 h-4 inline mr-1"></i> Query: "${userQuery}"</div>${formattedHtml}`;
-            lucide.createIcons();
-        } catch (err) {
-            content.innerHTML = `<div class="p-5 text-rose-600 font-bold bg-rose-50 border border-rose-200 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5 inline mr-2"></i> Error: ${err.message}</div>`;
-            lucide.createIcons();
-        }
-    };
-
-    window.closeAiModal = () => {
-        document.getElementById('modal-ai-result').classList.add('hidden');
-    };
-
     function runContradictionEngine() {
       const flags = ContradictionEngine.analyzeDataset(window.appState.records);
       const panel = document.getElementById('contradiction-panel');
@@ -746,7 +677,6 @@
 
     document.getElementById('logoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'Signed out'); signOut(auth); });
 
-    // UPDATED SEARCH EXECUTION TO SUPPORT MULTI-FIELD MODE
     function executeSearch() {
       const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiQuery } = window.appState;
       const tbody = document.getElementById('table-body');
