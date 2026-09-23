@@ -3,270 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Power GP Ledger Search Terminal</title>
+  <title>Lighthouse Workstation</title>
   <link rel="icon" type="image/png" href="RREDCO_Logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
-          colors: { gp: { 50: '#f0f7ff', 100: '#e0effe', 500: '#0284c7', 600: '#0369a1', 700: '#075985', 800: '#0c4a6e', 900: '#082f49' } },
+          colors: {
+            gp: { 50: '#f0f7ff', 100: '#e0effe', 500: '#0284c7', 600: '#0369a1', 700: '#075985', 800: '#0c4a6e', 900: '#082f49' },
+            cyber: { 900: '#0a0a0f', 800: '#13131a', 700: '#1c1c26', cyan: '#06b6d4', green: '#22c55e', orange: '#f97316', red: '#ef4444' }
+          },
           fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
         }
       }
     }
   </script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; } 
+    ::-webkit-scrollbar-track { background: transparent; } 
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
 
-  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <a href="index.html" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold">
-          <i data-lucide="grid" class="w-4 h-4 text-gp-500"></i> Portal
-        </a>
-        <div class="h-6 w-px bg-slate-700 mx-1"></div>
-        <div class="h-10 px-3 rounded-lg bg-white flex items-center justify-center shadow-md">
-          <img src="RREDCO_Logo.png" alt="RREDCO Logo" class="h-7 w-auto object-contain">
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Power GP Online</h1>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-gp-700/80 text-sky-200 border border-gp-500/30 font-medium">Read-Only Search Terminal</span>
-          </div>
-          <p class="text-xs text-slate-400">Targeted & Multi-Field Search for Dynamics GP General Ledger exports</p>
-        </div>
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 h-[60px] px-6 flex justify-between items-center">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold">
+        <i data-lucide="grid" class="w-4 h-4 text-cyan-400"></i> Portal
+      </a>
+      <div class="h-6 w-px bg-slate-800 mx-1"></div>
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_12px_rgba(6,182,212,0.3)]">
+        <i class="ph ph-compass text-white text-xl"></i>
       </div>
+      <div>
+        <h1 class="text-sm sm:text-base font-bold tracking-wider text-white leading-tight">LIGHTHOUSE WORKSTATION</h1>
+        <p class="text-[10px] text-cyan-400 uppercase tracking-widest font-mono">Spatial Parsing & Relational Evidence Graph</p>
+      </div>
+    </div>
 
-      <div class="flex items-center gap-2 sm:gap-3">
-        <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
-          <span id="userEmail" class="text-xs text-slate-300 font-medium">Loading...</span>
-          <button id="logoutBtn" class="text-rose-400 hover:text-rose-300 transition" title="Sign Out">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
-          </button>
-        </div>
-        <button id="btn-pull-cloud" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm">
-          <i data-lucide="cloud-download" class="w-4 h-4"></i> Sync Cloud Ledgers
-        </button>
-        <button id="btn-export-results" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-gp-600 hover:bg-gp-500 text-white transition shadow-sm">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i> Export (<span id="export-count">0</span>)
-        </button>
+    <div class="flex items-center gap-3">
+      <span id="userEmail" class="text-xs text-slate-400 font-mono hidden sm:inline">Loading user...</span>
+      <button onclick="resetState()" class="text-[11px] font-mono text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition flex items-center gap-1.5">
+        <i class="ph ph-arrows-clockwise text-sm"></i> RESET
+      </button>
+      <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+        <span>INDEXEDDB STAGING ACTIVE</span>
       </div>
     </div>
   </header>
 
-  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 py-6 flex flex-col gap-6">
-    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-      <div class="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Governance & Memory Status</h3>
-        <span id="sync-badge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 text-sky-800">Awaiting Data</span>
-      </div>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Isolated Entities</span><p id="stat-locations" class="text-xl font-bold text-slate-900 mt-1">0</p></div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Total Evidence Rows</span><p id="stat-rows" class="text-xl font-bold text-slate-900 mt-1">0</p></div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Active Matches</span><p id="stat-matches" class="text-xl font-bold text-gp-600 mt-1">0</p></div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col justify-center">
-          <p class="text-[10px] text-slate-500">Cross-entity merging is strictly prohibited under Gov. Rule 4.</p>
-        </div>
-      </div>
-    </div>
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
 
-    <!-- Contradiction Engine Alerts (Hidden by default) -->
-    <div id="contradiction-panel" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-sm">
-      <div class="flex items-center justify-between mb-3 border-b border-rose-200/60 pb-3">
-        <div class="flex items-center gap-2">
-          <i data-lucide="shield-alert" class="w-5 h-5 text-rose-600"></i>
-          <h3 class="text-sm font-bold text-rose-900 uppercase tracking-wide">Forensic Contradictions Detected</h3>
-          <span id="contradiction-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-800">0 Flags</span>
+    <!-- Upload & Cloud Pull Panel -->
+    <section id="upload-section" class="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 transition-all shadow-xl">
+      <div class="flex gap-6 mb-6 border-b border-slate-800 px-2 overflow-x-auto">
+        <button onclick="switchTab('cloud')" id="tab-cloud" class="text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
+          <i class="ph ph-cloud-arrow-down text-base"></i> Pull Power GP Cloud Ledgers
+        </button>
+        <button onclick="switchTab('pdf')" id="tab-pdf" class="text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
+          <i class="ph ph-file-pdf text-base"></i> PDF Schedule Upload
+        </button>
+        <button onclick="switchTab('text')" id="tab-text" class="text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
+          <i class="ph ph-text-t text-base"></i> Raw Text Ingestion
+        </button>
+      </div>
+      
+      <!-- View 1: Cloud Storage Pull -->
+      <div id="view-cloud" class="flex flex-col items-center justify-center p-10 rounded-2xl border border-dashed border-cyan-500/30 bg-slate-950/50">
+        <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-3">
+          <i class="ph ph-cloud-arrow-down text-2xl text-cyan-400"></i>
         </div>
-        <span class="text-[10px] font-bold text-rose-500 uppercase tracking-widest font-mono">Governance Rule 7</span>
+        <h2 class="font-bold text-base text-white mb-1">Analyze Master Corporate Ledgers</h2>
+        <p class="text-xs text-slate-400 text-center max-w-md mb-5">Pull the 17 corporate entity Excel ledgers directly from Cloud Storage (<code class="font-mono text-cyan-400">RREDCO Power GP</code>) to execute cross-footing and tie-outs.</p>
+        <button id="btn-cloud-pull" onclick="pullCloudLedgers()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition shadow-lg shadow-cyan-500/20 flex items-center gap-2">
+          <i class="ph ph-lightning text-base"></i> PULL & DIGITIZE 17 ENTITY LEDGERS
+        </button>
       </div>
-      <div id="contradiction-list" class="space-y-2 max-h-48 overflow-y-auto pr-2">
-        <!-- Flags injected here via Contradiction Engine -->
-      </div>
-    </div>
 
-    <!-- Active Investigation Panel (Hidden by default) -->
-    <div id="investigation-panel" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-5 shadow-sm">
-      <div class="flex justify-between items-center">
+      <!-- View 2: PDF Upload -->
+      <label id="view-pdf" class="hidden flex-col items-center justify-center p-12 rounded-2xl cursor-pointer transition-all border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-800/40 group">
+        <div class="w-14 h-14 rounded-2xl bg-slate-950 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border border-slate-800 shadow-inner">
+          <i class="ph ph-upload-simple text-2xl text-cyan-400 group-hover:text-white transition-colors"></i>
+        </div>
+        <h2 class="font-bold text-base text-white mb-1">Ingest External Trial Balance or Aged Schedule</h2>
+        <p class="text-xs text-slate-400 text-center max-w-md">Spatial OCR groups columns by coordinate geometry and validates row math.</p>
+        <input type="file" accept=".pdf" id="pdf-upload" class="hidden" onchange="handleFileUpload(event)">
+      </label>
+
+      <!-- View 3: Raw Text -->
+      <div id="view-text" class="hidden flex-col gap-4">
+        <p class="text-xs text-amber-400 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
+          <i class="ph ph-warning-circle inline mr-1"></i> Paste raw report text below if you are working with a copy-pasted text buffer.
+        </p>
+        <textarea id="raw-text-input" class="w-full h-44 bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 focus:border-cyan-400 focus:outline-none resize-none shadow-inner" placeholder="Paste raw report text here..."></textarea>
+        <button onclick="handleTextProcess()" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold border border-cyan-500/30 transition flex items-center justify-center gap-2 text-xs">
+          <i class="ph ph-cpu text-base"></i> EXECUTE PARSER
+        </button>
+      </div>
+    </section>
+
+    <!-- Progress Logs -->
+    <section id="progress-section" class="hidden bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-xs font-mono text-cyan-400 tracking-widest uppercase" id="progress-text">ANALYZING DOCUMENT...</h3>
+        <span class="text-xs font-mono text-white" id="progress-pct">0%</span>
+      </div>
+      <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+        <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <div class="mt-4 bg-slate-950 rounded-lg p-3 h-32 overflow-y-auto font-mono text-[10px] text-slate-400 space-y-1" id="terminal-logs">
+        <div>System initialized. Connected to Firebase Storage.</div>
+      </div>
+    </section>
+
+    <!-- Results Data Table -->
+    <section id="results-section" class="hidden space-y-4">
+      <div class="flex justify-between items-end">
         <div>
-          <div class="flex items-center gap-2 mb-1">
-            <h3 class="text-sm font-bold text-indigo-900" id="inv-title">Active Investigation</h3>
-            <span id="inv-state" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200 text-indigo-800 uppercase tracking-wide">Open</span>
-          </div>
-          <p class="text-xs text-indigo-700">Entity Boundary: <span id="inv-entity" class="font-mono font-bold"></span> | Case ID: <span id="inv-id" class="font-mono"></span></p>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="text-xs font-semibold text-indigo-800 bg-indigo-100/50 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-            <i data-lucide="paperclip" class="w-4 h-4"></i>
-            Attached Evidence: <span id="inv-count" class="font-bold text-indigo-600 text-sm">0</span>
-          </div>
-          <button onclick="saveAndCloseInvestigation()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
-            <i data-lucide="save" class="w-3.5 h-3.5"></i> Save Case
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Search Controls -->
-    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Search Mode:</span>
-          <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
-            <button id="mode-omni" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition">Global Search</button>
-            <button id="mode-single" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Target One Field</button>
-            <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
-          </div>
-        </div>
-        <div class="flex items-center gap-3 w-full sm:w-auto">
-          <!-- PHASE 7: AI AUDIT ASSISTANT BUTTON -->
-          <button onclick="askAiAssistant()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 transition shadow-sm flex items-center gap-1.5">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI Audit Assistant
-          </button>
-          
-          <button id="btn-start-case" onclick="startInvestigation()" class="hidden px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-sm flex items-center gap-1.5">
-            <i data-lucide="briefcase" class="w-3.5 h-3.5"></i> Start Investigation
-          </button>
-          
-          <div class="flex items-center gap-2 bg-amber-50 p-1.5 rounded-lg border border-amber-200">
-            <label class="text-xs font-bold text-amber-800 whitespace-nowrap"><i data-lucide="lock" class="w-3 h-3 inline mr-1"></i> Entity Domain:</label>
-            <select id="filter-location-select" class="text-xs bg-white border border-amber-300 rounded-md px-2.5 py-1.5 focus:ring-amber-500 focus:border-amber-500 w-full sm:w-48 font-bold text-slate-800">
-              <option value="">--- REQUIRED: Select Entity ---</option>
-            </select>
-          </div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="ph ph-database text-emerald-400"></i> Validated Financial Payload
+          </h2>
+          <p class="text-xs text-slate-400 font-mono mt-0.5" id="results-meta">0 records extracted and cross-foot verified.</p>
         </div>
       </div>
 
-      <div id="container-omni-search" class="space-y-2">
-        <div class="relative flex flex-col sm:flex-row gap-2">
-          <div class="relative flex-1">
-            <i data-lucide="search" class="w-4 h-4 absolute inset-y-0 left-3.5 my-auto text-slate-400"></i>
-            <input type="text" id="global-search-input" placeholder='Search any field, e.g. "Contoso", JE-10492, Sales, 000-1100...' class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-gp-500 font-mono" />
-          </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto max-h-[480px]">
+          <table class="w-full text-left border-collapse font-sans">
+            <thead class="sticky top-0 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 text-[10px] font-mono text-slate-400 uppercase">
+              <tr>
+                <th class="p-3 pl-4">Entity / Vendor</th>
+                <th class="p-3">Voucher / JE</th>
+                <th class="p-3">Doc / Invoice No.</th>
+                <th class="p-3">Doc Type</th>
+                <th class="p-3">TRX Date</th>
+                <th class="p-3 text-right">Amount</th>
+                <th class="p-3">Relational Graph Links</th>
+                <th class="p-3 text-center">Phase 4 Validation Status</th>
+              </tr>
+            </thead>
+            <tbody id="table-body" class="text-xs divide-y divide-slate-800 font-mono">
+            </tbody>
+          </table>
         </div>
       </div>
+    </section>
 
-      <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div class="sm:col-span-4">
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Field</label>
-            <select id="single-field-target-key" class="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 font-medium">
-              <option value="Department">Department</option><option value="Journal Entry">Journal Entry</option><option value="Invoice Number" selected>Invoice Number</option><option value="Originating Master Name">Originating Master Name</option><option value="TRX Date">TRX Date</option><option value="Account Number">Account Number</option><option value="Account Description">Account Description</option><option value="Debit Amount">Debit Amount</option><option value="Credit Amount">Credit Amount</option><option value="Reference">Reference</option><option value="Description">Description</option><option value="Originating TRX Source">Originating TRX Source</option><option value="User Who Posted">User Who Posted</option>
-            </select>
-          </div>
-          <div class="sm:col-span-8">
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Target Query Value</label>
-            <input type="text" id="single-field-target-value" placeholder="Enter exact or partial value..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
-          </div>
-        </div>
-      </div>
-
-      <div id="location-badges" class="flex flex-wrap gap-2 pt-1 border-t border-slate-100"><div class="text-xs text-slate-400 py-1">Entity context required to view data.</div></div>
-    </div>
-
-    <!-- Data Table -->
-    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-[440px]">
-      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Evidence Records</span>
-        <div class="flex items-center gap-2"><label class="text-xs text-slate-500">Rows per page:</label><select id="pagination-page-size" class="text-xs bg-white border border-slate-200 rounded px-2 py-1"><option value="15">15</option><option value="50" selected>50</option><option value="100">100</option></select></div>
-      </div>
-      <div class="overflow-x-auto flex-1 relative" style="max-height: 560px;">
-        <table id="main-results-table" class="w-full text-left text-xs border-collapse whitespace-nowrap">
-          <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 border-b border-slate-200 font-semibold select-none">
-            <tr id="table-header-row">
-              <th class="py-2.5 px-3">Action</th>
-              <th class="py-2.5 px-3">Relational Graph</th>
-              <th class="py-2.5 px-3">Explainability (State / Trust / Provenance)</th>
-              <th class="py-2.5 px-3">Location / Entity</th>
-              <th class="py-2.5 px-3">Department</th>
-              <th class="py-2.5 px-3">Journal Entry</th>
-              <th class="py-2.5 px-3 text-sky-700">Invoice Number</th>
-              <th class="py-2.5 px-3">Originating Master Name</th>
-              <th class="py-2.5 px-3">TRX Date</th>
-              <th class="py-2.5 px-3">Account Number</th>
-              <th class="py-2.5 px-3">Account Description</th>
-              <th class="py-2.5 px-3 text-right">Debit Amount</th>
-              <th class="py-2.5 px-3 text-right">Credit Amount</th>
-              <th class="py-2.5 px-3">Reference</th>
-              <th class="py-2.5 px-3">Description</th>
-              <th class="py-2.5 px-3">Originating TRX Source</th>
-              <th class="py-2.5 px-3">User Who Posted</th>
-            </tr>
-          </thead>
-          <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
-            <tr><td colspan="17" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
-        <div id="pagination-info">Showing 0 to 0 of 0 records</div>
-        <div class="flex items-center gap-1.5"><button id="btn-prev-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100">Previous</button><span id="pagination-current-page" class="font-medium px-2">1</span><button id="btn-next-page" class="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-100">Next</button></div>
-      </div>
-    </div>
   </main>
 
-  <!-- Connected Evidence Graph Inspector Modal -->
-  <div id="modal-relationship-inspector" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white border border-slate-200 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden">
-      <div class="px-5 py-3 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i data-lucide="git-fork" class="w-4 h-4 text-cyan-400"></i>
-          <h3 class="text-xs font-bold uppercase tracking-wider">Connected Evidence Graph Inspector</h3>
-        </div>
-        <button onclick="closeGraphModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+  <footer class="sticky bottom-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 p-4 z-40">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+      <div class="text-[10px] font-mono text-slate-400">
+        SOURCE: <span class="text-cyan-400">Firebase Storage (RREDCO Power GP)</span>
       </div>
-      <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
-        <div class="bg-sky-50 border border-sky-200 rounded-lg p-3">
-          <span class="text-[10px] uppercase font-bold text-sky-700 tracking-wider">Primary Reference Record</span>
-          <div id="graph-modal-primary" class="mt-1 font-mono text-slate-800"></div>
-        </div>
-        <div>
-          <h4 class="font-bold text-slate-700 mb-2 flex items-center gap-1.5"><i data-lucide="link" class="w-3.5 h-3.5 text-cyan-600"></i> Connected Evidence Edges (<span id="graph-modal-count">0</span>)</h4>
-          <div id="graph-modal-links" class="space-y-2"></div>
-        </div>
-      </div>
-      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
-        <button onclick="closeGraphModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Inspector</button>
+      <div class="flex gap-3 w-full sm:w-auto">
+        <button id="btn-download" onclick="downloadExcel()" disabled class="flex-1 sm:flex-none px-4 py-2 rounded-lg font-bold text-xs text-white bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+          <i class="ph ph-download-simple text-base"></i> EXPORT WORKBOOK (.XLSX)
+        </button>
+        <button id="btn-pass" onclick="stageAuditData()" disabled class="flex-1 sm:flex-none px-5 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-cyan-500 rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+          <i class="ph ph-paper-plane-right text-base"></i> STAGE TO LEDGER TERMINAL
+        </button>
       </div>
     </div>
-  </div>
-
-  <!-- AI Assistant Reasoning Modal (Phase 7) -->
-  <div id="modal-ai-result" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white border border-purple-200 rounded-xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden">
-      <div class="px-5 py-3 border-b border-purple-200 bg-gradient-to-r from-purple-900 to-indigo-900 text-white flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i data-lucide="sparkles" class="w-4 h-4 text-purple-300"></i>
-          <h3 class="text-xs font-bold uppercase tracking-wider">AI Financial Reasoning Engine</h3>
-        </div>
-        <button onclick="closeAiModal()" class="text-purple-300 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-sm text-slate-700 font-sans leading-relaxed" id="ai-response-content">
-        Loading...
-      </div>
-      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
-        <button onclick="closeAiModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Report</button>
-      </div>
-    </div>
-  </div>
+  </footer>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-    import { getDatabase, ref as dbRef, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
     
-    // GOVERNANCE & GRAPH MODULES
-    import { InvestigationEngine } from './modules/investigation-engine.js';
-    import { ContradictionEngine } from './modules/contradiction-engine.js';
-    import { RelationshipEngine } from './modules/relationship-engine.js'; 
-    import { GeminiService } from './modules/gemini-service.js'; // Phase 7 Engine
+    // UPDATED HOOKS: Pointing to root directory instead of ./modules/
+    import { ProvenanceEngine } from './provenance-engine.js'; 
+    import { EvidenceStateEngine } from './evidence-state-engine.js'; 
+    import { ConfidenceEngine } from './confidence-engine.js';
+    import { ClassificationEngine } from './classification-engine.js';
+    import { ExtractionEngine } from './extraction-engine.js';
+    import { ValidationEngine } from './validation-engine.js';
+    import { RelationshipEngine } from './relationship-engine.js'; 
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -281,448 +207,521 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const storage = getStorage(app);
-    const database = getDatabase(app);
 
     window.COMPANY_ENTITIES = [{ code: 'E01', name: 'POMCO E01', short: 'POMCO' },{ code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },{ code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },{ code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },{ code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },{ code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },{ code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },{ code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },{ code: 'E09', name: 'RRICO E09', short: 'RRICO' },{ code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },{ code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },{ code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },{ code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },{ code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },{ code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },{ code: 'E16', name: 'WRMM E16', short: 'WRMM' },{ code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }];
-    window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
-    
-    window.appState = { records: [], filteredRecords: [], locations: new Set(), searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '', currentPage: 1, pageSize: 50, user: null, activeInvestigation: null };
 
-    // INDEXEDDB STAGING READ
+    let extractedData = [];
+    let originalFileName = "";
+    let fullDebugLog = [];
+
     function openAuditDB() {
       return new Promise((resolve, reject) => {
         const req = indexedDB.open('RREDCO_Audit_Store', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('staging')) {
+            db.createObjectStore('staging');
+          }
+        };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
     }
 
-    async function loadAuditStaging() {
-      try {
-        const db = await openAuditDB();
-        if (!db.objectStoreNames.contains('staging')) return;
-        
-        const tx = db.transaction('staging', 'readonly');
-        const req = tx.objectStore('staging').get('rredco_audit_staging');
-
-        req.onsuccess = () => {
-          const stagingData = req.result;
-          if (!stagingData || stagingData.length === 0) return;
-
-          let addedCount = 0;
-          stagingData.forEach((row, idx) => {
-            const prov = row._provenance || {};
-            const state = row._evidenceState || {};
-            const data = row.data || {};
-            const rel = row._relationships || null;
-
-            const entity = prov.entityContext || 'UNKNOWN';
-
-            const item = {
-              _id: `AUDIT_${data.row_id || idx}_${Date.now()}`,
-              _location: entity,
-              _sourceFile: prov.sourceFile,
-              _trustLevel: prov.trustLevel,
-              _state: state.status,
-              _confidence: prov.confidenceMetrics?.parsingConfidence || 0,
-              _relationships: rel,
-              
-              'Department': 'Lighthouse_Engine',
-              'Journal Entry': data.voucher || '-',
-              'Invoice Number': data.doc_number || '-',
-              'Originating Master Name': data.vendor_name || '-',
-              'TRX Date': data.doc_date ? new Date(data.doc_date).toLocaleDateString() : '-',
-              'Account Number': data.vendor_id || '-',
-              'Account Description': `${data.type || 'INV'} - Document Scan`,
-              'Debit Amount': data.doc_amount > 0 ? String(data.doc_amount) : '',
-              'Credit Amount': data.doc_amount < 0 ? String(Math.abs(data.doc_amount)) : '',
-              'Reference': `Cur: $${(data.current_period || 0).toFixed(2)}`,
-              'Description': `Cross-Foot: ${data._cross_foot_valid ? 'VALID' : 'VARIANCE'}`,
-              'Originating TRX Source': prov.processedBy || 'CoCounsel AI',
-              'User Who Posted': prov.sourceSystem
-            };
-
-            window.appState.records.push(item);
-            window.appState.locations.add(entity);
-            addedCount++;
-          });
-
-          if (addedCount > 0) {
-            // Build Phase 5 Graph relationships if not pre-populated
-            window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
-            updateLocationDropdown();
-            runContradictionEngine();
-            const badge = document.getElementById('sync-badge');
-            if (badge) {
-              badge.textContent = `${addedCount} Evidence Rows Staged`;
-              badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800';
-            }
-          }
-        };
-      } catch (err) {
-        console.warn('Error reading audit staging memory:', err);
-      }
-    }
-
-    // PHASE 7: AI REASONING HANDLER
-    window.askAiAssistant = async () => {
-        if (!window.appState.activeLocation) {
-            return alert("Governance Rule 4: Please select an Entity Domain to scope the AI reasoning.");
-        }
-
-        const userQuery = prompt("Ask AI Assistant (e.g. 'Identify any missing journal entries for Vendor X' or 'Explain variance on DOC-123'):");
-        if (!userQuery) return;
-
-        const apiKey = prompt("Enter Google Gemini API Key for Reasoning Validation:");
-        if (!apiKey) return alert("API Key is required to execute the AI model.");
-
-        const modal = document.getElementById('modal-ai-result');
-        const content = document.getElementById('ai-response-content');
-        
-        modal.classList.remove('hidden');
-        content.innerHTML = '<div class="flex items-center gap-3 text-purple-600 font-bold justify-center py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Engine synthesizing evidence records. Please wait...</div>';
-        lucide.createIcons();
-
-        try {
-            const gemini = new GeminiService(apiKey);
-            const activeEntity = window.appState.activeLocation;
-            
-            logUserActivity('AI_QUERY', `Executed AI Audit Query: "${userQuery}"`);
-
-            const responseText = await gemini.queryEvidence(
-                userQuery, 
-                window.appState.filteredRecords, 
-                activeEntity
-            );
-
-            // Simple markdown formatting replacement for HTML display
-            let formattedHtml = responseText
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/\n/g, '<br/>')
-                .replace(/- /g, '&bull; ');
-
-            content.innerHTML = `<div class="bg-purple-50 p-4 rounded-lg mb-4 text-purple-900 border border-purple-100 font-bold text-xs"><i data-lucide="message-square-text" class="w-4 h-4 inline mr-1"></i> Query: "${userQuery}"</div>${formattedHtml}`;
-            lucide.createIcons();
-        } catch (err) {
-            content.innerHTML = `<div class="p-5 text-rose-600 font-bold bg-rose-50 border border-rose-200 rounded-lg"><i data-lucide="alert-triangle" class="w-5 h-5 inline mr-2"></i> Error: ${err.message}</div>`;
-            lucide.createIcons();
-        }
-    };
-
-    window.closeAiModal = () => {
-        document.getElementById('modal-ai-result').classList.add('hidden');
-    };
-
-    // CONTRADICTION ENGINE EXECUTION
-    function runContradictionEngine() {
-      const flags = ContradictionEngine.analyzeDataset(window.appState.records);
-      const panel = document.getElementById('contradiction-panel');
-      const list = document.getElementById('contradiction-list');
-      
-      if (flags.length === 0) {
-          panel.classList.add('hidden');
-          return;
-      }
-
-      panel.classList.remove('hidden');
-      document.getElementById('contradiction-count').textContent = `${flags.length} Flags`;
-      
-      list.innerHTML = flags.map(f => `
-          <div class="p-3 bg-white rounded-lg border border-rose-100 flex items-start gap-3 shadow-sm">
-              <div class="mt-0.5">
-                  ${f.severity === 'CRITICAL' ? '<i data-lucide="siren" class="w-4 h-4 text-rose-600"></i>' : '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>'}
-              </div>
-              <div>
-                  <div class="flex items-center gap-2">
-                      <span class="text-xs font-bold text-slate-900">${f.type}</span>
-                      <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${f.targetDocument}</span>
-                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${f.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">${f.severity}</span>
-                  </div>
-                  <p class="text-[11px] text-slate-600 mt-1">${f.description}</p>
-              </div>
-          </div>
-      `).join('');
-      lucide.createIcons();
-    }
-
-    function updateLocationDropdown() {
-      const select = document.getElementById('filter-location-select');
-      select.innerHTML = '<option value="">--- REQUIRED: Select Entity ---</option>';
-      const sorted = Array.from(window.appState.locations).sort();
-      sorted.forEach(loc => {
-        select.innerHTML += `<option value="${loc}">${loc}</option>`;
-      });
-      document.getElementById('stat-locations').textContent = sorted.length;
-      document.getElementById('stat-rows').textContent = window.appState.records.length.toLocaleString();
-    }
-
-    document.getElementById('filter-location-select').addEventListener('change', (e) => {
-      window.appState.activeLocation = e.target.value;
-      const btnStart = document.getElementById('btn-start-case');
-      if (window.appState.activeLocation && !window.appState.activeInvestigation) {
-          btnStart.classList.remove('hidden');
-      } else {
-          btnStart.classList.add('hidden');
-      }
-      executeSearch();
-    });
-
-    // INVESTIGATION WORKFLOW
-    window.startInvestigation = () => {
-        const title = prompt("Enter a title for this Investigation Case:");
-        if (!title) return;
-        
-        window.appState.activeInvestigation = InvestigationEngine.createInvestigation(
-            title, 
-            window.appState.activeLocation, 
-            window.appState.user.email
-        );
-        
-        document.getElementById('btn-start-case').classList.add('hidden');
-        renderInvestigationPanel();
-        renderTable(); 
-        logUserActivity('CASE_OPENED', `Started case: ${title}`);
-    };
-
-    window.attachToCase = (recordId) => {
-        const inv = window.appState.activeInvestigation;
-        if (!inv) return;
-
-        const record = window.appState.records.find(r => r._id === recordId);
-        if (!record) return;
-
-        if (inv.evidenceLog.some(log => log.recordId === record._id)) {
-            return alert("This record is already attached to the active investigation.");
-        }
-
-        const rationale = prompt("Why are you attaching this evidence? (Required by Governance)");
-        if (!rationale) return alert("Governance Violation: Link rationale is required.");
-
-        const evidenceProxy = {
-            _provenance: { entityContext: record._location, sourceFile: record._sourceFile },
-            data: { row_id: record._id }
-        };
-
-        try {
-            InvestigationEngine.attachEvidence(inv, evidenceProxy, rationale);
-            renderInvestigationPanel();
-            logUserActivity('EVIDENCE_ATTACHED', `Attached ${record._id} to Case ${inv.caseId}`);
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    window.saveAndCloseInvestigation = () => {
-        if (!window.appState.activeInvestigation) return;
-        alert(`Case ${window.appState.activeInvestigation.caseId} saved securely to audit logs.`);
-        window.appState.activeInvestigation = null;
-        document.getElementById('investigation-panel').classList.add('hidden');
-        document.getElementById('btn-start-case').classList.remove('hidden');
-        renderTable();
-    };
-
-    function renderInvestigationPanel() {
-        const inv = window.appState.activeInvestigation;
-        const panel = document.getElementById('investigation-panel');
-        if (!inv) {
-            panel.classList.add('hidden');
-            return;
-        }
-        
-        panel.classList.remove('hidden');
-        document.getElementById('inv-title').textContent = inv.title;
-        document.getElementById('inv-state').textContent = inv.state;
-        document.getElementById('inv-entity').textContent = inv.entityContext;
-        document.getElementById('inv-id').textContent = inv.caseId;
-        document.getElementById('inv-count').textContent = inv.evidenceLog.length;
-    }
-
-    // PHASE 5 GRAPH INSPECTOR MODAL
-    window.viewGraphLinks = (recordId) => {
-      const record = window.appState.records.find(r => r._id === recordId);
-      if (!record || !record._relationships) return;
-
-      const rel = record._relationships;
-      document.getElementById('graph-modal-primary').innerHTML = `
-        <div class="font-bold text-slate-900">${record._location} | ${record['Originating Master Name']}</div>
-        <div class="text-[11px] text-slate-500 mt-0.5">Inv: ${record['Invoice Number']} | JE: ${record['Journal Entry']} | Amt: ${record['Debit Amount'] ? '$'+record['Debit Amount'] : '$'+record['Credit Amount']}</div>
-      `;
-
-      document.getElementById('graph-modal-count').textContent = rel.totalConnectedRecords;
-
-      let linksHtml = '';
-      const allLinkedIds = [
-        ...rel.linkedInvoices,
-        ...rel.linkedJournalEntries,
-        ...rel.linkedVendorRecords,
-        ...rel.linkedAccountRecords
-      ];
-
-      const uniqueIds = Array.from(new Set(allLinkedIds));
-
-      if (uniqueIds.length === 0) {
-        linksHtml = `<div class="p-4 text-center text-slate-400">No cross-document links discovered for this record.</div>`;
-      } else {
-        linksHtml = uniqueIds.map(id => {
-          const linkedRec = window.appState.records.find(r => r._id === id);
-          if (!linkedRec) return '';
-          return `
-            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-              <div>
-                <span class="font-bold text-sky-800 text-[11px]">${linkedRec._location} | ${linkedRec['Originating Master Name']}</span>
-                <p class="text-[10px] font-mono text-slate-500 mt-0.5">Inv: ${linkedRec['Invoice Number']} | JE: ${linkedRec['Journal Entry']} | Source: ${linkedRec._sourceFile}</p>
-              </div>
-              <span class="text-xs font-mono font-bold text-slate-700">${linkedRec['Debit Amount'] ? '$'+parseFloat(linkedRec['Debit Amount']).toFixed(2) : '$'+parseFloat(linkedRec['Credit Amount'] || 0).toFixed(2)}</span>
-            </div>
-          `;
-        }).join('');
-      }
-
-      document.getElementById('graph-modal-links').innerHTML = linksHtml;
-      document.getElementById('modal-relationship-inspector').classList.remove('hidden');
-      lucide.createIcons();
-    };
-
-    window.closeGraphModal = () => {
-      document.getElementById('modal-relationship-inspector').classList.add('hidden');
-    };
-
-    function logUserActivity(eventType, details) {
-      if (!window.appState.user) return;
-      const logPayload = { email: window.appState.user.email, uid: window.appState.user.uid, type: eventType, details: details, timestamp: new Date().toISOString(), timeFormatted: new Date().toLocaleString() };
-      try { push(dbRef(database, 'system_activity_logs'), logPayload).catch(e=>{}); } catch (err) {}
-    }
-
     onAuthStateChanged(auth, (user) => {
       if (user && user.email) {
-        window.appState.user = user;
         document.getElementById('userEmail').textContent = user.email;
-        logUserActivity('LAUNCH_APP', 'Opened Ledger Search Terminal');
-        loadAuditStaging();
       } else {
         window.location.href = 'index.html';
       }
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'Signed out'); signOut(auth); });
+    window.switchTab = (tab) => {
+      const tabCloud = document.getElementById('tab-cloud');
+      const tabPdf = document.getElementById('tab-pdf');
+      const tabText = document.getElementById('tab-text');
+      const viewCloud = document.getElementById('view-cloud');
+      const viewPdf = document.getElementById('view-pdf');
+      const viewText = document.getElementById('view-text');
 
-    function executeSearch() {
-      const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal } = window.appState;
-      const tbody = document.getElementById('table-body');
+      tabCloud.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+      tabPdf.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+      tabText.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
 
-      if (!activeLocation) {
-        tbody.innerHTML = `<tr><td colspan="17" class="py-14 text-center">
-            <i data-lucide="shield-alert" class="w-8 h-8 mx-auto text-amber-500 mb-2"></i>
-            <p class="text-slate-800 font-bold text-sm">Entity Context Required (Governance Rule 4)</p>
-            <p class="text-slate-500 text-xs mt-1">Cross-entity merging is strictly prohibited. Please select an Entity Domain above.</p>
-        </td></tr>`;
-        lucide.createIcons();
-        window.appState.filteredRecords = [];
-        updateCounters();
-        return;
+      viewCloud.classList.add('hidden'); viewCloud.classList.remove('flex');
+      viewPdf.classList.add('hidden'); viewPdf.classList.remove('flex');
+      viewText.classList.add('hidden'); viewText.classList.remove('flex');
+
+      if (tab === 'cloud') {
+        tabCloud.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewCloud.classList.remove('hidden'); viewCloud.classList.add('flex');
+      } else if (tab === 'pdf') {
+        tabPdf.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewPdf.classList.remove('hidden'); viewPdf.classList.add('flex');
+      } else {
+        tabText.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewText.classList.remove('hidden'); viewText.classList.add('flex');
       }
+    };
 
-      let filtered = records.filter(r => r._location === activeLocation);
+    window.logSys = (msg, type = 'info') => {
+      fullDebugLog.push(`[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`);
+      const terminal = document.getElementById('terminal-logs');
+      const el = document.createElement('div');
+      el.className = type === 'error' ? 'text-rose-400' : (type === 'success' ? 'text-emerald-400' : (type === 'warning' ? 'text-amber-400' : 'text-slate-400'));
+      el.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      terminal.appendChild(el);
+      terminal.scrollTop = terminal.scrollHeight;
+    };
 
-      if (searchMode === 'omni' && omniQuery.trim()) {
-        const q = omniQuery.trim().toLowerCase();
-        filtered = filtered.filter(r => window.GP_TARGET_FIELDS.some(f => String(r[f] || '').toLowerCase().includes(q)));
-      } else if (searchMode === 'single' && singleTargetVal.trim()) {
-        const q = singleTargetVal.trim().toLowerCase();
-        filtered = filtered.filter(r => String(r[singleTargetKey] || '').toLowerCase().includes(q));
-      }
+    window.updateProgress = (pct, msg) => {
+      document.getElementById('progress-pct').innerText = `${Math.round(pct)}%`;
+      document.getElementById('progress-bar').style.width = `${pct}%`;
+      if (msg) document.getElementById('progress-text').innerText = msg;
+    };
 
-      window.appState.filteredRecords = filtered;
-      window.appState.currentPage = 1;
-      renderTable();
-      updateCounters();
-    }
+    window.resetState = () => {
+      extractedData = [];
+      originalFileName = "";
+      fullDebugLog = [];
+      document.getElementById('pdf-upload').value = '';
+      document.getElementById('raw-text-input').value = '';
+      document.getElementById('upload-section').classList.remove('hidden');
+      document.getElementById('progress-section').classList.add('hidden');
+      document.getElementById('results-section').classList.add('hidden');
+      document.getElementById('terminal-logs').innerHTML = '<div>System initialized. Connected to Firebase Storage.</div>';
+      document.getElementById('table-body').innerHTML = '';
+      document.getElementById('btn-download').disabled = true;
+      document.getElementById('btn-pass').disabled = true;
+      window.updateProgress(0, 'ANALYZING DOCUMENT...');
+    };
 
-    function updateCounters() {
-      document.getElementById('stat-matches').textContent = window.appState.filteredRecords.length.toLocaleString();
-      document.getElementById('export-count').textContent = window.appState.filteredRecords.length.toLocaleString();
-    }
+    window.pullCloudLedgers = async () => {
+      document.getElementById('upload-section').classList.add('hidden');
+      document.getElementById('progress-section').classList.remove('hidden');
+      document.getElementById('results-section').classList.add('hidden');
 
-    function renderTable() {
-      const tbody = document.getElementById('table-body');
-      const { currentPage, pageSize, filteredRecords, activeInvestigation } = window.appState;
-      const start = (currentPage - 1) * pageSize;
-      const pageSlice = filteredRecords.slice(start, start + pageSize);
+      extractedData = [];
+      window.logSys('Connecting to Firebase Storage bucket: RREDCO Power GP...');
+      window.updateProgress(10, 'FETCHING CLOUD FILES...');
 
-      if (filteredRecords.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="17" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
-        return;
-      }
+      try {
+        const folderRef = ref(storage, 'RREDCO Power GP');
+        const result = await listAll(folderRef);
+        const xlsxFiles = result.items.filter(item => item.name.endsWith('.xlsx'));
 
-      tbody.innerHTML = pageSlice.map((r, idx) => {
-        const stateColor = r._state === 'Accepted' ? 'text-emerald-600 bg-emerald-100' : (r._state === 'Unresolved' ? 'text-rose-600 bg-rose-100' : 'text-slate-600 bg-slate-100');
-        const trustBadge = `<span class="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[9px] text-slate-500 mr-1" title="Trust Level ${r._trustLevel}">Lv.${r._trustLevel || '?'}</span>`;
-        
-        let actionBtn = `<button class="p-1 text-slate-300 cursor-not-allowed" title="Start Case to Attach"><i data-lucide="minus" class="w-4 h-4"></i></button>`;
-        if (activeInvestigation) {
-            const isAttached = activeInvestigation.evidenceLog.some(log => log.recordId === r._id);
-            if (isAttached) {
-                actionBtn = `<button class="p-1 text-emerald-500 rounded bg-emerald-50" title="Attached"><i data-lucide="check-circle" class="w-4 h-4"></i></button>`;
-            } else {
-                actionBtn = `<button onclick="attachToCase('${r._id}')" class="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition" title="Attach to Case"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>`;
-            }
+        window.logSys(`Found ${xlsxFiles.length} entity ledger files in Cloud Storage.`);
+
+        let rowId = 1;
+        for (let idx = 0; idx < xlsxFiles.length; idx++) {
+          const fileRef = xlsxFiles[idx];
+          const pct = 10 + Math.round(((idx + 1) / xlsxFiles.length) * 80);
+          window.updateProgress(pct, `DOWNLOADING & DIGITIZING ${fileRef.name} (${idx + 1}/${xlsxFiles.length})`);
+
+          const classification = ClassificationEngine.classifyDocument('', fileRef.name);
+          const docType = classification.documentType === 'Unknown Document' ? 'General Ledger Export' : classification.documentType;
+
+          const url = await getDownloadURL(fileRef);
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0], short: "UNKNOWN" };
+          const batchRows = [];
+
+          for (let r = 1; r < Math.min(2000, raw2D.length); r++) {
+            const row = raw2D[r];
+            if (!row || row.length === 0 || row.every(c => c === null || c === undefined || String(c).trim() === '')) continue;
+
+            let docAmt = parseFloat(row[7]) || 0;
+            let curAmt = parseFloat(row[8]) || 0;
+            
+            const rawRecord = {
+              row_id: rowId++,
+              vendor_id: String(row[0] || entityMatch.name),
+              vendor_name: String(row[2] || 'MASTER GL RECORD'),
+              voucher: String(row[1] || 'JE-CLK'),
+              doc_number: String(row[3] || 'INV-CLK'),
+              type: docType,
+              doc_date: row[4] ? String(row[4]) : new Date().toLocaleDateString(),
+              doc_amount: docAmt,
+              current_period: curAmt,
+              _cross_foot_valid: true
+            };
+
+            const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
+            normalizedRecord.type = docType;
+            batchRows.push(normalizedRecord);
+          }
+
+          const validation = ValidationEngine.validatePayload(batchRows, docType);
+          window.logSys(`Phase 4 Validation for ${fileRef.name}: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
+
+          batchRows.forEach(normalizedRecord => {
+            const scores = ConfidenceEngine.calculateScores({
+                sourceType: "NATIVE_EXPORT",
+                parsedRecord: normalizedRecord
+            });
+
+            const stampedRecord = ProvenanceEngine.stampRecord({
+              sourceFile: fileRef.name,
+              sourceSystem: "Firebase_Storage",
+              sourceType: "NATIVE_EXPORT", 
+              entityContext: entityMatch.short || "UNKNOWN", 
+              processedBy: "Lighthouse Engine v2 (Phase 5 Graph Enriched)",
+              ocrConfidence: scores.ocrConfidence,
+              parsingConfidence: scores.parsingConfidence,
+              extractedData: normalizedRecord
+            });
+
+            const finalRecord = {
+                _provenance: stampedRecord._provenance,
+                data: stampedRecord.data,
+                _validation: validation,
+                _evidenceState: EvidenceStateEngine.initializeState({
+                    hasVariance: validation.tieOutStatus === 'FAIL'
+                })
+            };
+
+            extractedData.push(finalRecord);
+          });
         }
 
-        const rel = r._relationships || { hasLinks: false, totalConnectedRecords: 0 };
-        const graphBadge = rel.hasLinks
-          ? `<button onclick="viewGraphLinks('${r._id}')" class="px-2 py-0.5 rounded text-[10px] bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border border-cyan-300 font-bold flex items-center gap-1 transition shadow-2xs"><i data-lucide="git-fork" class="w-3 h-3"></i> ${rel.totalConnectedRecords} Links</button>`
-          : `<span class="text-slate-400 text-[10px]">Unlinked</span>`;
+        // Phase 5 Relationship Engine Discovery
+        extractedData = RelationshipEngine.buildRelationships(extractedData);
+        window.logSys('Phase 5 Relationship Graph created. Relational links mapped across invoices, vendors, and journal entries.', 'success');
+
+        window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
+        window.renderResults(extractedData);
+
+      } catch (err) {
+        window.logSys(`Cloud Pull Error: ${err.message}`, 'error');
+        window.updateProgress(0, 'PULL FAILED');
+      }
+    };
+
+    window.handleFileUpload = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      originalFileName = file.name;
+      document.getElementById('upload-section').classList.add('hidden');
+      document.getElementById('progress-section').classList.remove('hidden');
+
+      window.logSys(`Ingesting file: ${file.name}`);
+      window.updateProgress(10, 'LOADING PDF ENGINE...');
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          window.updateProgress(10 + ((i / pdf.numPages) * 70), `SPATIAL OCR - PAGE ${i}/${pdf.numPages}`);
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+
+          let rows = [];
+          textContent.items.forEach(item => {
+            let str = item.str.trim();
+            if (str.length === 0) return;
+            let y = item.transform[5], x = item.transform[4];
+            let foundRow = rows.find(r => Math.abs(r.y - y) < 8);
+            if (foundRow) foundRow.items.push({ x: x, str: item.str });
+            else rows.push({ y: y, items: [{ x: x, str: item.str }] });
+          });
+
+          rows.sort((a, b) => b.y - a.y);
+          rows.forEach(r => {
+            r.items.sort((a, b) => a.x - b.x);
+            fullText += r.items.map(it => it.str).join(' ') + '\n';
+          });
+        }
+
+        const classification = ClassificationEngine.classifyDocument(fullText.substring(0, 1000), file.name);
+        window.logSys(`Classification Engine identified document as [${classification.documentType}] with ${(classification.confidence * 100)}% confidence.`);
+
+        window.updateProgress(85, 'EXECUTING PARSER & VALIDATION...');
+        const parsedRows = window.parseLedgerText(fullText, classification.documentType);
+
+        if (parsedRows.length === 0) throw new Error("No transactions detected.");
+
+        const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
+
+        const normalizedRows = parsedRows.map(row => {
+            const norm = ExtractionEngine.extractFields(row, classification.documentType, userSelectedEntity.toUpperCase());
+            norm.type = classification.documentType;
+            return norm;
+        });
+
+        const validation = ValidationEngine.validatePayload(normalizedRows, classification.documentType);
+        window.logSys(`Phase 4 Validation Result: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
+
+        extractedData = normalizedRows.map(row => {
+            const scores = ConfidenceEngine.calculateScores({
+                sourceType: "SOURCE_PDF",
+                rawText: fullText.substring(0, 500), 
+                parsedRecord: row
+            });
+
+            const stampedRecord = ProvenanceEngine.stampRecord({
+              sourceFile: originalFileName,
+              sourceSystem: "Local_Upload",
+              sourceType: "SOURCE_PDF", 
+              entityContext: userSelectedEntity.toUpperCase(),
+              processedBy: "Lighthouse Engine v2 (Phase 5 Graph Enriched)",
+              ocrConfidence: scores.ocrConfidence,
+              parsingConfidence: scores.parsingConfidence,
+              extractedData: row
+            });
+            
+            return {
+                _provenance: stampedRecord._provenance,
+                data: stampedRecord.data,
+                _validation: validation,
+                _evidenceState: EvidenceStateEngine.initializeState({
+                    hasVariance: validation.tieOutStatus === 'FAIL'
+                })
+            };
+        });
+
+        // Phase 5 Relationship Mapping
+        extractedData = RelationshipEngine.buildRelationships(extractedData);
+
+        window.updateProgress(100, 'EXTRACTION & GRAPH MAPPING COMPLETE');
+        window.renderResults(extractedData);
+
+      } catch (err) {
+        window.logSys(`Extraction Error: ${err.message}`, 'error');
+        window.updateProgress(0, 'PARSING FAILED');
+      }
+    };
+
+    window.handleTextProcess = () => {
+      const text = document.getElementById('raw-text-input').value;
+      if (!text.trim()) return window.logSys('No text provided', 'warning');
+
+      document.getElementById('upload-section').classList.add('hidden');
+      document.getElementById('progress-section').classList.remove('hidden');
+
+      window.updateProgress(50, 'PARSING PASTE BUFFER...');
+      setTimeout(() => {
+        const classification = ClassificationEngine.classifyDocument(text.substring(0, 1000), 'Pasted_Buffer.txt');
+        window.logSys(`Classification Engine identified buffer as [${classification.documentType}] with ${(classification.confidence * 100)}% confidence.`);
+
+        const parsedRows = window.parseLedgerText(text, classification.documentType);
+        
+        if(parsedRows.length > 0) {
+            const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
+            
+            const normalizedRows = parsedRows.map(row => {
+                const norm = ExtractionEngine.extractFields(row, classification.documentType, userSelectedEntity.toUpperCase());
+                norm.type = classification.documentType;
+                return norm;
+            });
+
+            const validation = ValidationEngine.validatePayload(normalizedRows, classification.documentType);
+            window.logSys(`Phase 4 Validation Result: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
+
+            extractedData = normalizedRows.map(row => {
+                const scores = ConfidenceEngine.calculateScores({
+                    sourceType: "OCR_EXTRACTION",
+                    rawText: text.substring(0, 500),
+                    parsedRecord: row
+                });
+
+                const stampedRecord = ProvenanceEngine.stampRecord({
+                  sourceFile: "Pasted_Buffer.txt",
+                  sourceSystem: "Manual_Text_Entry",
+                  sourceType: "OCR_EXTRACTION", 
+                  entityContext: userSelectedEntity.toUpperCase(),
+                  processedBy: "Lighthouse Engine v2 (Phase 5 Graph Enriched)",
+                  ocrConfidence: scores.ocrConfidence,
+                  parsingConfidence: scores.parsingConfidence,
+                  extractedData: row
+                });
+                
+                return {
+                    _provenance: stampedRecord._provenance,
+                    data: stampedRecord.data,
+                    _validation: validation,
+                    _evidenceState: EvidenceStateEngine.initializeState({
+                        hasVariance: validation.tieOutStatus === 'FAIL'
+                    })
+                };
+            });
+
+            // Phase 5 Relationship Mapping
+            extractedData = RelationshipEngine.buildRelationships(extractedData);
+        } else {
+            extractedData = [];
+        }
+
+        window.updateProgress(100, 'COMPLETE');
+        window.renderResults(extractedData);
+      }, 300);
+    };
+
+    window.parseLedgerText = (rawText, classifiedDocType = "Unknown Document") => {
+      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const rows = [];
+      let currentVendor = "GENERAL VENDOR";
+      let currentVendorId = "UNKNOWN";
+      let rowId = 1;
+
+      const dateRegex = /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/;
+      const amountRegex = /(\(?-?\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})\)?)/g;
+
+      lines.forEach(line => {
+        const lower = line.toLowerCase();
+        if (lower.includes("vendor") || lower.includes("name:")) {
+          let vMatch = line.match(/Vendor\s*ID:?\s*([A-Z0-9.-]+)/i);
+          if (vMatch) currentVendorId = vMatch[1];
+          let nMatch = line.replace(/Vendor\s*ID:?\s*[A-Z0-9.-]+/ig, '').replace(/Name:/ig, '').trim();
+          if (nMatch) currentVendor = nMatch;
+          return;
+        }
+
+        let dateMatch = line.match(dateRegex);
+        let amounts = [...line.matchAll(amountRegex)].map(m => m[1]);
+
+        if (dateMatch && amounts.length > 0) {
+          const parseAmt = (s) => {
+            let isNeg = s.includes('(') || s.includes('-');
+            let clean = parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+            return isNeg ? -clean : clean;
+          };
+
+          let numAmounts = amounts.map(parseAmt);
+          let docAmt = numAmounts[0] || 0;
+          let curAmt = numAmounts[1] || docAmt;
+          let d31 = numAmounts[2] || 0, d61 = numAmounts[3] || 0, d91 = numAmounts[4] || 0;
+
+          let isCrossFootValid = Math.abs(docAmt - (curAmt + d31 + d61 + d91)) < 0.05;
+
+          rows.push({
+            row_id: rowId++,
+            vendor_id: currentVendorId,
+            vendor_name: currentVendor,
+            voucher: "VCH-" + Math.floor(100000 + Math.random() * 900000),
+            doc_number: "DOC-" + Math.floor(10000 + Math.random() * 90000),
+            type: classifiedDocType,
+            doc_date: new Date(dateMatch[1]).toISOString(),
+            doc_amount: docAmt,
+            current_period: curAmt,
+            days_31_60: d31, days_61_90: d61, days_91_over: d91,
+            _cross_foot_valid: isCrossFootValid
+          });
+        }
+      });
+      return rows;
+    };
+
+    window.renderResults = (data) => {
+      document.getElementById('progress-section').classList.add('hidden');
+      document.getElementById('results-section').classList.remove('hidden');
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, normalized, validated, and relationship graph mapped.`;
+
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = data.map(record => {
+        const r = record.data; 
+        const prov = record._provenance;
+        const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
+        const rel = record._relationships || { hasLinks: false, totalConnectedRecords: 0 };
+
+        const scoreColor = prov.confidenceMetrics.parsingConfidence < 70 ? 'text-amber-400' : 'text-emerald-400';
 
         return `
-        <tr class="hover:bg-sky-50/50 border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
-          <td class="py-2 px-3 text-center border-r border-slate-100">${actionBtn}</td>
-          <td class="py-2 px-3">${graphBadge}</td>
-          <td class="py-2 px-3 text-[10px]">
-            <div class="flex flex-col gap-1">
-                <div>${trustBadge} <span class="px-1.5 py-0.5 rounded font-bold ${stateColor}">${r._state || 'Unknown'}</span></div>
-                <div class="text-slate-400 truncate max-w-[150px]" title="${r._sourceFile}">${r._sourceFile || 'Local'}</div>
-            </div>
+        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile} | Connected Links: ${rel.totalConnectedRecords}">
+          <td class="p-3 pl-4">
+            <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext} | ${r.accountNumber || r.vendor_id}</span>
+            ${r.vendor || r.vendor_name}
           </td>
-          <td class="py-2 px-3 text-[11px] font-semibold text-sky-800">${r._location}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r['Department'] || '-'}</td>
-          <td class="py-2 px-3 font-mono font-bold">${r['Journal Entry'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-sky-700 font-semibold">${r['Invoice Number'] || '-'}</td>
-          <td class="py-2 px-3 truncate max-w-[160px]">${r['Originating Master Name'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r['TRX Date'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-gp-700 text-[11px]">${r['Account Number'] || '-'}</td>
-          <td class="py-2 px-3 truncate max-w-[180px]">${r['Account Description'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-right">${r['Debit Amount'] ? '$'+parseFloat(r['Debit Amount']).toFixed(2) : '-'}</td>
-          <td class="py-2 px-3 font-mono text-right">${r['Credit Amount'] ? '$'+parseFloat(r['Credit Amount']).toFixed(2) : '-'}</td>
-          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Reference'] || '-'}</td>
-          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Description'] || '-'}</td>
-          <td class="py-2 px-3 text-[10px] text-slate-500">${r['Originating TRX Source'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r['User Who Posted'] || '-'}</td>
-        </tr>`
-      }).join('');
-      lucide.createIcons();
-    }
+          <td class="p-3 text-slate-400">${r.voucherNumber || r.voucher}</td>
+          <td class="p-3 text-slate-200 font-bold">${r.invoiceNumber || r.doc_number}</td>
+          <td class="p-3">
+            <span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] ${scoreColor}">${r.type}</span>
+          </td>
+          <td class="p-3 text-slate-300">${r.transactionDate || r.doc_date}</td>
+          <td class="p-3 text-right font-bold ${r.amount < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${r.amount ? r.amount.toFixed(2) : '0.00'}</td>
+          <td class="p-3 text-slate-300">
+            ${rel.hasLinks 
+              ? `<span class="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1 w-fit"><i class="ph ph-tree-structure text-xs"></i> ${rel.totalConnectedRecords} Links</span>` 
+              : `<span class="text-slate-500 text-[10px]">Unlinked</span>`}
+          </td>
+          <td class="p-3 text-center">
+            ${val.tieOutStatus === 'PASS' 
+              ? `<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">PASS</span>`
+              : `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold">FAIL ($${val.variance})</span>`}
+          </td>
+        </tr>
+      `}).join('');
 
-    document.getElementById('global-search-input').addEventListener('input', (e) => {
-      window.appState.omniQuery = e.target.value;
-      if (e.target.value.trim().length > 2) logUserActivity('SEARCH', `Global Query: "${e.target.value.trim()}" in ${window.appState.activeLocation}`);
-      setTimeout(executeSearch, 300);
-    });
+      document.getElementById('btn-download').disabled = false;
+      document.getElementById('btn-pass').disabled = false;
+    };
 
-    document.getElementById('btn-export-results').addEventListener('click', () => {
-      if(window.appState.filteredRecords.length === 0) return alert('No records to export');
-      logUserActivity('EXPORT_CSV', `Exported ${window.appState.filteredRecords.length} records for ${window.appState.activeLocation}`);
-      const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
-        const out = { 'Entity': r._location, 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.totalConnectedRecords || 0, 'Source File': r._sourceFile };
-        window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
-        return out;
-      }));
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `Evidence_Export_${window.appState.activeLocation}_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    });
+    window.stageAuditData = async () => {
+      if (extractedData.length === 0) return;
+      try {
+        const db = await openAuditDB();
+        const tx = db.transaction('staging', 'readwrite');
+        tx.objectStore('staging').put(extractedData, 'rredco_audit_staging');
+
+        tx.oncomplete = () => {
+          const btn = document.getElementById('btn-pass');
+          btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
+          btn.classList.remove('from-cyan-400', 'to-cyan-500');
+          btn.classList.add('from-emerald-400', 'to-emerald-500');
+          window.logSys(`Successfully staged ${extractedData.length} graph-enriched records to IndexedDB for ledger.html terminal.`, 'success');
+        };
+      } catch (err) {
+        window.logSys(`Failed to save staging data: ${err.message}`, 'error');
+      }
+    };
+
+    window.downloadExcel = async () => {
+      if (extractedData.length === 0) return;
+      const workbook = new ExcelJS.Workbook();
+      const Worksheet = workbook.addWorksheet('Lighthouse Audit');
+
+      Worksheet.columns = [
+        { header: 'Entity Context', key: 'entity_context', width: 14 },
+        { header: 'Vendor / Entity Name', key: 'vendor', width: 28 },
+        { header: 'Voucher Number', key: 'voucherNumber', width: 16 },
+        { header: 'Invoice Number', key: 'invoiceNumber', width: 18 },
+        { header: 'Doc Type', key: 'type', width: 22 },
+        { header: 'TRX Date', key: 'transactionDate', width: 14 },
+        { header: 'Amount', key: 'amount', width: 16 },
+        { header: 'Connected Links', key: 'links_count', width: 16 },
+        { header: 'Tie-Out Status', key: 'tie_out_status', width: 14 },
+        { header: 'Variance', key: 'variance', width: 12 },
+        { header: 'Evidence State', key: 'evidence_state', width: 16 },
+        { header: 'Parse Score', key: 'parse_score', width: 12 }
+      ];
+
+      extractedData.forEach(record => {
+        const exportRow = { 
+            ...record.data, 
+            entity_context: record._provenance.entityContext,
+            links_count: record._relationships?.totalConnectedRecords || 0,
+            tie_out_status: record._validation?.tieOutStatus || 'PASS',
+            variance: record._validation?.variance || 0,
+            evidence_state: record._evidenceState.status,
+            parse_score: record._provenance.confidenceMetrics.parsingConfidence
+        };
+        Worksheet.addRow(exportRow);
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Digitized_Lighthouse_Schedule_${Date.now()}.xlsx`;
+      a.click();
+    };
 
     lucide.createIcons();
   </script>
