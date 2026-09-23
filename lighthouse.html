@@ -54,7 +54,6 @@
     </div>
 
     <div class="flex items-center gap-3">
-      <!-- AI AUDIT ASSISTANT BUTTON -->
       <button onclick="askAiAssistant()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-purple-400/30">
         <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-300"></i> AI Audit Assistant
       </button>
@@ -169,6 +168,32 @@
 
   </main>
 
+  <!-- GRAPH INSPECTOR MODAL -->
+  <div id="modal-relationship-inspector" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-cyan-500/30 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden text-slate-100">
+      <div class="px-5 py-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="git-fork" class="w-4 h-4 text-cyan-400"></i>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-200">Connected Evidence Graph Inspector</h3>
+        </div>
+        <button onclick="closeGraphModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+        <div class="bg-slate-950 border border-cyan-500/20 rounded-xl p-3">
+          <span class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Primary Reference Record</span>
+          <div id="graph-modal-primary" class="mt-1 font-mono text-slate-200"></div>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-300 mb-2 flex items-center gap-1.5"><i data-lucide="link" class="w-3.5 h-3.5 text-cyan-400"></i> Connected Evidence Edges (<span id="graph-modal-count">0</span>)</h4>
+          <div id="graph-modal-links" class="space-y-2"></div>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-slate-800 bg-slate-950 flex justify-end">
+        <button onclick="closeGraphModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Inspector</button>
+      </div>
+    </div>
+  </div>
+
   <!-- AI AUDIT ASSISTANT REASONING MODAL -->
   <div id="modal-ai-result" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-100">
@@ -261,7 +286,59 @@
       }
     });
 
-    // AI AUDIT ASSISTANT HANDLER FOR LIGHTHOUSE
+    // GRAPH INSPECTOR MODAL HANDLER FOR LIGHTHOUSE
+    window.viewGraphLinks = (recordId) => {
+      const record = extractedData.find(r => r._id === recordId || r.data?.row_id === recordId);
+      if (!record || !record._relationships) return;
+
+      const r = record.data || record;
+      const rel = record._relationships;
+      
+      document.getElementById('graph-modal-primary').innerHTML = `
+        <div class="font-bold text-cyan-300">${record._provenance?.entityContext || 'UNKNOWN'} | ${r.vendor || r.vendor_name || 'Vendor'}</div>
+        <div class="text-[11px] text-slate-400 mt-0.5">Inv: ${r.invoiceNumber || r.doc_number || '-'} | JE: ${r.voucherNumber || r.voucher || '-'} | Amt: $${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</div>
+      `;
+
+      document.getElementById('graph-modal-count').textContent = rel.totalConnectedRecords;
+
+      const allLinkedIds = [
+        ...rel.linkedInvoices,
+        ...rel.linkedJournalEntries,
+        ...rel.linkedVendorRecords,
+        ...rel.linkedAccountRecords
+      ];
+
+      const uniqueIds = Array.from(new Set(allLinkedIds));
+
+      let linksHtml = '';
+      if (uniqueIds.length === 0) {
+        linksHtml = `<div class="p-4 text-center text-slate-500">No cross-document links discovered for this record.</div>`;
+      } else {
+        linksHtml = uniqueIds.map(id => {
+          const linkedRec = extractedData.find(item => item._id === id || item.data?.row_id === id);
+          if (!linkedRec) return '';
+          const lr = linkedRec.data || linkedRec;
+          return `
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <span class="font-bold text-cyan-400 text-[11px]">${linkedRec._provenance?.entityContext || 'ENTITY'} | ${lr.vendor || lr.vendor_name}</span>
+                <p class="text-[10px] font-mono text-slate-400 mt-0.5">Inv: ${lr.invoiceNumber || lr.doc_number || '-'} | JE: ${lr.voucherNumber || lr.voucher || '-'}</p>
+              </div>
+              <span class="text-xs font-mono font-bold text-emerald-400">$${parseFloat(lr.amount || lr.doc_amount || 0).toFixed(2)}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('graph-modal-links').innerHTML = linksHtml;
+      document.getElementById('modal-relationship-inspector').classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    window.closeGraphModal = () => {
+      document.getElementById('modal-relationship-inspector').classList.add('hidden');
+    };
+
     window.askAiAssistant = async () => {
       if (!extractedData || extractedData.length === 0) {
         return alert("No extracted data available to analyze. Please pull cloud ledgers or ingest a document first.");
@@ -408,7 +485,7 @@
             let curAmt = parseFloat(row[8]) || 0;
             
             const rawRecord = {
-              row_id: rowId++,
+              row_id: `ROW_${rowId++}`,
               vendor_id: String(row[0] || entityMatch.name),
               vendor_name: String(row[2] || 'MASTER GL RECORD'),
               voucher: String(row[1] || 'JE-CLK'),
@@ -446,6 +523,7 @@
             });
 
             const finalRecord = {
+                _id: stampedRecord.data?.row_id || `LH_REC_${Date.now()}_${Math.random()}`,
                 _provenance: stampedRecord._provenance,
                 data: stampedRecord.data,
                 _validation: validation,
@@ -527,7 +605,7 @@
         const validation = ValidationEngine.validatePayload(normalizedRows, classification.documentType);
         window.logSys(`Phase 4 Validation Result: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
 
-        extractedData = normalizedRows.map(row => {
+        extractedData = normalizedRows.map((row, idx) => {
             const scores = ConfidenceEngine.calculateScores({
                 sourceType: "SOURCE_PDF",
                 rawText: fullText.substring(0, 500), 
@@ -546,6 +624,7 @@
             });
             
             return {
+                _id: `PDF_REC_${idx}_${Date.now()}`,
                 _provenance: stampedRecord._provenance,
                 data: stampedRecord.data,
                 _validation: validation,
@@ -592,7 +671,7 @@
             const validation = ValidationEngine.validatePayload(normalizedRows, classification.documentType);
             window.logSys(`Phase 4 Validation Result: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
 
-            extractedData = normalizedRows.map(row => {
+            extractedData = normalizedRows.map((row, idx) => {
                 const scores = ConfidenceEngine.calculateScores({
                     sourceType: "OCR_EXTRACTION",
                     rawText: text.substring(0, 500),
@@ -611,6 +690,7 @@
                 });
                 
                 return {
+                    _id: `TXT_REC_${idx}_${Date.now()}`,
                     _provenance: stampedRecord._provenance,
                     data: stampedRecord.data,
                     _validation: validation,
@@ -668,7 +748,7 @@
           let isCrossFootValid = Math.abs(docAmt - (curAmt + d31 + d61 + d91)) < 0.05;
 
           rows.push({
-            row_id: rowId++,
+            row_id: `RAW_ROW_${rowId++}`,
             vendor_id: currentVendorId,
             vendor_name: currentVendor,
             voucher: "VCH-" + Math.floor(100000 + Math.random() * 900000),
@@ -692,17 +772,18 @@
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
-        const r = record.data; 
-        const prov = record._provenance;
+        const r = record.data || record; 
+        const prov = record._provenance || {};
         const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
         const rel = record._relationships || { hasLinks: false, totalConnectedRecords: 0 };
+        const recId = record._id || r.row_id;
 
-        const scoreColor = prov.confidenceMetrics.parsingConfidence < 70 ? 'text-amber-400' : 'text-emerald-400';
+        const scoreColor = (prov.confidenceMetrics?.parsingConfidence || 100) < 70 ? 'text-amber-400' : 'text-emerald-400';
 
         return `
-        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile} | Connected Links: ${rel.totalConnectedRecords}">
+        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile || 'Local'} | Connected Links: ${rel.totalConnectedRecords}">
           <td class="p-3 pl-4">
-            <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext} | ${r.accountNumber || r.vendor_id}</span>
+            <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext || 'ENTITY'} | ${r.accountNumber || r.vendor_id}</span>
             ${r.vendor || r.vendor_name}
           </td>
           <td class="p-3 text-slate-400">${r.voucherNumber || r.voucher}</td>
@@ -711,10 +792,10 @@
             <span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] ${scoreColor}">${r.type}</span>
           </td>
           <td class="p-3 text-slate-300">${r.transactionDate || r.doc_date}</td>
-          <td class="p-3 text-right font-bold ${r.amount < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${r.amount ? r.amount.toFixed(2) : '0.00'}</td>
+          <td class="p-3 text-right font-bold ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
           <td class="p-3 text-slate-300">
             ${rel.hasLinks 
-              ? `<span class="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1 w-fit"><i class="ph ph-tree-structure text-xs"></i> ${rel.totalConnectedRecords} Links</span>` 
+              ? `<button onclick="viewGraphLinks('${recId}')" class="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 font-bold flex items-center gap-1 transition shadow-xs cursor-pointer"><i class="ph ph-tree-structure text-xs"></i> ${rel.totalConnectedRecords} Links</button>` 
               : `<span class="text-slate-500 text-[10px]">Unlinked</span>`}
           </td>
           <td class="p-3 text-center">
@@ -727,6 +808,7 @@
 
       document.getElementById('btn-download').disabled = false;
       document.getElementById('btn-pass').disabled = false;
+      lucide.createIcons();
     };
 
     window.stageAuditData = async () => {
@@ -776,14 +858,15 @@
       ];
 
       extractedData.forEach(record => {
+        const r = record.data || record;
         const exportRow = { 
-            ...record.data, 
-            entity_context: record._provenance.entityContext,
+            ...r, 
+            entity_context: record._provenance?.entityContext || 'ENTITY',
             links_count: record._relationships?.totalConnectedRecords || 0,
             tie_out_status: record._validation?.tieOutStatus || 'PASS',
             variance: record._validation?.variance || 0,
-            evidence_state: record._evidenceState.status,
-            parse_score: record._provenance.confidenceMetrics.parsingConfidence
+            evidence_state: record._evidenceState?.status || 'Accepted',
+            parse_score: record._provenance?.confidenceMetrics?.parsingConfidence || 100
         };
         sheet.addRow(exportRow);
       });
