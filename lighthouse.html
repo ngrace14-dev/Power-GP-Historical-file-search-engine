@@ -53,7 +53,10 @@
     </div>
 
     <div class="flex items-center gap-3">
-      <!-- PHASE 6 MEMO WRITER BUTTON -->
+      <button onclick="startInvestigationUI()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-indigo-400/30">
+        <i data-lucide="briefcase" class="w-3.5 h-3.5 text-indigo-200"></i> Start Case
+      </button>
+
       <button onclick="generateAuditMemoUI()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-emerald-400/30">
         <i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-200"></i> Draft Audit Memo
       </button>
@@ -74,6 +77,28 @@
   </header>
 
   <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+    <!-- Active Investigation Case Panel (Hidden by default) -->
+    <section id="case-section" class="hidden bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-5 shadow-xl">
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="text-sm font-bold text-indigo-200" id="case-title">Active Investigation Workspace</h3>
+            <span id="case-state" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 uppercase tracking-wide">Open</span>
+          </div>
+          <p class="text-xs text-indigo-300/80 font-mono">Entity Boundary: <span id="case-entity" class="font-bold text-white"></span> | ID: <span id="case-id"></span></p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-xs font-mono font-semibold text-indigo-200 bg-indigo-900/60 border border-indigo-500/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <i data-lucide="paperclip" class="w-4 h-4 text-indigo-400"></i>
+            Attached Evidence: <span id="case-count" class="font-bold text-cyan-400 text-sm">0</span>
+          </div>
+          <button onclick="saveAndCloseCaseUI()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i> Save & Close Case
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- Upload & Cloud Pull Panel -->
     <section id="upload-section" class="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 transition-all shadow-xl">
@@ -123,7 +148,7 @@
       </div>
     </section>
 
-    <!-- Phase 5 Contradiction Alert Panel (Hidden by default) -->
+    <!-- Phase 5 Contradiction Alert Panel -->
     <section id="contradiction-section" class="hidden bg-rose-950/40 border border-rose-500/30 rounded-2xl p-5 shadow-xl">
       <div class="flex items-center justify-between border-b border-rose-500/30 pb-3 mb-3">
         <div class="flex items-center gap-2">
@@ -166,7 +191,8 @@
           <table class="w-full text-left border-collapse font-sans">
             <thead class="sticky top-0 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 text-[10px] font-mono text-slate-400 uppercase">
               <tr>
-                <th class="p-3 pl-4">Entity / Vendor</th>
+                <th class="p-3 pl-4 text-center">Case Action</th>
+                <th class="p-3">Entity / Vendor</th>
                 <th class="p-3">Voucher / JE</th>
                 <th class="p-3">Doc / Invoice No.</th>
                 <th class="p-3">Doc Type</th>
@@ -296,7 +322,9 @@
     import { AuthorityEngine } from './authority-engine.js';
     import { CorroborationEngine } from './corroboration-engine.js';
     import { ContradictionEngine } from './contradiction-engine.js';
-    import { MemoWriter } from './memo-writer.js'; // Phase 6 Import
+    import { MemoWriter } from './memo-writer.js';
+    import { ChainOfCustody } from './chain-of-custody.js';
+    import { InvestigationEngine } from './investigation-engine.js'; // Phase 8 Import
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -317,6 +345,8 @@
     let extractedData = [];
     let originalFileName = "";
     let fullDebugLog = [];
+    let currentUserEmail = "SYSTEM_USER";
+    let activeCase = null;
 
     function openAuditDB() {
       return new Promise((resolve, reject) => {
@@ -334,11 +364,66 @@
 
     onAuthStateChanged(auth, (user) => {
       if (user && user.email) {
+        currentUserEmail = user.email;
         document.getElementById('userEmail').textContent = user.email;
       } else {
         window.location.href = 'index.html';
       }
     });
+
+    // PHASE 8 INVESTIGATION WORKSPACE HANDLERS
+    window.startInvestigationUI = () => {
+      const title = prompt("Enter a title for this Investigation Case:");
+      if (!title) return;
+
+      const entity = prompt("Enter Entity Domain boundary (e.g., POMCO, RREDCO):", "POMCO") || "UNKNOWN";
+
+      try {
+        activeCase = InvestigationEngine.createInvestigation(title, entity, currentUserEmail);
+        renderCasePanel();
+        renderResults(extractedData);
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
+    window.attachToCaseUI = (recordId) => {
+      if (!activeCase) return alert("No active investigation case. Click 'Start Case' in the header to open a workspace.");
+
+      const record = extractedData.find(r => r._id === recordId || r.data?.row_id === recordId);
+      if (!record) return;
+
+      const rationale = prompt("Enter mandatory Governance rationale for attaching this evidence:");
+      if (!rationale) return alert("Governance Violation: Link rationale is required.");
+
+      try {
+        InvestigationEngine.attachEvidence(activeCase, record, rationale, currentUserEmail);
+        renderCasePanel();
+        renderResults(extractedData);
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
+    window.saveAndCloseCaseUI = () => {
+      if (!activeCase) return;
+      alert(`Case ${activeCase.caseId} saved securely with ${activeCase.evidenceLog.length} evidence attachments.`);
+      activeCase = null;
+      document.getElementById('case-section').classList.add('hidden');
+      renderResults(extractedData);
+    };
+
+    function renderCasePanel() {
+      if (!activeCase) return;
+      const section = document.getElementById('case-section');
+      section.classList.remove('hidden');
+
+      document.getElementById('case-title').textContent = activeCase.title;
+      document.getElementById('case-state').textContent = activeCase.state;
+      document.getElementById('case-entity').textContent = activeCase.entityContext;
+      document.getElementById('case-id').textContent = activeCase.caseId;
+      document.getElementById('case-count').textContent = activeCase.evidenceLog.length;
+    }
 
     window.switchTab = (tab) => {
       const tabCloud = document.getElementById('tab-cloud');
@@ -400,7 +485,6 @@
       window.updateProgress(0, 'ANALYZING DOCUMENT...');
     };
 
-    // PHASE 6 MEMO DRAFTING UI HANDLER
     window.generateAuditMemoUI = async () => {
       if (!extractedData || extractedData.length === 0) {
         return alert("No extracted data available to generate memorandum. Please pull cloud ledgers or ingest a document first.");
@@ -416,7 +500,13 @@
         const gemini = new GeminiService();
         const memoMarkdown = await gemini.generateAuditMemo(extractedData, "Corporate General Ledger Forensic Audit Memorandum");
         content.textContent = memoMarkdown;
-        window.logSys('Phase 6 Forensic Audit Memorandum generated successfully.', 'success');
+        
+        await ChainOfCustody.recordEvent("MEMO_GENERATED", {
+            recordCount: extractedData.length,
+            title: "Corporate General Ledger Forensic Audit Memorandum"
+        }, currentUserEmail);
+
+        window.logSys('Phase 6 Forensic Audit Memorandum generated and stamped into Phase 7 Chain of Custody.', 'success');
       } catch (err) {
         content.textContent = `Error generating Audit Memorandum: ${err.message}`;
       }
@@ -458,6 +548,8 @@
           .replace(/- /g, '&bull; ');
 
         content.innerHTML = `<div class="bg-purple-950/50 p-4 rounded-xl mb-4 text-purple-200 border border-purple-500/20 font-mono text-xs"><i data-lucide="message-square-text" class="w-4 h-4 inline mr-1"></i> Audit Scope: "${userQuery}"</div>${formattedHtml}`;
+        
+        await ChainOfCustody.recordEvent("AI_REASONING_QUERY", { query: userQuery }, currentUserEmail);
         lucide.createIcons();
       } catch (err) {
         content.innerHTML = `<div class="p-5 text-rose-400 font-bold bg-rose-950/50 border border-rose-500/30 rounded-xl"><i data-lucide="alert-triangle" class="w-5 h-5 inline mr-2"></i> Error: ${err.message}</div>`;
@@ -624,7 +716,7 @@
           });
         }
 
-        // Full Pipeline Sequence: Relationships -> Corroboration -> Materiality -> Risk -> Authority -> Contradiction Expansion
+        // Full Pipeline Sequence
         extractedData = RelationshipEngine.buildRelationships(extractedData);
         extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
         extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
@@ -634,7 +726,13 @@
         const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
         renderContradictionPanel(contradictionFlags);
 
-        window.logSys(`Phase 5 Contradiction Intelligence Expansion complete. Analyzed ${contradictionFlags.length} forensic contradiction flags.`, contradictionFlags.length > 0 ? 'warning' : 'success');
+        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS", {
+            fileCount: xlsxFiles.length,
+            recordCount: extractedData.length,
+            flaggedContradictions: contradictionFlags.length
+        }, currentUserEmail);
+
+        window.logSys(`Phase 7 Chain-of-Custody event recorded. Digitized ${extractedData.length} total records across 17 entities.`, 'success');
 
         window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
         window.renderResults(extractedData);
@@ -736,6 +834,12 @@
         extractedData = RiskEngine.evaluateDataset(extractedData).records;
         extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
 
+        await ChainOfCustody.recordEvent("INGEST_PDF_SCHEDULE", {
+            filename: file.name,
+            recordCount: extractedData.length,
+            entity: userSelectedEntity.toUpperCase()
+        }, currentUserEmail);
+
         window.updateProgress(100, 'EXTRACTION & GRAPH MAPPING COMPLETE');
         window.renderResults(extractedData);
 
@@ -753,7 +857,7 @@
       document.getElementById('progress-section').classList.remove('hidden');
 
       window.updateProgress(50, 'PARSING PASTE BUFFER...');
-      setTimeout(() => {
+      setTimeout(async () => {
         const classification = ClassificationEngine.classifyDocument(text.substring(0, 1000), 'Pasted_Buffer.txt');
         window.logSys(`Classification Engine identified buffer as [${classification.documentType}] with ${(classification.confidence * 100)}% confidence.`);
 
@@ -804,6 +908,11 @@
             extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
             extractedData = RiskEngine.evaluateDataset(extractedData).records;
             extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
+
+            await ChainOfCustody.recordEvent("INGEST_TEXT_BUFFER", {
+                recordCount: extractedData.length,
+                entity: userSelectedEntity.toUpperCase()
+            }, currentUserEmail);
         } else {
             extractedData = [];
         }
@@ -914,6 +1023,11 @@
         const contra = record._contradictions || { hasContradictions: false, count: 0 };
         const recId = record._id || r.row_id;
 
+        let actionCell = `<button onclick="attachToCaseUI('${recId}')" class="px-2 py-1 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 rounded border border-indigo-500/40 text-[10px] transition font-bold" title="Attach to Active Case">Attach</button>`;
+        if (activeCase && activeCase.evidenceLog.some(log => log.recordId === recId)) {
+          actionCell = `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-bold">Attached</span>`;
+        }
+
         let linkDisplay = `<span class="text-slate-500 text-[10px]">Unlinked</span>`;
         if (rel.hasLinks) {
           linkDisplay = `
@@ -938,15 +1052,16 @@
 
         return `
         <tr class="hover:bg-slate-800/50 transition">
-          <td class="p-3 pl-4">
+          <td class="p-3 pl-4 text-center">${actionCell}</td>
+          <td class="p-3 font-mono">
             <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext || 'ENTITY'} | ${r.accountNumber || r.vendor_id}</span>
             ${r.vendor || r.vendor_name}
           </td>
-          <td class="p-3 text-slate-400">${r.voucherNumber || r.voucher}</td>
-          <td class="p-3 text-slate-200 font-bold">${r.invoiceNumber || r.doc_number}</td>
-          <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300">${r.type}</span></td>
-          <td class="p-3 text-slate-300">${r.transactionDate || r.doc_date}</td>
-          <td class="p-3 text-right font-bold ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
+          <td class="p-3 text-slate-400 font-mono">${r.voucherNumber || r.voucher}</td>
+          <td class="p-3 text-slate-200 font-bold font-mono">${r.invoiceNumber || r.doc_number}</td>
+          <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300 font-mono">${r.type}</span></td>
+          <td class="p-3 text-slate-300 font-mono">${r.transactionDate || r.doc_date}</td>
+          <td class="p-3 text-right font-bold font-mono ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
           <td class="p-3">${linkDisplay}</td>
           <td class="p-3 text-center">${corrobBadge}</td>
           <td class="p-3 text-center">${contraBadge}</td>
@@ -974,10 +1089,15 @@
         const store = tx.objectStore('staging');
 
         const getReq = store.get('rredco_audit_staging');
-        getReq.onsuccess = () => {
+        getReq.onsuccess = async () => {
           const existingRecords = getReq.result || [];
           const combinedRecords = [...existingRecords, ...extractedData];
           store.put(combinedRecords, 'rredco_audit_staging');
+
+          await ChainOfCustody.recordEvent("STAGE_DATA_TO_TERMINAL", {
+              stagedCount: extractedData.length,
+              totalStagedInMemory: combinedRecords.length
+          }, currentUserEmail);
         };
 
         tx.oncomplete = () => {
@@ -985,7 +1105,7 @@
           btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
           btn.classList.remove('from-cyan-400', 'to-cyan-500');
           btn.classList.add('from-emerald-400', 'to-emerald-500');
-          window.logSys(`Successfully staged ${extractedData.length} graph-enriched records to IndexedDB for ledger.html terminal.`, 'success');
+          window.logSys(`Successfully staged ${extractedData.length} graph-enriched records to IndexedDB and recorded in Phase 7 Chain of Custody.`, 'success');
         };
       } catch (err) {
         window.logSys(`Failed to save staging data: ${err.message}`, 'error');
@@ -1035,7 +1155,7 @@
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const blob = new Blob blow([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `Digitized_Lighthouse_Schedule_${Date.now()}.xlsx`;
