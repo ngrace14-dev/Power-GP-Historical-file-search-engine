@@ -155,7 +155,7 @@
                 <th class="p-3">TRX Date</th>
                 <th class="p-3 text-right">Amount</th>
                 <th class="p-3">Evidence Graph Links</th>
-                <th class="p-3 text-center">Corroboration</th>
+                <th class="p-3 text-center">Phase 4 Corroboration</th>
                 <th class="p-3 text-center">Phase 1 Materiality</th>
                 <th class="p-3 text-center">Phase 2 Forensic Risk</th>
                 <th class="p-3 text-center">Phase 3 Authority</th>
@@ -254,7 +254,8 @@
     import { AIGovernanceEngine } from './ai-governance.js';
     import { MaterialityEngine } from './materiality-engine.js';
     import { RiskEngine } from './risk-engine.js';
-    import { AuthorityEngine } from './authority-engine.js'; // Phase 3 Import
+    import { AuthorityEngine } from './authority-engine.js';
+    import { CorroborationEngine } from './corroboration-engine.js'; // Phase 4 Import
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -410,6 +411,7 @@
       const invNum = r.invoiceNumber || r.doc_number || '-';
       const voucherNum = r.voucherNumber || r.voucher || '-';
       const authCitation = record._authority?.primaryCitation || 'ASC 205';
+      const corr = record._corroboration || { corroborationLevel: 'A', corroborationStatus: 'Detected', sourceCount: 1 };
       
       document.getElementById('graph-modal-primary').innerHTML = `
         <div class="flex justify-between items-center text-sm">
@@ -417,7 +419,7 @@
           <span class="text-emerald-400 font-bold">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</span>
         </div>
         <div class="text-[11px] text-slate-400 mt-1 font-mono">
-          Ref Invoice #${invNum} | JE: ${voucherNum} | Authority Context: <span class="text-purple-300 font-bold">${authCitation} (${record._authority?.topic || 'GAAP'})</span>
+          Ref Invoice #${invNum} | JE: ${voucherNum} | Corroboration: <span class="text-amber-400 font-bold">Level ${corr.corroborationLevel} - ${corr.corroborationStatus} (${corr.sourceCount} Source)</span> | Authority: <span class="text-purple-300 font-bold">${authCitation}</span>
         </div>
       `;
 
@@ -555,15 +557,21 @@
           });
         }
 
-        // Pipeline Sequence: Relationships -> Materiality -> Risk -> Phase 3 Authority Engine
+        // Complete Pipeline Sequence: Relationships -> Corroboration -> Materiality -> Risk -> Authority
         extractedData = RelationshipEngine.buildRelationships(extractedData);
+        
+        const corrobRes = CorroborationEngine.evaluateDataset(extractedData);
+        extractedData = corrobRes.records;
+        
         extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
-        extractedData = RiskEngine.evaluateDataset(extractedData).records;
+        
+        const riskRes = RiskEngine.evaluateDataset(extractedData);
+        extractedData = riskRes.records;
         
         const authRes = AuthorityEngine.evaluateDataset(extractedData);
         extractedData = authRes.records;
 
-        window.logSys(`Phase 3 Authority Mapping complete. Applied governing accounting standards to ${authRes.mappedCount} specific records.`, 'success');
+        window.logSys(`Phase 4 Evidence Corroboration complete. Cross-verified ${corrobRes.corroboratedCount} independent source records.`, 'success');
 
         window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
         window.renderResults(extractedData);
@@ -660,6 +668,7 @@
         });
 
         extractedData = RelationshipEngine.buildRelationships(extractedData);
+        extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
         extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
         extractedData = RiskEngine.evaluateDataset(extractedData).records;
         extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
@@ -728,6 +737,7 @@
             });
 
             extractedData = RelationshipEngine.buildRelationships(extractedData);
+            extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
             extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
             extractedData = RiskEngine.evaluateDataset(extractedData).records;
             extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
@@ -798,7 +808,7 @@
     window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted, validated, risk scored, and authority mapped.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, validated, risk scored, and corroboration evaluated.`;
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
@@ -807,7 +817,7 @@
         const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
         const rel = record._relationships || { hasLinks: false, evidenceCount: 0, corroboratingCount: 0 };
         const mat = AIGovernanceEngine.classifyMateriality(r.amount || r.doc_amount, val.variance);
-        const corr = record._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
+        const corr = record._corroboration || { corroborationLevel: 'A', corroborationStatus: 'Detected', sourceCount: 1 };
         const risk = record._risk || { riskScore: 0, riskClass: 'LOW', badgeColor: '' };
         const auth = record._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
         const recId = record._id || r.row_id;
@@ -827,9 +837,8 @@
         else if (mat.level === 'SIGNIFICANT') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">Significant</span>`;
 
         const riskBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${risk.badgeColor}" title="${(risk.riskFactors || []).map(f => f.indicator).join(', ')}">${risk.riskScore}/100 (${risk.riskClass})</span>`;
-
-        // Render Phase 3 Authority Citation Badge
-        const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/60 text-purple-300 border border-purple-500/30" title="Governing Standard: ${auth.topic} (${auth.governanceNote})">${auth.primaryCitation}</span>`;
+        const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/60 text-purple-300 border border-purple-500/30" title="${auth.topic}">${auth.primaryCitation}</span>`;
+        const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700" title="Corroboration Status: ${corr.corroborationStatus}">Lvl ${corr.corroborationLevel} (${corr.sourceCount} Src)</span>`;
 
         return `
         <tr class="hover:bg-slate-800/50 transition">
@@ -843,7 +852,7 @@
           <td class="p-3 text-slate-300">${r.transactionDate || r.doc_date}</td>
           <td class="p-3 text-right font-bold ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
           <td class="p-3">${linkDisplay}</td>
-          <td class="p-3 text-center"><span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span></td>
+          <td class="p-3 text-center">${corrobBadge}</td>
           <td class="p-3 text-center">${matBadge}</td>
           <td class="p-3 text-center">${riskBadge}</td>
           <td class="p-3 text-center">${authBadge}</td>
@@ -900,6 +909,7 @@
         { header: 'TRX Date', key: 'transactionDate', width: 14 },
         { header: 'Amount', key: 'amount', width: 16 },
         { header: 'Connected Links', key: 'links_count', width: 16 },
+        { header: 'Corroboration Rating', key: 'corroboration_level', width: 18 },
         { header: 'Materiality Risk', key: 'materiality_risk', width: 16 },
         { header: 'Forensic Risk Score', key: 'risk_score', width: 18 },
         { header: 'Governing Authority', key: 'authority_citation', width: 18 },
@@ -915,6 +925,7 @@
             ...r, 
             entity_context: record._provenance?.entityContext || 'ENTITY',
             links_count: record._relationships?.evidenceCount || 0,
+            corroboration_level: `Level ${record._corroboration?.corroborationLevel || 'A'} (${record._corroboration?.corroborationStatus || 'Detected'})`,
             materiality_risk: record._materiality?.materialityLevel || 'IMMATERIAL',
             risk_score: record._risk?.riskScore || 0,
             authority_citation: record._authority?.primaryCitation || 'ASC 205',
