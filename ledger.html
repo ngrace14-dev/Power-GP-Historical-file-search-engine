@@ -86,9 +86,7 @@
         </div>
         <span class="text-[10px] font-bold text-rose-500 uppercase tracking-widest font-mono">Governance Rule 7</span>
       </div>
-      <div id="contradiction-list" class="space-y-2 max-h-48 overflow-y-auto pr-2">
-        <!-- Flags injected here via Contradiction Engine -->
-      </div>
+      <div id="contradiction-list" class="space-y-2 max-h-48 overflow-y-auto pr-2"></div>
     </div>
 
     <!-- Active Investigation Panel (Hidden by default) -->
@@ -121,10 +119,10 @@
           <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
             <button id="mode-omni" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition">Global Search</button>
             <button id="mode-single" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Target One Field</button>
+            <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
           </div>
         </div>
         <div class="flex items-center gap-3 w-full sm:w-auto">
-          <!-- PHASE 7: AI AUDIT ASSISTANT BUTTON -->
           <button onclick="askAiAssistant()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI Audit Assistant
           </button>
@@ -142,6 +140,7 @@
         </div>
       </div>
 
+      <!-- OMNI / GLOBAL SEARCH -->
       <div id="container-omni-search" class="space-y-2">
         <div class="relative flex flex-col sm:flex-row gap-2">
           <div class="relative flex-1">
@@ -151,6 +150,7 @@
         </div>
       </div>
 
+      <!-- SINGLE FIELD TARGET SEARCH -->
       <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div class="sm:col-span-4">
@@ -162,6 +162,28 @@
           <div class="sm:col-span-8">
             <label class="block text-xs font-semibold text-slate-600 mb-1">Target Query Value</label>
             <input type="text" id="single-field-target-value" placeholder="Enter exact or partial value..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+          </div>
+        </div>
+      </div>
+
+      <!-- MULTI-FIELD TARGETED SEARCH CONTAINER (RESTORED) -->
+      <div id="container-multi-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Invoice Number</label>
+            <input type="text" id="multi-input-invoice" placeholder="Filter by Invoice..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Journal Entry</label>
+            <input type="text" id="multi-input-je" placeholder="Filter by JE..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Vendor / Master Name</label>
+            <input type="text" id="multi-input-vendor" placeholder="Filter by Vendor..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Account Number</label>
+            <input type="text" id="multi-input-account" placeholder="Filter by GL Code..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-gp-500 focus:outline-none" />
           </div>
         </div>
       </div>
@@ -285,9 +307,22 @@
     window.COMPANY_ENTITIES = [{ code: 'E01', name: 'POMCO E01', short: 'POMCO' },{ code: 'E02', name: 'RRCLLC E02', short: 'RRCLLC' },{ code: 'E03', name: 'RRCSCO E03', short: 'RRCSCO' },{ code: 'E04', name: 'RRDLLC E04', short: 'RRDLLC' },{ code: 'E05', name: 'RREDCO E05', short: 'RREDCO' },{ code: 'E06', name: 'RRELLC E06', short: 'RRELLC' },{ code: 'E07', name: 'RREVMCO E07', short: 'RREVMCO' },{ code: 'E08', name: 'RRH2ECO E08', short: 'RRH2ECO' },{ code: 'E09', name: 'RRICO E09', short: 'RRICO' },{ code: 'E10', name: 'RRKOLLC E10', short: 'RRKOLLC' },{ code: 'E11', name: 'RRSDLLC E11', short: 'RRSDLLC' },{ code: 'E12', name: 'RRSDRBLLC E12', short: 'RRSDRBLLC' },{ code: 'E13', name: 'RRUCO E13', short: 'RRUCO' },{ code: 'E14', name: 'WRGCC E14', short: 'WRGCC' },{ code: 'E15', name: 'WRHCO E15', short: 'WRHCO' },{ code: 'E16', name: 'WRMM E16', short: 'WRMM' },{ code: 'E17', name: 'RR-KR3 JV E17', short: 'RR-KR3 JV' }];
     window.GP_TARGET_FIELDS = ['Department','Journal Entry','Invoice Number','Originating Master Name','TRX Date','Account Number','Account Description','Debit Amount','Credit Amount','Reference','Description','Originating TRX Source','User Who Posted'];
     
-    window.appState = { records: [], filteredRecords: [], locations: new Set(), searchMode: 'omni', activeLocation: '', omniQuery: '', singleTargetKey: 'Invoice Number', singleTargetVal: '', currentPage: 1, pageSize: 50, user: null, activeInvestigation: null };
+    window.appState = { 
+      records: [], 
+      filteredRecords: [], 
+      locations: new Set(), 
+      searchMode: 'omni', 
+      activeLocation: '', 
+      omniQuery: '', 
+      singleTargetKey: 'Invoice Number', 
+      singleTargetVal: '', 
+      multiQuery: { invoice: '', je: '', vendor: '', account: '' },
+      currentPage: 1, 
+      pageSize: 50, 
+      user: null, 
+      activeInvestigation: null 
+    };
 
-    // INDEXEDDB STAGING READ
     function openAuditDB() {
       return new Promise((resolve, reject) => {
         const req = indexedDB.open('RREDCO_Audit_Store', 1);
@@ -314,7 +349,6 @@
             const state = row._evidenceState || {};
             const data = row.data || {};
             const rel = row._relationships || null;
-
             const entity = prov.entityContext || 'UNKNOWN';
 
             const item = {
@@ -362,7 +396,6 @@
       }
     }
 
-    // FIREBASE STORAGE CLOUD SYNC HANDLER
     async function syncCloudLedgers() {
       const badge = document.getElementById('sync-badge');
       if (badge) {
@@ -478,7 +511,6 @@
       }
     }
 
-    // PHASE 7: AI REASONING HANDLER
     window.askAiAssistant = async () => {
         if (!window.appState.activeLocation) {
             return alert("Governance Rule 4: Please select an Entity Domain to scope the AI reasoning.");
@@ -524,7 +556,6 @@
         document.getElementById('modal-ai-result').classList.add('hidden');
     };
 
-    // CONTRADICTION ENGINE EXECUTION
     function runContradictionEngine() {
       const flags = ContradictionEngine.analyzeDataset(window.appState.records);
       const panel = document.getElementById('contradiction-panel');
@@ -578,7 +609,6 @@
       executeSearch();
     });
 
-    // INVESTIGATION WORKFLOW
     window.startInvestigation = () => {
         const title = prompt("Enter a title for this Investigation Case:");
         if (!title) return;
@@ -648,7 +678,6 @@
         document.getElementById('inv-count').textContent = inv.evidenceLog.length;
     }
 
-    // PHASE 5 GRAPH INSPECTOR MODAL
     window.viewGraphLinks = (recordId) => {
       const record = window.appState.records.find(r => r._id === recordId);
       if (!record || !record._relationships) return;
@@ -717,8 +746,9 @@
 
     document.getElementById('logoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'Signed out'); signOut(auth); });
 
+    // UPDATED SEARCH EXECUTION TO SUPPORT MULTI-FIELD MODE
     function executeSearch() {
-      const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal } = window.appState;
+      const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiQuery } = window.appState;
       const tbody = document.getElementById('table-body');
 
       if (!activeLocation) {
@@ -741,6 +771,19 @@
       } else if (searchMode === 'single' && singleTargetVal.trim()) {
         const q = singleTargetVal.trim().toLowerCase();
         filtered = filtered.filter(r => String(r[singleTargetKey] || '').toLowerCase().includes(q));
+      } else if (searchMode === 'multi') {
+        const invQ = multiQuery.invoice.trim().toLowerCase();
+        const jeQ = multiQuery.je.trim().toLowerCase();
+        const vendorQ = multiQuery.vendor.trim().toLowerCase();
+        const accountQ = multiQuery.account.trim().toLowerCase();
+
+        filtered = filtered.filter(r => {
+          const matchInv = !invQ || String(r['Invoice Number'] || '').toLowerCase().includes(invQ);
+          const matchJe = !jeQ || String(r['Journal Entry'] || '').toLowerCase().includes(jeQ);
+          const matchVendor = !vendorQ || String(r['Originating Master Name'] || '').toLowerCase().includes(vendorQ);
+          const matchAccount = !accountQ || String(r['Account Number'] || '').toLowerCase().includes(accountQ);
+          return matchInv && matchJe && matchVendor && matchAccount;
+        });
       }
 
       window.appState.filteredRecords = filtered;
@@ -848,6 +891,7 @@
       window.appState.searchMode = 'omni';
       document.getElementById('container-omni-search').classList.remove('hidden');
       document.getElementById('container-single-search').classList.add('hidden');
+      document.getElementById('container-multi-search').classList.add('hidden');
       executeSearch();
     });
 
@@ -855,6 +899,15 @@
       window.appState.searchMode = 'single';
       document.getElementById('container-omni-search').classList.add('hidden');
       document.getElementById('container-single-search').classList.remove('hidden');
+      document.getElementById('container-multi-search').classList.add('hidden');
+      executeSearch();
+    });
+
+    document.getElementById('mode-multi').addEventListener('click', () => {
+      window.appState.searchMode = 'multi';
+      document.getElementById('container-omni-search').classList.add('hidden');
+      document.getElementById('container-single-search').classList.add('hidden');
+      document.getElementById('container-multi-search').classList.remove('hidden');
       executeSearch();
     });
 
@@ -869,6 +922,19 @@
       window.appState.singleTargetKey = e.target.value;
       executeSearch();
     });
+
+    // MULTI-FIELD TARGET SEARCH EVENT LISTENERS
+    const bindMultiInput = (id, key) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        window.appState.multiQuery[key] = e.target.value;
+        setTimeout(executeSearch, 300);
+      });
+    };
+
+    bindMultiInput('multi-input-invoice', 'invoice');
+    bindMultiInput('multi-input-je', 'je');
+    bindMultiInput('multi-input-vendor', 'vendor');
+    bindMultiInput('multi-input-account', 'account');
 
     // PAGINATION CONTROLS
     document.getElementById('btn-prev-page').addEventListener('click', () => {
