@@ -69,14 +69,14 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Isolated Entities</span><p id="stat-locations" class="text-xl font-bold text-slate-900 mt-1">0</p></div>
         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Total Evidence Rows</span><p id="stat-rows" class="text-xl font-bold text-slate-900 mt-1">0</p></div>
-        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Active Matches</span><p id="stat-matches" class="text-xl font-bold text-gp-600 mt-1">0</p></div>
+        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Graph Nodes / Edges</span><p id="stat-graph" class="text-xl font-bold text-gp-600 mt-1">0 / 0</p></div>
         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col justify-center">
           <p class="text-[10px] text-slate-500">Cross-entity merging is strictly prohibited under Gov. Rule 6.</p>
         </div>
       </div>
     </div>
 
-    <!-- Contradiction Engine Alerts (Hidden by default) -->
+    <!-- Contradiction Engine Alerts -->
     <div id="contradiction-panel" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-sm">
       <div class="flex items-center justify-between mb-3 border-b border-rose-200/60 pb-3">
         <div class="flex items-center gap-2">
@@ -89,7 +89,7 @@
       <div id="contradiction-list" class="space-y-2 max-h-48 overflow-y-auto pr-2"></div>
     </div>
 
-    <!-- Active Investigation Panel (Hidden by default) -->
+    <!-- Active Investigation Panel -->
     <div id="investigation-panel" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-5 shadow-sm">
       <div class="flex justify-between items-center">
         <div>
@@ -273,6 +273,7 @@
     import { AuthorityEngine } from './authority-engine.js';
     import { CorroborationEngine } from './corroboration-engine.js';
     import { ChainOfCustody } from './chain-of-custody.js';
+    import { EvidenceGraph } from './evidence-graph.js'; // Phase 9 Import
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -305,7 +306,8 @@
       currentPage: 1, 
       pageSize: 50, 
       user: null,
-      activeInvestigation: null
+      activeInvestigation: null,
+      evidenceGraph: null
     };
 
     function openAuditDB() {
@@ -375,8 +377,14 @@
             const contradictionFlags = ContradictionEngine.analyzeDataset(window.appState.records);
             renderContradictionPanel(contradictionFlags);
 
-            await ChainOfCustody.recordEvent("LOAD_AUDIT_STAGING", {
+            // Construct Phase 9 Evidence Graph
+            window.appState.evidenceGraph = EvidenceGraph.buildGraphFromDataset(window.appState.records);
+            document.getElementById('stat-graph').textContent = `${window.appState.evidenceGraph.nodes.size} / ${window.appState.evidenceGraph.edges.length}`;
+
+            await ChainOfCustody.recordEvent("LOAD_AUDIT_STAGING_GRAPH", {
                 loadedCount: addedCount,
+                nodes: window.appState.evidenceGraph.nodes.size,
+                edges: window.appState.evidenceGraph.edges.length,
                 totalMemoryRecords: window.appState.records.length
             }, window.appState.user?.email || "SYSTEM_USER");
 
@@ -492,8 +500,13 @@
           const contradictionFlags = ContradictionEngine.analyzeDataset(window.appState.records);
           renderContradictionPanel(contradictionFlags);
 
-          await ChainOfCustody.recordEvent("SYNC_CLOUD_LEDGERS_TERMINAL", {
+          window.appState.evidenceGraph = EvidenceGraph.buildGraphFromDataset(window.appState.records);
+          document.getElementById('stat-graph').textContent = `${window.appState.evidenceGraph.nodes.size} / ${window.appState.evidenceGraph.edges.length}`;
+
+          await ChainOfCustody.recordEvent("SYNC_CLOUD_LEDGERS_TERMINAL_GRAPH", {
               loadedCount,
+              nodes: window.appState.evidenceGraph.nodes.size,
+              edges: window.appState.evidenceGraph.edges.length,
               contradictionsDetected: contradictionFlags.length
           }, window.appState.user?.email || "SYSTEM_USER");
 
@@ -664,12 +677,6 @@
       document.getElementById('modal-relationship-inspector').classList.add('hidden');
     };
 
-    function logUserActivity(eventType, details) {
-      if (!window.appState.user) return;
-      const logPayload = { email: window.appState.user.email, uid: window.appState.user.uid, type: eventType, details: details, timestamp: new Date().toISOString(), timeFormatted: new Date().toLocaleString() };
-      try { push(dbRef(database, 'system_activity_logs'), logPayload).catch(e=>{}); } catch (err) {}
-    }
-
     function executeSearch() {
       const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiQuery } = window.appState;
       const tbody = document.getElementById('table-body');
@@ -814,16 +821,13 @@
       lucide.createIcons();
     }
 
-    // EVENT LISTENERS
     document.getElementById('global-search-input').addEventListener('input', (e) => {
       window.appState.omniQuery = e.target.value;
-      if (e.target.value.trim().length > 2) logUserActivity('SEARCH', `Global Query: "${e.target.value.trim()}" in ${window.appState.activeLocation}`);
       setTimeout(executeSearch, 300);
     });
 
     document.getElementById('btn-export-results').addEventListener('click', () => {
       if(window.appState.filteredRecords.length === 0) return alert('No records to export');
-      logUserActivity('EXPORT_CSV', `Exported ${window.appState.filteredRecords.length} records for ${window.appState.activeLocation}`);
       const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
         const out = { 'Entity': r._location, 'Materiality': r._materiality?.materialityLevel || 'IMMATERIAL', 'Forensic Risk': r._risk?.riskScore || 0, 'Governing Authority': r._authority?.primaryCitation || 'ASC 205', 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.evidenceCount || 0, 'Source File': r._sourceFile };
         window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
