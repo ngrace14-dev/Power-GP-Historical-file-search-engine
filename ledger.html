@@ -199,6 +199,7 @@
             <tr id="table-header-row">
               <th class="py-2.5 px-3">Action</th>
               <th class="py-2.5 px-3">Relational Graph</th>
+              <th class="py-2.5 px-3">Phase 1 Materiality</th>
               <th class="py-2.5 px-3">Explainability (State / Trust / Provenance)</th>
               <th class="py-2.5 px-3">Location / Entity</th>
               <th class="py-2.5 px-3">Department</th>
@@ -217,7 +218,7 @@
             </tr>
           </thead>
           <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
-            <tr><td colspan="17" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
+            <tr><td colspan="18" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
           </tbody>
         </table>
       </div>
@@ -264,6 +265,7 @@
     import { InvestigationEngine } from './investigation-engine.js';
     import { ContradictionEngine } from './contradiction-engine.js';
     import { RelationshipEngine } from './relationship-engine.js'; 
+    import { MaterialityEngine } from './materiality-engine.js'; // Phase 1 Import
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -358,6 +360,7 @@
 
           if (addedCount > 0) {
             window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
+            window.appState.records = MaterialityEngine.evaluateDataset(window.appState.records).records;
             updateLocationDropdown();
             runContradictionEngine();
             const badge = document.getElementById('sync-badge');
@@ -465,6 +468,7 @@
 
         if (loadedCount > 0) {
           window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
+          window.appState.records = MaterialityEngine.evaluateDataset(window.appState.records).records;
           updateLocationDropdown();
           runContradictionEngine();
           if (badge) {
@@ -682,7 +686,7 @@
       const tbody = document.getElementById('table-body');
 
       if (!activeLocation) {
-        tbody.innerHTML = `<tr><td colspan="17" class="py-14 text-center">
+        tbody.innerHTML = `<tr><td colspan="18" class="py-14 text-center">
             <i data-lucide="shield-alert" class="w-8 h-8 mx-auto text-amber-500 mb-2"></i>
             <p class="text-slate-800 font-bold text-sm">Entity Context Required (Governance Rule 4)</p>
             <p class="text-slate-500 text-xs mt-1">Cross-entity merging is strictly prohibited. Please select an Entity Domain above.</p>
@@ -740,7 +744,7 @@
       const pageSlice = filteredRecords.slice(start, start + pageSize);
 
       if (filteredRecords.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="17" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="18" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
         return;
       }
 
@@ -763,10 +767,21 @@
           ? `<button onclick="viewGraphLinks('${r._id}')" class="px-2 py-0.5 rounded text-[10px] bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border border-cyan-300 font-bold flex items-center gap-1 transition shadow-2xs"><i data-lucide="git-fork" class="w-3 h-3"></i> ${rel.totalConnectedRecords} Links</button>`
           : `<span class="text-slate-400 text-[10px]">Unlinked</span>`;
 
+        const mat = r._materiality || { materialityLevel: 'IMMATERIAL', isMaterial: false };
+        let matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 text-slate-500">Immaterial</span>`;
+        if (mat.materialityLevel === 'CRITICAL') {
+          matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200">Critical</span>`;
+        } else if (mat.materialityLevel === 'ELEVATED') {
+          matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Elevated</span>`;
+        } else if (mat.materialityLevel === 'HIGH_EXPOSURE') {
+          matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-700 border border-sky-200">High Scope</span>`;
+        }
+
         return `
         <tr class="hover:bg-sky-50/50 border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
           <td class="py-2 px-3 text-center border-r border-slate-100">${actionBtn}</td>
           <td class="py-2 px-3">${graphBadge}</td>
+          <td class="py-2 px-3">${matBadge}</td>
           <td class="py-2 px-3 text-[10px]">
             <div class="flex flex-col gap-1">
                 <div>${trustBadge} <span class="px-1.5 py-0.5 rounded font-bold ${stateColor}">${r._state || 'Unknown'}</span></div>
@@ -802,7 +817,7 @@
       if(window.appState.filteredRecords.length === 0) return alert('No records to export');
       logUserActivity('EXPORT_CSV', `Exported ${window.appState.filteredRecords.length} records for ${window.appState.activeLocation}`);
       const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
-        const out = { 'Entity': r._location, 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.totalConnectedRecords || 0, 'Source File': r._sourceFile };
+        const out = { 'Entity': r._location, 'Materiality': r._materiality?.materialityLevel || 'IMMATERIAL', 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.totalConnectedRecords || 0, 'Source File': r._sourceFile };
         window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
         return out;
       }));
