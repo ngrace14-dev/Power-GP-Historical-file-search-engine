@@ -76,6 +76,21 @@
       </div>
     </div>
 
+    <!-- Contradiction Engine Alerts (Hidden by default) -->
+    <div id="contradiction-panel" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-sm">
+      <div class="flex items-center justify-between mb-3 border-b border-rose-200/60 pb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-alert" class="w-5 h-5 text-rose-600"></i>
+          <h3 class="text-sm font-bold text-rose-900 uppercase tracking-wide">Forensic Contradictions Detected</h3>
+          <span id="contradiction-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-800">0 Flags</span>
+        </div>
+        <span class="text-[10px] font-bold text-rose-500 uppercase tracking-widest font-mono">Governance Rule 7</span>
+      </div>
+      <div id="contradiction-list" class="space-y-2 max-h-48 overflow-y-auto pr-2">
+        <!-- Flags injected here via Contradiction Engine -->
+      </div>
+    </div>
+
     <!-- Active Investigation Panel (Hidden by default) -->
     <div id="investigation-panel" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-5 shadow-sm">
       <div class="flex justify-between items-center">
@@ -131,7 +146,6 @@
         </div>
       </div>
 
-      <!-- ... single and multi search containers remain structurally the same ... -->
       <div id="container-single-search" class="hidden space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
           <div class="sm:col-span-4">
@@ -196,8 +210,9 @@
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     import { getDatabase, ref as dbRef, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
     
-    // GOVERNANCE MODULE
+    // GOVERNANCE MODULES
     import { InvestigationEngine } from './modules/investigation-engine.js';
+    import { ContradictionEngine } from './modules/contradiction-engine.js'; // NEW MODULE
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -278,6 +293,7 @@
 
           if (addedCount > 0) {
             updateLocationDropdown();
+            runContradictionEngine(); // Analyze new dataset
             const badge = document.getElementById('sync-badge');
             if (badge) {
               badge.textContent = `${addedCount} Evidence Rows Staged`;
@@ -288,6 +304,38 @@
       } catch (err) {
         console.warn('Error reading audit staging memory:', err);
       }
+    }
+
+    // CONTRADICTION ENGINE EXECUTION
+    function runContradictionEngine() {
+      const flags = ContradictionEngine.analyzeDataset(window.appState.records);
+      const panel = document.getElementById('contradiction-panel');
+      const list = document.getElementById('contradiction-list');
+      
+      if (flags.length === 0) {
+          panel.classList.add('hidden');
+          return;
+      }
+
+      panel.classList.remove('hidden');
+      document.getElementById('contradiction-count').textContent = `${flags.length} Flags`;
+      
+      list.innerHTML = flags.map(f => `
+          <div class="p-3 bg-white rounded-lg border border-rose-100 flex items-start gap-3 shadow-sm">
+              <div class="mt-0.5">
+                  ${f.severity === 'CRITICAL' ? '<i data-lucide="siren" class="w-4 h-4 text-rose-600"></i>' : '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>'}
+              </div>
+              <div>
+                  <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-slate-900">${f.type}</span>
+                      <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${f.targetDocument}</span>
+                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${f.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">${f.severity}</span>
+                  </div>
+                  <p class="text-[11px] text-slate-600 mt-1">${f.description}</p>
+              </div>
+          </div>
+      `).join('');
+      lucide.createIcons();
     }
 
     function updateLocationDropdown() {
@@ -325,7 +373,7 @@
         
         document.getElementById('btn-start-case').classList.add('hidden');
         renderInvestigationPanel();
-        renderTable(); // Re-render to show plus icons
+        renderTable(); 
         logUserActivity('CASE_OPENED', `Started case: ${title}`);
     };
 
@@ -343,7 +391,6 @@
         const rationale = prompt("Why are you attaching this evidence? (Required by Governance)");
         if (!rationale) return alert("Governance Violation: Link rationale is required.");
 
-        // Construct proxy provenance object for the engine
         const evidenceProxy = {
             _provenance: { entityContext: record._location, sourceFile: record._sourceFile },
             data: { row_id: record._id }
@@ -451,11 +498,9 @@
       }
 
       tbody.innerHTML = pageSlice.map((r, idx) => {
-        // Explainability Layer Generation
         const stateColor = r._state === 'Accepted' ? 'text-emerald-600 bg-emerald-100' : (r._state === 'Unresolved' ? 'text-rose-600 bg-rose-100' : 'text-slate-600 bg-slate-100');
         const trustBadge = `<span class="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[9px] text-slate-500 mr-1" title="Trust Level ${r._trustLevel}">Lv.${r._trustLevel || '?'}</span>`;
         
-        // Investigation Action Generator
         let actionBtn = `<button class="p-1 text-slate-300 cursor-not-allowed" title="Start Case to Attach"><i data-lucide="minus" class="w-4 h-4"></i></button>`;
         if (activeInvestigation) {
             const isAttached = activeInvestigation.evidenceLog.some(log => log.recordId === r._id);
