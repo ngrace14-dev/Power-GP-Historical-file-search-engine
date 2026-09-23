@@ -118,6 +118,19 @@
       </div>
     </section>
 
+    <!-- Phase 5 Contradiction Alert Panel (Hidden by default) -->
+    <section id="contradiction-section" class="hidden bg-rose-950/40 border border-rose-500/30 rounded-2xl p-5 shadow-xl">
+      <div class="flex items-center justify-between border-b border-rose-500/30 pb-3 mb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-alert" class="w-5 h-5 text-rose-400"></i>
+          <h3 class="text-sm font-bold text-rose-200 uppercase tracking-wide">Phase 5 Contradiction Intelligence Alerts</h3>
+          <span id="contradiction-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">0 Flags</span>
+        </div>
+        <span class="text-[10px] font-bold text-rose-400 uppercase tracking-widest font-mono">Governance Rule 7</span>
+      </div>
+      <div id="contradiction-cards" class="space-y-2 max-h-48 overflow-y-auto pr-2"></div>
+    </section>
+
     <!-- Progress Logs -->
     <section id="progress-section" class="hidden bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800">
       <div class="flex items-center justify-between mb-2">
@@ -156,6 +169,7 @@
                 <th class="p-3 text-right">Amount</th>
                 <th class="p-3">Evidence Graph Links</th>
                 <th class="p-3 text-center">Phase 4 Corroboration</th>
+                <th class="p-3 text-center">Phase 5 Contradictions</th>
                 <th class="p-3 text-center">Phase 1 Materiality</th>
                 <th class="p-3 text-center">Phase 2 Forensic Risk</th>
                 <th class="p-3 text-center">Phase 3 Authority</th>
@@ -255,7 +269,8 @@
     import { MaterialityEngine } from './materiality-engine.js';
     import { RiskEngine } from './risk-engine.js';
     import { AuthorityEngine } from './authority-engine.js';
-    import { CorroborationEngine } from './corroboration-engine.js'; // Phase 4 Import
+    import { CorroborationEngine } from './corroboration-engine.js';
+    import { ContradictionEngine } from './contradiction-engine.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -557,21 +572,17 @@
           });
         }
 
-        // Complete Pipeline Sequence: Relationships -> Corroboration -> Materiality -> Risk -> Authority
+        // Full Pipeline Execution: Relationships -> Corroboration -> Materiality -> Risk -> Authority -> Contradiction Expansion
         extractedData = RelationshipEngine.buildRelationships(extractedData);
-        
-        const corrobRes = CorroborationEngine.evaluateDataset(extractedData);
-        extractedData = corrobRes.records;
-        
+        extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
         extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
+        extractedData = RiskEngine.evaluateDataset(extractedData).records;
+        extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
         
-        const riskRes = RiskEngine.evaluateDataset(extractedData);
-        extractedData = riskRes.records;
-        
-        const authRes = AuthorityEngine.evaluateDataset(extractedData);
-        extractedData = authRes.records;
+        const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
+        renderContradictionPanel(contradictionFlags);
 
-        window.logSys(`Phase 4 Evidence Corroboration complete. Cross-verified ${corrobRes.corroboratedCount} independent source records.`, 'success');
+        window.logSys(`Phase 5 Contradiction Intelligence Expansion complete. Analyzed ${contradictionFlags.length} forensic contradiction flags.`, contradictionFlags.length > 0 ? 'warning' : 'success');
 
         window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
         window.renderResults(extractedData);
@@ -805,10 +816,38 @@
       return rows;
     };
 
+    function renderContradictionPanel(flags = []) {
+      const section = document.getElementById('contradiction-section');
+      const badge = document.getElementById('contradiction-badge');
+      const cards = document.getElementById('contradiction-cards');
+
+      if (!flags || flags.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      section.classList.remove('hidden');
+      badge.textContent = `${flags.length} Flags`;
+
+      cards.innerHTML = flags.map(f => `
+        <div class="p-3 bg-slate-900 rounded-xl border border-rose-500/30 flex items-start justify-between text-xs font-mono">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-rose-400 font-bold uppercase">${f.category}</span>
+              <span class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold border border-rose-500/30">${f.severity}</span>
+              <span class="text-slate-400 text-[10px]">${f.sourceEntity} | Target: ${f.targetDocument}</span>
+            </div>
+            <p class="text-slate-300 mt-1 font-sans text-xs">${f.description}</p>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
     window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted, validated, risk scored, and corroboration evaluated.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, validated, risk scored, and contradiction evaluated.`;
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
@@ -817,9 +856,10 @@
         const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
         const rel = record._relationships || { hasLinks: false, evidenceCount: 0, corroboratingCount: 0 };
         const mat = AIGovernanceEngine.classifyMateriality(r.amount || r.doc_amount, val.variance);
-        const corr = record._corroboration || { corroborationLevel: 'A', corroborationStatus: 'Detected', sourceCount: 1 };
+        const corr = record._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
         const risk = record._risk || { riskScore: 0, riskClass: 'LOW', badgeColor: '' };
         const auth = record._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
+        const contra = record._contradictions || { hasContradictions: false, count: 0 };
         const recId = record._id || r.row_id;
 
         let linkDisplay = `<span class="text-slate-500 text-[10px]">Unlinked</span>`;
@@ -838,7 +878,11 @@
 
         const riskBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${risk.badgeColor}" title="${(risk.riskFactors || []).map(f => f.indicator).join(', ')}">${risk.riskScore}/100 (${risk.riskClass})</span>`;
         const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/60 text-purple-300 border border-purple-500/30" title="${auth.topic}">${auth.primaryCitation}</span>`;
-        const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700" title="Corroboration Status: ${corr.corroborationStatus}">Lvl ${corr.corroborationLevel} (${corr.sourceCount} Src)</span>`;
+        const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span>`;
+        
+        const contraBadge = contra.hasContradictions 
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">${contra.count} Contradiction${contra.count > 1 ? 's' : ''}</span>`
+          : `<span class="text-slate-500 text-[10px]">Clear</span>`;
 
         return `
         <tr class="hover:bg-slate-800/50 transition">
@@ -853,6 +897,7 @@
           <td class="p-3 text-right font-bold ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
           <td class="p-3">${linkDisplay}</td>
           <td class="p-3 text-center">${corrobBadge}</td>
+          <td class="p-3 text-center">${contraBadge}</td>
           <td class="p-3 text-center">${matBadge}</td>
           <td class="p-3 text-center">${riskBadge}</td>
           <td class="p-3 text-center">${authBadge}</td>
