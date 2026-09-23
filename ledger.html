@@ -199,7 +199,8 @@
             <tr id="table-header-row">
               <th class="py-2.5 px-3">Action</th>
               <th class="py-2.5 px-3">Evidence Graph Links</th>
-              <th class="py-2.5 px-3">Corroboration</th>
+              <th class="py-2.5 px-3">Phase 4 Corroboration</th>
+              <th class="py-2.5 px-3">Phase 5 Contradictions</th>
               <th class="py-2.5 px-3">Phase 2 Forensic Risk</th>
               <th class="py-2.5 px-3">Phase 3 Authority</th>
               <th class="py-2.5 px-3">Explainability (State / Trust / Provenance)</th>
@@ -220,7 +221,7 @@
             </tr>
           </thead>
           <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
-            <tr><td colspan="20" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
+            <tr><td colspan="21" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
           </tbody>
         </table>
       </div>
@@ -270,6 +271,8 @@
     import { MaterialityEngine } from './materiality-engine.js';
     import { RiskEngine } from './risk-engine.js';
     import { AuthorityEngine } from './authority-engine.js';
+    import { CorroborationEngine } from './corroboration-engine.js';
+    import { ChainOfCustody } from './chain-of-custody.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -301,8 +304,8 @@
       multiQuery: { invoice: '', je: '', vendor: '', account: '' },
       currentPage: 1, 
       pageSize: 50, 
-      user: null, 
-      activeInvestigation: null 
+      user: null,
+      activeInvestigation: null
     };
 
     function openAuditDB() {
@@ -321,7 +324,7 @@
         const tx = db.transaction('staging', 'readonly');
         const req = tx.objectStore('staging').get('rredco_audit_staging');
 
-        req.onsuccess = () => {
+        req.onsuccess = async () => {
           const stagingData = req.result;
           if (!stagingData || stagingData.length === 0) return;
 
@@ -364,12 +367,20 @@
 
           if (addedCount > 0) {
             window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
+            window.appState.records = CorroborationEngine.evaluateDataset(window.appState.records).records;
             window.appState.records = MaterialityEngine.evaluateDataset(window.appState.records).records;
             window.appState.records = RiskEngine.evaluateDataset(window.appState.records).records;
             window.appState.records = AuthorityEngine.evaluateDataset(window.appState.records).records;
 
+            const contradictionFlags = ContradictionEngine.analyzeDataset(window.appState.records);
+            renderContradictionPanel(contradictionFlags);
+
+            await ChainOfCustody.recordEvent("LOAD_AUDIT_STAGING", {
+                loadedCount: addedCount,
+                totalMemoryRecords: window.appState.records.length
+            }, window.appState.user?.email || "SYSTEM_USER");
+
             updateLocationDropdown();
-            runContradictionEngine();
             const badge = document.getElementById('sync-badge');
             if (badge) {
               badge.textContent = `${addedCount} Staged Evidence Rows`;
@@ -380,6 +391,34 @@
       } catch (err) {
         console.warn('Error reading audit staging memory:', err);
       }
+    }
+
+    function renderContradictionPanel(flags = []) {
+      const panel = document.getElementById('contradiction-panel');
+      const count = document.getElementById('contradiction-count');
+      const list = document.getElementById('contradiction-list');
+
+      if (!flags || flags.length === 0) {
+        panel.classList.add('hidden');
+        return;
+      }
+
+      panel.classList.remove('hidden');
+      count.textContent = `${flags.length} Flags`;
+
+      list.innerHTML = flags.map(f => `
+        <div class="p-3 bg-white rounded-lg border border-rose-100 flex items-start justify-between text-xs">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-rose-900">${f.category}</span>
+              <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">${f.severity}</span>
+              <span class="text-slate-500 font-mono text-[10px]">${f.sourceEntity} | Target: ${f.targetDocument}</span>
+            </div>
+            <p class="text-slate-600 mt-1">${f.description}</p>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
     }
 
     async function syncCloudLedgers() {
@@ -440,55 +479,28 @@
               window.appState.locations.add(entityCode);
               loadedCount++;
             });
-          } else if (fileName.endsWith('.csv')) {
-            const response = await fetch(url);
-            const text = await response.text();
-            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-            (parsed.data || []).forEach((row, idx) => {
-              const loc = row['Location'] || row['Entity'] || entityCode;
-              const rec = {
-                _id: `CLOUD_CSV_${idx}_${Date.now()}`,
-                _location: loc,
-                _sourceFile: fileName,
-                _trustLevel: 5,
-                _state: 'Accepted',
-                'Department': row['Department'] || '-',
-                'Journal Entry': String(row['Journal Entry'] || row['Voucher'] || '-'),
-                'Invoice Number': String(row['Invoice Number'] || '-'),
-                'Originating Master Name': String(row['Originating Master Name'] || row['Vendor'] || '-'),
-                'TRX Date': row['TRX Date'] || row['Transaction Date'] || '-',
-                'Account Number': String(row['Account Number'] || row['GL Code'] || '-'),
-                'Account Description': String(row['Account Description'] || '-'),
-                'Debit Amount': String(row['Debit Amount'] || ''),
-                'Credit Amount': String(row['Credit Amount'] || ''),
-                'Reference': String(row['Reference'] || row['Reference ID'] || '-'),
-                'Description': String(row['Description'] || '-'),
-                'Originating TRX Source': 'Power GP Cloud CSV',
-                'User Who Posted': row['User Who Posted'] || 'System'
-              };
-              window.appState.records.push(rec);
-              window.appState.locations.add(loc);
-              loadedCount++;
-            });
           }
         }
 
         if (loadedCount > 0) {
           window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
+          window.appState.records = CorroborationEngine.evaluateDataset(window.appState.records).records;
           window.appState.records = MaterialityEngine.evaluateDataset(window.appState.records).records;
           window.appState.records = RiskEngine.evaluateDataset(window.appState.records).records;
           window.appState.records = AuthorityEngine.evaluateDataset(window.appState.records).records;
 
+          const contradictionFlags = ContradictionEngine.analyzeDataset(window.appState.records);
+          renderContradictionPanel(contradictionFlags);
+
+          await ChainOfCustody.recordEvent("SYNC_CLOUD_LEDGERS_TERMINAL", {
+              loadedCount,
+              contradictionsDetected: contradictionFlags.length
+          }, window.appState.user?.email || "SYSTEM_USER");
+
           updateLocationDropdown();
-          runContradictionEngine();
           if (badge) {
             badge.textContent = `${loadedCount} Cloud Rows Synced`;
             badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800';
-          }
-        } else {
-          if (badge) {
-            badge.textContent = 'No Cloud Files Found';
-            badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800';
           }
         }
       } catch (err) {
@@ -497,39 +509,7 @@
           badge.textContent = 'Cloud Sync Failed';
           badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800';
         }
-        alert('Cloud Sync Error: ' + err.message);
       }
-    }
-
-    function runContradictionEngine() {
-      const flags = ContradictionEngine.analyzeDataset(window.appState.records);
-      const panel = document.getElementById('contradiction-panel');
-      const list = document.getElementById('contradiction-list');
-      
-      if (flags.length === 0) {
-          panel.classList.add('hidden');
-          return;
-      }
-
-      panel.classList.remove('hidden');
-      document.getElementById('contradiction-count').textContent = `${flags.length} Flags`;
-      
-      list.innerHTML = flags.map(f => `
-          <div class="p-3 bg-white rounded-lg border border-rose-100 flex items-start gap-3 shadow-sm">
-              <div class="mt-0.5">
-                  ${f.severity === 'CRITICAL' ? '<i data-lucide="siren" class="w-4 h-4 text-rose-600"></i>' : '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>'}
-              </div>
-              <div>
-                  <div class="flex items-center gap-2">
-                      <span class="text-xs font-bold text-slate-900">${f.type}</span>
-                      <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${f.targetDocument}</span>
-                      <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${f.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">${f.severity}</span>
-                  </div>
-                  <p class="text-[11px] text-slate-600 mt-1">${f.description}</p>
-              </div>
-          </div>
-      `).join('');
-      lucide.createIcons();
     }
 
     function updateLocationDropdown() {
@@ -554,7 +534,7 @@
       executeSearch();
     });
 
-    window.startInvestigation = () => {
+    window.startInvestigation = async () => {
         const title = prompt("Enter a title for this Investigation Case:");
         if (!title) return;
         
@@ -563,14 +543,19 @@
             window.appState.activeLocation, 
             window.appState.user.email
         );
+
+        await ChainOfCustody.recordEvent("INVESTIGATION_CASE_CREATED", {
+            caseId: window.appState.activeInvestigation.caseId,
+            title,
+            entity: window.appState.activeLocation
+        }, window.appState.user.email);
         
         document.getElementById('btn-start-case').classList.add('hidden');
         renderInvestigationPanel();
         renderTable(); 
-        logUserActivity('CASE_OPENED', `Started case: ${title}`);
     };
 
-    window.attachToCase = (recordId) => {
+    window.attachToCase = async (recordId) => {
         const inv = window.appState.activeInvestigation;
         if (!inv) return;
 
@@ -591,16 +576,28 @@
 
         try {
             InvestigationEngine.attachEvidence(inv, evidenceProxy, rationale);
+            
+            await ChainOfCustody.recordEvent("EVIDENCE_ATTACHED_TO_CASE", {
+                caseId: inv.caseId,
+                recordId: record._id,
+                rationale
+            }, window.appState.user.email);
+
             renderInvestigationPanel();
-            logUserActivity('EVIDENCE_ATTACHED', `Attached ${record._id} to Case ${inv.caseId}`);
         } catch (err) {
             alert(err.message);
         }
     };
 
-    window.saveAndCloseInvestigation = () => {
+    window.saveAndCloseInvestigation = async () => {
         if (!window.appState.activeInvestigation) return;
-        alert(`Case ${window.appState.activeInvestigation.caseId} saved securely to audit logs.`);
+        
+        await ChainOfCustody.recordEvent("INVESTIGATION_CASE_CLOSED", {
+            caseId: window.appState.activeInvestigation.caseId,
+            evidenceCount: window.appState.activeInvestigation.evidenceLog.length
+        }, window.appState.user.email);
+
+        alert(`Case ${window.appState.activeInvestigation.caseId} saved securely to audit logs and stamped in Chain of Custody.`);
         window.appState.activeInvestigation = null;
         document.getElementById('investigation-panel').classList.add('hidden');
         document.getElementById('btn-start-case').classList.remove('hidden');
@@ -673,25 +670,12 @@
       try { push(dbRef(database, 'system_activity_logs'), logPayload).catch(e=>{}); } catch (err) {}
     }
 
-    onAuthStateChanged(auth, (user) => {
-      if (user && user.email) {
-        window.appState.user = user;
-        document.getElementById('userEmail').textContent = user.email;
-        logUserActivity('LAUNCH_APP', 'Opened Ledger Search Terminal');
-        loadAuditStaging();
-      } else {
-        window.location.href = 'index.html';
-      }
-    });
-
-    document.getElementById('logoutBtn').addEventListener('click', () => { logUserActivity('LOGOUT', 'Signed out'); signOut(auth); });
-
     function executeSearch() {
       const { records, searchMode, activeLocation, omniQuery, singleTargetKey, singleTargetVal, multiQuery } = window.appState;
       const tbody = document.getElementById('table-body');
 
       if (!activeLocation) {
-        tbody.innerHTML = `<tr><td colspan="20" class="py-14 text-center">
+        tbody.innerHTML = `<tr><td colspan="21" class="py-14 text-center">
             <i data-lucide="shield-alert" class="w-8 h-8 mx-auto text-amber-500 mb-2"></i>
             <p class="text-slate-800 font-bold text-sm">Entity Context Required (Governance Rule 6)</p>
             <p class="text-slate-500 text-xs mt-1">Cross-entity merging is strictly prohibited. Please select an Entity Domain above.</p>
@@ -749,7 +733,7 @@
       const pageSlice = filteredRecords.slice(start, start + pageSize);
 
       if (filteredRecords.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="20" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="21" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
         return;
       }
 
@@ -768,9 +752,10 @@
         }
 
         const rel = r._relationships || { hasLinks: false, evidenceCount: 0, corroboratingCount: 0 };
-        const corr = r._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
+        const corr = r._corroboration || { corroborationLevel: 'A', corroborationStatus: 'Detected', sourceCount: 1 };
         const risk = r._risk || { riskScore: 0, riskClass: 'LOW' };
         const auth = r._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
+        const contra = r._contradictions || { hasContradictions: false, count: 0 };
 
         let linkDisplay = `<span class="text-slate-400 text-[10px]">Unlinked</span>`;
         if (rel.hasLinks) {
@@ -790,12 +775,18 @@
         }
 
         const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="${auth.topic}">${auth.primaryCitation}</span>`;
+        const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-100 text-slate-700 border border-slate-200" title="Corroboration: ${corr.corroborationStatus}">Lvl ${corr.corroborationLevel} (${corr.sourceCount} Src)</span>`;
+
+        const contraBadge = contra.hasContradictions 
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">${contra.count} Contradiction${contra.count > 1 ? 's' : ''}</span>`
+          : `<span class="text-slate-400 text-[10px]">Clear</span>`;
 
         return `
         <tr class="hover:bg-sky-50/50 border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
           <td class="py-2 px-3 text-center border-r border-slate-100">${actionBtn}</td>
           <td class="py-2 px-3">${linkDisplay}</td>
-          <td class="py-2 px-3 text-center"><span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-100 text-slate-700 border border-slate-200">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span></td>
+          <td class="py-2 px-3 text-center">${corrobBadge}</td>
+          <td class="py-2 px-3 text-center">${contraBadge}</td>
           <td class="py-2 px-3 text-center">${riskBadge}</td>
           <td class="py-2 px-3 text-center">${authBadge}</td>
           <td class="py-2 px-3 text-[10px]">
@@ -823,6 +814,7 @@
       lucide.createIcons();
     }
 
+    // EVENT LISTENERS
     document.getElementById('global-search-input').addEventListener('input', (e) => {
       window.appState.omniQuery = e.target.value;
       if (e.target.value.trim().length > 2) logUserActivity('SEARCH', `Global Query: "${e.target.value.trim()}" in ${window.appState.activeLocation}`);
@@ -844,10 +836,8 @@
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
     });
 
-    // CLOUD SYNC BUTTON
     document.getElementById('btn-pull-cloud').addEventListener('click', syncCloudLedgers);
 
-    // SEARCH MODE TOGGLES
     document.getElementById('mode-omni').addEventListener('click', () => {
       window.appState.searchMode = 'omni';
       document.getElementById('container-omni-search').classList.remove('hidden');
@@ -872,7 +862,6 @@
       executeSearch();
     });
 
-    // SINGLE FIELD TARGET SEARCH
     document.getElementById('single-field-target-value').addEventListener('input', (e) => {
       window.appState.singleTargetVal = e.target.value;
       window.appState.singleTargetKey = document.getElementById('single-field-target-key').value;
@@ -884,7 +873,6 @@
       executeSearch();
     });
 
-    // MULTI-FIELD TARGET SEARCH EVENT LISTENERS
     const bindMultiInput = (id, key) => {
       document.getElementById(id).addEventListener('input', (e) => {
         window.appState.multiQuery[key] = e.target.value;
@@ -897,7 +885,6 @@
     bindMultiInput('multi-input-vendor', 'vendor');
     bindMultiInput('multi-input-account', 'account');
 
-    // PAGINATION CONTROLS
     document.getElementById('btn-prev-page').addEventListener('click', () => {
       if (window.appState.currentPage > 1) {
         window.appState.currentPage--;
@@ -920,6 +907,18 @@
       window.appState.currentPage = 1;
       renderTable();
       updateCounters();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => { signOut(auth); });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.email) {
+        window.appState.user = user;
+        document.getElementById('userEmail').textContent = user.email;
+        loadAuditStaging();
+      } else {
+        window.location.href = 'index.html';
+      }
     });
 
     lucide.createIcons();
