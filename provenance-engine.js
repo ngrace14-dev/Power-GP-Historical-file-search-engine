@@ -1,62 +1,30 @@
-// modules/confidence-engine.js
-
 /**
- * Confidence Engine
- * Enforces RREDCO System Governance Charter v5.0 - Rule 6
- * Calculates probabilistic confidence scores for extraction and parsing.
+ * Provenance Engine
+ * Phase 1 Roadmap Requirement - Source Tracking & Trust Scoring
  */
-
-export class ConfidenceEngine {
-    
-    /**
-     * Calculates combined confidence metrics for a given record.
-     * @param {Object} params - Contains sourceType, rawText (optional), and the parsedRecord
-     * @returns {Object} { ocrConfidence, parsingConfidence }
-     */
-    static calculateScores(params) {
-        let ocrConfidence = 100.0;
-        let parsingConfidence = 0.0; // FIXED: Default to 0, not 100, for missing records.
-
-        // 1. OCR / Text Extraction Quality
-        if (params.sourceType === 'NATIVE_EXPORT') {
-            ocrConfidence = 100.0; // Native Excel exports have perfect "OCR" confidence
-        } else if (params.rawText) {
-            // Heuristic: Penalize for high presence of garbled or unexpected characters
-            const totalChars = params.rawText.length;
-            
-            // FIXED: Moved hyphen to the end of the character class to avoid regex range errors
-            const badChars = (params.rawText.match(/[^a-zA-Z0-9\s.,$():/-]/g) || []).length;
-            
-            if (totalChars > 0) {
-                const penalty = (badChars / totalChars) * 150; // Weighted penalty
-                ocrConfidence = Math.max(0, 100 - penalty);
-            }
-        } else {
-            ocrConfidence = 85.0; // Baseline for unknown unstructured text
-        }
-
-        // 2. Parsing Structural Integrity
-        if (params.parsedRecord) {
-            let requiredFieldsScore = 0;
-            const r = params.parsedRecord;
-            
-            // Validate core forensic fields (20 points each)
-            if (r.vendor_id && r.vendor_id !== "UNKNOWN") requiredFieldsScore += 20;
-            if (r.doc_date && r.doc_date !== "Invalid Date") requiredFieldsScore += 20;
-            
-            // FIXED: Added !isNaN checks because typeof NaN is 'number' in JS
-            if (typeof r.doc_amount === 'number' && !isNaN(r.doc_amount)) requiredFieldsScore += 20;
-            if (typeof r.current_period === 'number' && !isNaN(r.current_period)) requiredFieldsScore += 20;
-            
-            // Validate mathematical integrity (20 points)
-            if (r._cross_foot_valid === true) requiredFieldsScore += 20;
-
-            parsingConfidence = requiredFieldsScore;
-        }
-
+export class ProvenanceEngine {
+    static stampRecord({ sourceFile, sourceSystem, sourceType, entityContext, processedBy, ocrConfidence, parsingConfidence, extractedData }) {
         return {
-            ocrConfidence: parseFloat(ocrConfidence.toFixed(1)),
-            parsingConfidence: parseFloat(parsingConfidence.toFixed(1))
+            _provenance: {
+                sourceFile: sourceFile || 'Unknown',
+                sourceSystem: sourceSystem || 'Unknown',
+                sourceType: sourceType || 'Unknown',
+                entityContext: entityContext || 'UNKNOWN',
+                processedBy: processedBy || 'Lighthouse Engine',
+                timestamp: new Date().toISOString(),
+                trustLevel: this.calculateTrustLevel(ocrConfidence, parsingConfidence),
+                confidenceMetrics: { ocrConfidence, parsingConfidence }
+            },
+            data: extractedData
         };
+    }
+
+    static calculateTrustLevel(ocr, parse) {
+        const avg = ((ocr || 100) + (parse || 100)) / 2;
+        if (avg >= 95) return 5;
+        if (avg >= 85) return 4;
+        if (avg >= 70) return 3;
+        if (avg >= 50) return 2;
+        return 1;
     }
 }
