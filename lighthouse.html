@@ -54,6 +54,11 @@
     </div>
 
     <div class="flex items-center gap-3">
+      <!-- AI AUDIT ASSISTANT BUTTON -->
+      <button onclick="askAiAssistant()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-purple-400/30">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-300"></i> AI Audit Assistant
+      </button>
+
       <span id="userEmail" class="text-xs text-slate-400 font-mono hidden sm:inline">Loading user...</span>
       <button onclick="resetState()" class="text-[11px] font-mono text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition flex items-center gap-1.5">
         <i class="ph ph-arrows-clockwise text-sm"></i> RESET
@@ -164,6 +169,25 @@
 
   </main>
 
+  <!-- AI AUDIT ASSISTANT REASONING MODAL -->
+  <div id="modal-ai-result" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-100">
+      <div class="px-5 py-3 border-b border-slate-800 bg-gradient-to-r from-purple-950 to-slate-900 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-purple-200">AI Audit & Financial Reasoning Engine</h3>
+        </div>
+        <button onclick="closeAiModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-sm font-sans leading-relaxed text-slate-300" id="ai-response-content">
+        Loading...
+      </div>
+      <div class="px-5 py-3 border-t border-slate-800 bg-slate-950 flex justify-end">
+        <button onclick="closeAiModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Report</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="sticky bottom-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 p-4 z-40">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
       <div class="text-[10px] font-mono text-slate-400">
@@ -193,6 +217,7 @@
     import { ExtractionEngine } from './extraction-engine.js';
     import { ValidationEngine } from './validation-engine.js';
     import { RelationshipEngine } from './relationship-engine.js';
+    import { GeminiService } from './gemini-service.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -235,6 +260,50 @@
         window.location.href = 'index.html';
       }
     });
+
+    // AI AUDIT ASSISTANT HANDLER FOR LIGHTHOUSE
+    window.askAiAssistant = async () => {
+      if (!extractedData || extractedData.length === 0) {
+        return alert("No extracted data available to analyze. Please pull cloud ledgers or ingest a document first.");
+      }
+
+      const userQuery = prompt("Ask AI Audit Assistant (e.g. 'Identify anomalies or variance flags across these digitized ledgers', 'Summarize top vendor exposure'):");
+      if (!userQuery) return;
+
+      const modal = document.getElementById('modal-ai-result');
+      const content = document.getElementById('ai-response-content');
+      
+      modal.classList.remove('hidden');
+      content.innerHTML = '<div class="flex items-center gap-3 text-purple-400 font-bold justify-center py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Analyzing digitized Lighthouse records with AI reasoning engine...</div>';
+      lucide.createIcons();
+
+      try {
+        const gemini = new GeminiService();
+        const payloadToAnalyze = extractedData.map(d => d.data || d);
+        
+        const responseText = await gemini.queryEvidence(
+          userQuery, 
+          payloadToAnalyze, 
+          "LIGHTHOUSE_STUDIO"
+        );
+
+        let formattedHtml = responseText
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/\n/g, '<br/>')
+          .replace(/- /g, '&bull; ');
+
+        content.innerHTML = `<div class="bg-purple-950/50 p-4 rounded-xl mb-4 text-purple-200 border border-purple-500/20 font-mono text-xs"><i data-lucide="message-square-text" class="w-4 h-4 inline mr-1"></i> Audit Scope: "${userQuery}"</div>${formattedHtml}`;
+        lucide.createIcons();
+      } catch (err) {
+        content.innerHTML = `<div class="p-5 text-rose-400 font-bold bg-rose-950/50 border border-rose-500/30 rounded-xl"><i data-lucide="alert-triangle" class="w-5 h-5 inline mr-2"></i> Error: ${err.message}</div>`;
+        lucide.createIcons();
+      }
+    };
+
+    window.closeAiModal = () => {
+      document.getElementById('modal-ai-result').classList.add('hidden');
+    };
 
     window.switchTab = (tab) => {
       const tabCloud = document.getElementById('tab-cloud');
@@ -389,7 +458,6 @@
           });
         }
 
-        // Phase 5 Relationship Engine Discovery
         extractedData = RelationshipEngine.buildRelationships(extractedData);
         window.logSys('Phase 5 Relationship Graph created. Relational links mapped across invoices, vendors, and journal entries.', 'success');
 
@@ -487,7 +555,6 @@
             };
         });
 
-        // Phase 5 Relationship Mapping
         extractedData = RelationshipEngine.buildRelationships(extractedData);
 
         window.updateProgress(100, 'EXTRACTION & GRAPH MAPPING COMPLETE');
@@ -553,7 +620,6 @@
                 };
             });
 
-            // Phase 5 Relationship Mapping
             extractedData = RelationshipEngine.buildRelationships(extractedData);
         } else {
             extractedData = [];
