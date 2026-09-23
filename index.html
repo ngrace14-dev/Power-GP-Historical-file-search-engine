@@ -132,7 +132,7 @@
 
   <!-- DEV CALIBRATION MODAL -->
   <div id="dev-calibration-modal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
         <div class="flex items-center gap-2">
           <i data-lucide="shield-alert" class="w-5 h-5 text-amber-400"></i>
@@ -172,8 +172,9 @@
               <thead class="bg-slate-100 font-semibold border-b border-slate-200 text-slate-700">
                 <tr>
                   <th class="p-2.5">Registered Account Email</th>
-                  <th class="p-2.5 text-center w-24">Power GP</th>
-                  <th class="p-2.5 text-center w-24">Lighthouse</th>
+                  <th class="p-2.5 text-center w-20">Power GP</th>
+                  <th class="p-2.5 text-center w-20">Lighthouse</th>
+                  <th class="p-2.5 text-center w-20">Review Q</th>
                   <th class="p-2.5 text-center w-20">Financials</th>
                   <th class="p-2.5 text-center w-20">Assets</th>
                   <th class="p-2.5 text-right w-16">Action</th>
@@ -245,16 +246,19 @@
     try { savedRegistered = JSON.parse(localStorage.getItem('rredco_registered_users') || '[]'); } catch(e){}
     window.REGISTERED_USERS = Array.from(new Set([...defaultRegistered, ...savedRegistered]));
 
-    let initialPerms = { "nicholas.grace@rredco.com": ["gp-ledger", "lighthouse", "fin-reporting", "asset-tracker", "system-logs"] };
+    // Updated initial Perms to include "review-queue"
+    let initialPerms = { "nicholas.grace@rredco.com": ["gp-ledger", "lighthouse", "review-queue", "fin-reporting", "asset-tracker", "system-logs"] };
     try {
       const storedP = localStorage.getItem('rredco_permissions');
       if (storedP) initialPerms = JSON.parse(storedP);
     } catch(e){}
     window.APP_PERMISSIONS = initialPerms;
 
+    // Updated to include the Review Queue card
     window.AVAILABLE_APPS = [
       { id: "gp-ledger", title: "Power GP Historical Ledger", version: "v3.6", description: "Read-only multi-entity search engine for 17 corporate General Ledger exports.", icon: "database", url: "ledger.html" },
       { id: "lighthouse", title: "Lighthouse", version: "v1.0 (Live)", description: "Enterprise operations, analytics, and spatial OCR document digitizer.", icon: "compass", url: "lighthouse.html" },
+      { id: "review-queue", title: "Human Review Queue", version: "v1.0 (Live)", description: "Governance Rule 8 Triage. Resolve cross-foot failures and override low-confidence extractions.", icon: "shield-alert", url: "review-queue.html" },
       { id: "system-logs", title: "System Audit & Live Session Logs", version: "v1.0 (Admin)", description: "Real-time user session tracking, query history, audit logs across instances.", icon: "activity", devOnly: true, url: "audit-logs.html" },
       { id: "fin-reporting", title: "Financial Reporting Suite", version: "v1.0 (Dev)", description: "Consolidated balance sheets, executive income statements, and trial balance reports.", icon: "line-chart", url: "#" },
       { id: "asset-tracker", title: "Corporate Asset Tracker", version: "v1.0 (Dev)", description: "Fixed assets register, depreciation schedules, and asset management.", icon: "building-2", url: "#" }
@@ -284,8 +288,9 @@
       if (!user) return;
       const emailLower = user.email.toLowerCase();
       const isDevUser = emailLower === ADMIN_EMAIL.toLowerCase();
+      
       const userPerms = isDevUser 
-        ? ["gp-ledger", "lighthouse", "fin-reporting", "asset-tracker", "system-logs"] 
+        ? ["gp-ledger", "lighthouse", "review-queue", "fin-reporting", "asset-tracker", "system-logs"] 
         : (window.APP_PERMISSIONS[emailLower] || ["gp-ledger", "lighthouse"]);
 
       const grid = document.getElementById('apps-grid-container');
@@ -307,21 +312,37 @@
       grid.innerHTML = visibleApps.map(app => {
         const hasAccess = userPerms.includes(app.id);
         const isLighthouse = app.id === 'lighthouse';
+        const isReviewQueue = app.id === 'review-queue';
+        
+        let iconBgColor = 'bg-gp-600 text-white shadow-md shadow-gp-600/30';
+        let badgeColor = 'bg-emerald-100 text-emerald-800';
+        let btnColor = 'bg-gp-600 hover:bg-gp-500';
+        
+        if (isLighthouse) {
+            iconBgColor = 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/30';
+            badgeColor = 'bg-cyan-100 text-cyan-800';
+            btnColor = 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-500/20';
+        } else if (isReviewQueue) {
+            iconBgColor = 'bg-amber-500 text-white shadow-md shadow-amber-500/30';
+            badgeColor = 'bg-amber-100 text-amber-800';
+            btnColor = 'bg-amber-600 hover:bg-amber-500 shadow-amber-500/20';
+        }
+
         return `
           <div class="bg-white border ${hasAccess ? (isLighthouse ? 'border-cyan-300 hover:shadow-lg hover:shadow-cyan-500/10' : 'border-slate-200 hover:shadow-md') : 'border-slate-200 opacity-60 bg-slate-50/50'} rounded-2xl p-6 shadow-sm transition flex flex-col justify-between group">
             <div>
               <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 rounded-xl ${hasAccess ? (isLighthouse ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-500/30' : 'bg-gp-600 text-white shadow-md shadow-gp-600/30') : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
+                <div class="w-12 h-12 rounded-xl ${hasAccess ? iconBgColor : 'bg-slate-200 text-slate-400'} flex items-center justify-center">
                   <i data-lucide="${app.icon}" class="w-6 h-6"></i>
                 </div>
-                ${hasAccess ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${isLighthouse ? 'bg-cyan-100 text-cyan-800' : 'bg-emerald-100 text-emerald-800'} uppercase tracking-wider">Authorized</span>` : `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 uppercase tracking-wider"><i data-lucide="lock" class="w-3 h-3 inline mr-0.5"></i> Restricted</span>`}
+                ${hasAccess ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${badgeColor} uppercase tracking-wider">Authorized</span>` : `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 uppercase tracking-wider"><i data-lucide="lock" class="w-3 h-3 inline mr-0.5"></i> Restricted</span>`}
               </div>
               <h3 class="text-lg font-bold text-slate-900 ${hasAccess ? 'group-hover:text-gp-600' : ''} transition">${app.title}</h3>
               <p class="text-xs text-slate-500 mt-2 leading-relaxed">${app.description}</p>
             </div>
             <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
               <span class="text-[11px] font-mono text-slate-400">${app.version}</span>
-              ${hasAccess ? `<button onclick="window.launchApp('${app.id}', '${app.url}')" class="px-4 py-2 rounded-lg ${isLighthouse ? 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-500/20' : 'bg-gp-600 hover:bg-gp-500'} text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">Launch App <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>` : `<button disabled class="px-4 py-2 rounded-lg bg-slate-200 text-slate-400 text-xs font-semibold cursor-not-allowed">Locked</button>`}
+              ${hasAccess ? `<button onclick="window.launchApp('${app.id}', '${app.url}')" class="px-4 py-2 rounded-lg ${btnColor} text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">Launch App <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>` : `<button disabled class="px-4 py-2 rounded-lg bg-slate-200 text-slate-400 text-xs font-semibold cursor-not-allowed">Locked</button>`}
             </div>
           </div>`;
       }).join('');
@@ -348,7 +369,7 @@
         if (!window.REGISTERED_USERS.includes(emailLower)) window.REGISTERED_USERS.push(emailLower);
         if (!window.APP_PERMISSIONS[emailLower]) {
           window.APP_PERMISSIONS[emailLower] = emailLower === ADMIN_EMAIL.toLowerCase() 
-            ? ["gp-ledger", "lighthouse", "fin-reporting", "asset-tracker", "system-logs"] 
+            ? ["gp-ledger", "lighthouse", "review-queue", "fin-reporting", "asset-tracker", "system-logs"] 
             : ["gp-ledger", "lighthouse"];
         }
         syncUserStores();
@@ -393,7 +414,7 @@
       }
       try {
         await updatePassword(auth.currentUser, nP);
-        try { localStorage.getItem('pwd_updated_' + auth.currentUser.uid, 'true'); } catch(e){}
+        try { localStorage.setItem('pwd_updated_' + auth.currentUser.uid, 'true'); } catch(e){}
         logUserActivity('PASSWORD_CHANGE', 'Updated permanent password');
         document.getElementById('first-time-pwd-modal').classList.add('hidden');
         renderAppPortal();
@@ -424,6 +445,7 @@
           <td class="p-2.5 font-mono text-slate-800 font-semibold truncate max-w-[180px]">${email} ${isA ? `<span class="ml-1 px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px]">Admin</span>` : ''}</td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('gp-ledger') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'gp-ledger', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('lighthouse') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'lighthouse', this.checked)" class="rounded text-cyan-600 focus:ring-cyan-500 h-4 w-4"></td>
+          <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('review-queue') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'review-queue', this.checked)" class="rounded text-amber-600 focus:ring-amber-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('fin-reporting') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'fin-reporting', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('asset-tracker') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'asset-tracker', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
           <td class="p-2.5 text-right">${isA ? `<span class="text-[10px] text-slate-400">Owner</span>` : `<button onclick="window.removeRegisteredUser('${eL}')" class="text-rose-600 font-semibold text-[11px]">Remove</button>`}</td>
