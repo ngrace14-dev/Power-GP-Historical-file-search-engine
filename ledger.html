@@ -71,7 +71,7 @@
         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Total Evidence Rows</span><p id="stat-rows" class="text-xl font-bold text-slate-900 mt-1">0</p></div>
         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100"><span class="text-xs text-slate-500 font-medium">Active Matches</span><p id="stat-matches" class="text-xl font-bold text-gp-600 mt-1">0</p></div>
         <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex flex-col justify-center">
-          <p class="text-[10px] text-slate-500">Cross-entity merging is strictly prohibited under Gov. Rule 4.</p>
+          <p class="text-[10px] text-slate-500">Cross-entity merging is strictly prohibited under Gov. Rule 6.</p>
         </div>
       </div>
     </div>
@@ -198,8 +198,10 @@
           <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 border-b border-slate-200 font-semibold select-none">
             <tr id="table-header-row">
               <th class="py-2.5 px-3">Action</th>
-              <th class="py-2.5 px-3">Relational Graph</th>
-              <th class="py-2.5 px-3">Phase 1 Materiality</th>
+              <th class="py-2.5 px-3">Evidence Graph Links</th>
+              <th class="py-2.5 px-3">Corroboration</th>
+              <th class="py-2.5 px-3">Phase 2 Forensic Risk</th>
+              <th class="py-2.5 px-3">Phase 3 Authority</th>
               <th class="py-2.5 px-3">Explainability (State / Trust / Provenance)</th>
               <th class="py-2.5 px-3">Location / Entity</th>
               <th class="py-2.5 px-3">Department</th>
@@ -218,7 +220,7 @@
             </tr>
           </thead>
           <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
-            <tr><td colspan="18" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
+            <tr><td colspan="20" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
           </tbody>
         </table>
       </div>
@@ -265,7 +267,9 @@
     import { InvestigationEngine } from './investigation-engine.js';
     import { ContradictionEngine } from './contradiction-engine.js';
     import { RelationshipEngine } from './relationship-engine.js'; 
-    import { MaterialityEngine } from './materiality-engine.js'; // Phase 1 Import
+    import { MaterialityEngine } from './materiality-engine.js';
+    import { RiskEngine } from './risk-engine.js';
+    import { AuthorityEngine } from './authority-engine.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -361,6 +365,9 @@
           if (addedCount > 0) {
             window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
             window.appState.records = MaterialityEngine.evaluateDataset(window.appState.records).records;
+            window.appState.records = RiskEngine.evaluateDataset(window.appState.records).records;
+            window.appState.records = AuthorityEngine.evaluateDataset(window.appState.records).records;
+
             updateLocationDropdown();
             runContradictionEngine();
             const badge = document.getElementById('sync-badge');
@@ -469,6 +476,9 @@
         if (loadedCount > 0) {
           window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
           window.appState.records = MaterialityEngine.evaluateDataset(window.appState.records).records;
+          window.appState.records = RiskEngine.evaluateDataset(window.appState.records).records;
+          window.appState.records = AuthorityEngine.evaluateDataset(window.appState.records).records;
+
           updateLocationDropdown();
           runContradictionEngine();
           if (badge) {
@@ -623,31 +633,26 @@
         <div class="text-[11px] text-slate-500 mt-0.5">Inv: ${record['Invoice Number']} | JE: ${record['Journal Entry']} | Amt: ${record['Debit Amount'] ? '$'+record['Debit Amount'] : '$'+record['Credit Amount']}</div>
       `;
 
-      document.getElementById('graph-modal-count').textContent = rel.totalConnectedRecords;
+      const allValidEdges = [...rel.tier1Edges, ...rel.tier2Edges];
+      document.getElementById('graph-modal-count').textContent = allValidEdges.length;
 
       let linksHtml = '';
-      const allLinkedIds = [
-        ...rel.linkedInvoices,
-        ...rel.linkedJournalEntries,
-        ...rel.linkedVendorRecords,
-        ...rel.linkedAccountRecords
-      ];
-
-      const uniqueIds = Array.from(new Set(allLinkedIds));
-
-      if (uniqueIds.length === 0) {
-        linksHtml = `<div class="p-4 text-center text-slate-400">No cross-document links discovered for this record.</div>`;
+      if (allValidEdges.length === 0) {
+        linksHtml = `<div class="p-4 text-center text-slate-400">No Tier 1 or Tier 2 evidence links discovered for this record.</div>`;
       } else {
-        linksHtml = uniqueIds.map(id => {
-          const linkedRec = window.appState.records.find(r => r._id === id);
+        linksHtml = allValidEdges.map(edge => {
+          const linkedRec = window.appState.records.find(r => r._id === edge.targetId);
           if (!linkedRec) return '';
           return `
-            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-              <div>
+            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex flex-col gap-1">
+              <div class="flex items-center justify-between">
                 <span class="font-bold text-sky-800 text-[11px]">${linkedRec._location} | ${linkedRec['Originating Master Name']}</span>
-                <p class="text-[10px] font-mono text-slate-500 mt-0.5">Inv: ${linkedRec['Invoice Number']} | JE: ${linkedRec['Journal Entry']} | Source: ${linkedRec._sourceFile}</p>
+                <span class="text-xs font-mono font-bold text-slate-700">${linkedRec['Debit Amount'] ? '$'+parseFloat(linkedRec['Debit Amount']).toFixed(2) : '$'+parseFloat(linkedRec['Credit Amount'] || 0).toFixed(2)}</span>
               </div>
-              <span class="text-xs font-mono font-bold text-slate-700">${linkedRec['Debit Amount'] ? '$'+parseFloat(linkedRec['Debit Amount']).toFixed(2) : '$'+parseFloat(linkedRec['Credit Amount'] || 0).toFixed(2)}</span>
+              <p class="text-[10px] font-mono text-slate-500">Inv: ${linkedRec['Invoice Number']} | JE: ${linkedRec['Journal Entry']} | Source: ${linkedRec._sourceFile}</p>
+              <div class="text-[9px] text-slate-600 bg-white p-1 rounded border border-slate-200 mt-1">
+                <strong>Reasons:</strong> ${edge.reasons.join(', ')}
+              </div>
             </div>
           `;
         }).join('');
@@ -686,9 +691,9 @@
       const tbody = document.getElementById('table-body');
 
       if (!activeLocation) {
-        tbody.innerHTML = `<tr><td colspan="18" class="py-14 text-center">
+        tbody.innerHTML = `<tr><td colspan="20" class="py-14 text-center">
             <i data-lucide="shield-alert" class="w-8 h-8 mx-auto text-amber-500 mb-2"></i>
-            <p class="text-slate-800 font-bold text-sm">Entity Context Required (Governance Rule 4)</p>
+            <p class="text-slate-800 font-bold text-sm">Entity Context Required (Governance Rule 6)</p>
             <p class="text-slate-500 text-xs mt-1">Cross-entity merging is strictly prohibited. Please select an Entity Domain above.</p>
         </td></tr>`;
         lucide.createIcons();
@@ -744,7 +749,7 @@
       const pageSlice = filteredRecords.slice(start, start + pageSize);
 
       if (filteredRecords.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="18" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="20" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
         return;
       }
 
@@ -762,26 +767,37 @@
             }
         }
 
-        const rel = r._relationships || { hasLinks: false, totalConnectedRecords: 0 };
-        const graphBadge = rel.hasLinks
-          ? `<button onclick="viewGraphLinks('${r._id}')" class="px-2 py-0.5 rounded text-[10px] bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border border-cyan-300 font-bold flex items-center gap-1 transition shadow-2xs"><i data-lucide="git-fork" class="w-3 h-3"></i> ${rel.totalConnectedRecords} Links</button>`
-          : `<span class="text-slate-400 text-[10px]">Unlinked</span>`;
+        const rel = r._relationships || { hasLinks: false, evidenceCount: 0, corroboratingCount: 0 };
+        const corr = r._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
+        const risk = r._risk || { riskScore: 0, riskClass: 'LOW' };
+        const auth = r._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
 
-        const mat = r._materiality || { materialityLevel: 'IMMATERIAL', isMaterial: false };
-        let matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 text-slate-500">Immaterial</span>`;
-        if (mat.materialityLevel === 'CRITICAL') {
-          matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200">Critical</span>`;
-        } else if (mat.materialityLevel === 'ELEVATED') {
-          matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Elevated</span>`;
-        } else if (mat.materialityLevel === 'HIGH_EXPOSURE') {
-          matBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-700 border border-sky-200">High Scope</span>`;
+        let linkDisplay = `<span class="text-slate-400 text-[10px]">Unlinked</span>`;
+        if (rel.hasLinks) {
+          linkDisplay = `
+            <button onclick="viewGraphLinks('${r._id}')" class="flex items-center gap-1 cursor-pointer">
+              ${rel.evidenceCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">${rel.evidenceCount} Evid</span>` : ''}
+              ${rel.corroboratingCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-300">${rel.corroboratingCount} Corrob</span>` : ''}
+            </button>
+          `;
         }
+
+        let riskBadge = `<span class="px-1.5 py-0.5 rounded font-mono text-[9px] bg-slate-100 text-slate-600 border border-slate-200">${risk.riskScore}/100</span>`;
+        if (risk.riskClass === 'CRITICAL') {
+          riskBadge = `<span class="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-300">${risk.riskScore}/100 (CRIT)</span>`;
+        } else if (risk.riskClass === 'ELEVATED') {
+          riskBadge = `<span class="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">${risk.riskScore}/100 (ELEV)</span>`;
+        }
+
+        const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="${auth.topic}">${auth.primaryCitation}</span>`;
 
         return `
         <tr class="hover:bg-sky-50/50 border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
           <td class="py-2 px-3 text-center border-r border-slate-100">${actionBtn}</td>
-          <td class="py-2 px-3">${graphBadge}</td>
-          <td class="py-2 px-3">${matBadge}</td>
+          <td class="py-2 px-3">${linkDisplay}</td>
+          <td class="py-2 px-3 text-center"><span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-100 text-slate-700 border border-slate-200">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span></td>
+          <td class="py-2 px-3 text-center">${riskBadge}</td>
+          <td class="py-2 px-3 text-center">${authBadge}</td>
           <td class="py-2 px-3 text-[10px]">
             <div class="flex flex-col gap-1">
                 <div>${trustBadge} <span class="px-1.5 py-0.5 rounded font-bold ${stateColor}">${r._state || 'Unknown'}</span></div>
@@ -817,7 +833,7 @@
       if(window.appState.filteredRecords.length === 0) return alert('No records to export');
       logUserActivity('EXPORT_CSV', `Exported ${window.appState.filteredRecords.length} records for ${window.appState.activeLocation}`);
       const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
-        const out = { 'Entity': r._location, 'Materiality': r._materiality?.materialityLevel || 'IMMATERIAL', 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.totalConnectedRecords || 0, 'Source File': r._sourceFile };
+        const out = { 'Entity': r._location, 'Materiality': r._materiality?.materialityLevel || 'IMMATERIAL', 'Forensic Risk': r._risk?.riskScore || 0, 'Governing Authority': r._authority?.primaryCitation || 'ASC 205', 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.evidenceCount || 0, 'Source File': r._sourceFile };
         window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
         return out;
       }));
