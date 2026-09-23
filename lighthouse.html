@@ -185,14 +185,14 @@
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     
-    // GOVERNANCE & PROCESSING MODULES
-    import { ProvenanceEngine } from './modules/provenance-engine.js'; 
-    import { EvidenceStateEngine } from './modules/evidence-state-engine.js'; 
-    import { ConfidenceEngine } from './modules/confidence-engine.js';
-    import { ClassificationEngine } from './modules/classification-engine.js';
-    import { ExtractionEngine } from './modules/extraction-engine.js';
-    import { ValidationEngine } from './modules/validation-engine.js';
-    import { RelationshipEngine } from './modules/relationship-engine.js'; // Phase 5 Relationship Engine
+    // UPDATED HOOKS: Pointing to root directory instead of ./modules/
+    import { ProvenanceEngine } from './provenance-engine.js'; 
+    import { EvidenceStateEngine } from './evidence-state-engine.js'; 
+    import { ConfidenceEngine } from './confidence-engine.js';
+    import { ClassificationEngine } from './classification-engine.js';
+    import { ExtractionEngine } from './extraction-engine.js';
+    import { ValidationEngine } from './validation-engine.js';
+    import { RelationshipEngine } from './relationship-engine.js'; 
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -685,9 +685,9 @@
     window.downloadExcel = async () => {
       if (extractedData.length === 0) return;
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Lighthouse Audit');
+      const Worksheet = workbook.addWorksheet('Lighthouse Audit');
 
-      sheet.columns = [
+      Worksheet.columns = [
         { header: 'Entity Context', key: 'entity_context', width: 14 },
         { header: 'Vendor / Entity Name', key: 'vendor', width: 28 },
         { header: 'Voucher Number', key: 'voucherNumber', width: 16 },
@@ -712,7 +712,7 @@
             evidence_state: record._evidenceState.status,
             parse_score: record._provenance.confidenceMetrics.parsingConfidence
         };
-        sheet.addRow(exportRow);
+        Worksheet.addRow(exportRow);
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
