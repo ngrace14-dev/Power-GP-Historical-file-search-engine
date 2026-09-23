@@ -175,6 +175,7 @@
           <thead class="bg-slate-100 text-slate-700 sticky top-0 z-10 border-b border-slate-200 font-semibold select-none">
             <tr id="table-header-row">
               <th class="py-2.5 px-3">Action</th>
+              <th class="py-2.5 px-3">Relational Graph</th>
               <th class="py-2.5 px-3">Explainability (State / Trust / Provenance)</th>
               <th class="py-2.5 px-3">Location / Entity</th>
               <th class="py-2.5 px-3">Department</th>
@@ -193,7 +194,7 @@
             </tr>
           </thead>
           <tbody id="table-body" class="divide-y divide-slate-100 font-sans">
-            <tr><td colspan="16" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
+            <tr><td colspan="17" class="py-16 text-center text-slate-400">Select an Entity Domain above to begin research.</td></tr>
           </tbody>
         </table>
       </div>
@@ -204,15 +205,42 @@
     </div>
   </main>
 
+  <!-- Connected Evidence Graph Inspector Modal -->
+  <div id="modal-relationship-inspector" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="git-fork" class="w-4 h-4 text-cyan-400"></i>
+          <h3 class="text-xs font-bold uppercase tracking-wider">Connected Evidence Graph Inspector</h3>
+        </div>
+        <button onclick="closeGraphModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+        <div class="bg-sky-50 border border-sky-200 rounded-lg p-3">
+          <span class="text-[10px] uppercase font-bold text-sky-700 tracking-wider">Primary Reference Record</span>
+          <div id="graph-modal-primary" class="mt-1 font-mono text-slate-800"></div>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-700 mb-2 flex items-center gap-1.5"><i data-lucide="link" class="w-3.5 h-3.5 text-cyan-600"></i> Connected Evidence Edges (<span id="graph-modal-count">0</span>)</h4>
+          <div id="graph-modal-links" class="space-y-2"></div>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <button onclick="closeGraphModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Inspector</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     import { getDatabase, ref as dbRef, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
     
-    // GOVERNANCE MODULES
+    // GOVERNANCE & GRAPH MODULES
     import { InvestigationEngine } from './modules/investigation-engine.js';
-    import { ContradictionEngine } from './modules/contradiction-engine.js'; // NEW MODULE
+    import { ContradictionEngine } from './modules/contradiction-engine.js';
+    import { RelationshipEngine } from './modules/relationship-engine.js'; // Phase 5 Engine
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -260,6 +288,7 @@
             const prov = row._provenance || {};
             const state = row._evidenceState || {};
             const data = row.data || {};
+            const rel = row._relationships || null;
 
             const entity = prov.entityContext || 'UNKNOWN';
 
@@ -270,6 +299,7 @@
               _trustLevel: prov.trustLevel,
               _state: state.status,
               _confidence: prov.confidenceMetrics?.parsingConfidence || 0,
+              _relationships: rel,
               
               'Department': 'Lighthouse_Engine',
               'Journal Entry': data.voucher || '-',
@@ -292,8 +322,10 @@
           });
 
           if (addedCount > 0) {
+            // Build Phase 5 Graph relationships if not pre-populated
+            window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
             updateLocationDropdown();
-            runContradictionEngine(); // Analyze new dataset
+            runContradictionEngine();
             const badge = document.getElementById('sync-badge');
             if (badge) {
               badge.textContent = `${addedCount} Evidence Rows Staged`;
@@ -430,6 +462,56 @@
         document.getElementById('inv-count').textContent = inv.evidenceLog.length;
     }
 
+    // PHASE 5 GRAPH INSPECTOR MODAL
+    window.viewGraphLinks = (recordId) => {
+      const record = window.appState.records.find(r => r._id === recordId);
+      if (!record || !record._relationships) return;
+
+      const rel = record._relationships;
+      document.getElementById('graph-modal-primary').innerHTML = `
+        <div class="font-bold text-slate-900">${record._location} | ${record['Originating Master Name']}</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Inv: ${record['Invoice Number']} | JE: ${record['Journal Entry']} | Amt: ${record['Debit Amount'] ? '$'+record['Debit Amount'] : '$'+record['Credit Amount']}</div>
+      `;
+
+      document.getElementById('graph-modal-count').textContent = rel.totalConnectedRecords;
+
+      let linksHtml = '';
+      const allLinkedIds = [
+        ...rel.linkedInvoices,
+        ...rel.linkedJournalEntries,
+        ...rel.linkedVendorRecords,
+        ...rel.linkedAccountRecords
+      ];
+
+      const uniqueIds = Array.from(new Set(allLinkedIds));
+
+      if (uniqueIds.length === 0) {
+        linksHtml = `<div class="p-4 text-center text-slate-400">No cross-document links discovered for this record.</div>`;
+      } else {
+        linksHtml = uniqueIds.map(id => {
+          const linkedRec = window.appState.records.find(r => r._id === id);
+          if (!linkedRec) return '';
+          return `
+            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+              <div>
+                <span class="font-bold text-sky-800 text-[11px]">${linkedRec._location} | ${linkedRec['Originating Master Name']}</span>
+                <p class="text-[10px] font-mono text-slate-500 mt-0.5">Inv: ${linkedRec['Invoice Number']} | JE: ${linkedRec['Journal Entry']} | Source: ${linkedRec._sourceFile}</p>
+              </div>
+              <span class="text-xs font-mono font-bold text-slate-700">${linkedRec['Debit Amount'] ? '$'+parseFloat(linkedRec['Debit Amount']).toFixed(2) : '$'+parseFloat(linkedRec['Credit Amount'] || 0).toFixed(2)}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('graph-modal-links').innerHTML = linksHtml;
+      document.getElementById('modal-relationship-inspector').classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    window.closeGraphModal = () => {
+      document.getElementById('modal-relationship-inspector').classList.add('hidden');
+    };
+
     function logUserActivity(eventType, details) {
       if (!window.appState.user) return;
       const logPayload = { email: window.appState.user.email, uid: window.appState.user.uid, type: eventType, details: details, timestamp: new Date().toISOString(), timeFormatted: new Date().toLocaleString() };
@@ -454,7 +536,7 @@
       const tbody = document.getElementById('table-body');
 
       if (!activeLocation) {
-        tbody.innerHTML = `<tr><td colspan="16" class="py-14 text-center">
+        tbody.innerHTML = `<tr><td colspan="17" class="py-14 text-center">
             <i data-lucide="shield-alert" class="w-8 h-8 mx-auto text-amber-500 mb-2"></i>
             <p class="text-slate-800 font-bold text-sm">Entity Context Required (Governance Rule 4)</p>
             <p class="text-slate-500 text-xs mt-1">Cross-entity merging is strictly prohibited. Please select an Entity Domain above.</p>
@@ -493,7 +575,7 @@
       const pageSlice = filteredRecords.slice(start, start + pageSize);
 
       if (filteredRecords.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="16" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="17" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
         return;
       }
 
@@ -511,9 +593,16 @@
             }
         }
 
+        // Relational Graph Badge Generator
+        const rel = r._relationships || { hasLinks: false, totalConnectedRecords: 0 };
+        const graphBadge = rel.hasLinks
+          ? `<button onclick="viewGraphLinks('${r._id}')" class="px-2 py-0.5 rounded text-[10px] bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border border-cyan-300 font-bold flex items-center gap-1 transition shadow-2xs"><i data-lucide="git-fork" class="w-3 h-3"></i> ${rel.totalConnectedRecords} Links</button>`
+          : `<span class="text-slate-400 text-[10px]">Unlinked</span>`;
+
         return `
         <tr class="hover:bg-sky-50/50 border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
           <td class="py-2 px-3 text-center border-r border-slate-100">${actionBtn}</td>
+          <td class="py-2 px-3">${graphBadge}</td>
           <td class="py-2 px-3 text-[10px]">
             <div class="flex flex-col gap-1">
                 <div>${trustBadge} <span class="px-1.5 py-0.5 rounded font-bold ${stateColor}">${r._state || 'Unknown'}</span></div>
@@ -549,7 +638,7 @@
       if(window.appState.filteredRecords.length === 0) return alert('No records to export');
       logUserActivity('EXPORT_CSV', `Exported ${window.appState.filteredRecords.length} records for ${window.appState.activeLocation}`);
       const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
-        const out = { 'Entity': r._location, 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Source File': r._sourceFile };
+        const out = { 'Entity': r._location, 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.totalConnectedRecords || 0, 'Source File': r._sourceFile };
         window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
         return out;
       }));
