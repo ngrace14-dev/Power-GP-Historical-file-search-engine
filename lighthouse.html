@@ -185,19 +185,19 @@
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     
-    // Flat-root imports for GitHub Pages compatibility
+    // FLAT ROOT MODULE HOOKS
     import { ProvenanceEngine } from './provenance-engine.js'; 
     import { EvidenceStateEngine } from './evidence-state-engine.js'; 
     import { ConfidenceEngine } from './confidence-engine.js';
     import { ClassificationEngine } from './classification-engine.js';
     import { ExtractionEngine } from './extraction-engine.js';
     import { ValidationEngine } from './validation-engine.js';
-    import { RelationshipEngine } from './relationship-engine.js'; 
+    import { RelationshipEngine } from './relationship-engine.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
       authDomain: "rredco-database.firebaseapp.com",
-      databaseURL: "https://rredco-database-default-rtdb.firebaseio.com",
+      databaseURL: "https://rredco-database.firebaseio.com",
       projectId: "rredco-database",
       storageBucket: "rredco-database.firebasestorage.app",
       messagingSenderId: "96836268607",
@@ -267,7 +267,6 @@
     window.logSys = (msg, type = 'info') => {
       fullDebugLog.push(`[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`);
       const terminal = document.getElementById('terminal-logs');
-      if (!terminal) return;
       const el = document.createElement('div');
       el.className = type === 'error' ? 'text-rose-400' : (type === 'success' ? 'text-emerald-400' : (type === 'warning' ? 'text-amber-400' : 'text-slate-400'));
       el.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
@@ -276,12 +275,9 @@
     };
 
     window.updateProgress = (pct, msg) => {
-      const pctEl = document.getElementById('progress-pct');
-      const barEl = document.getElementById('progress-bar');
-      const textEl = document.getElementById('progress-text');
-      if (pctEl) pctEl.innerText = `${Math.round(pct)}%`;
-      if (barEl) barEl.style.width = `${pct}%`;
-      if (textEl && msg) textEl.innerText = msg;
+      document.getElementById('progress-pct').innerText = `${Math.round(pct)}%`;
+      document.getElementById('progress-bar').style.width = `${pct}%`;
+      if (msg) document.getElementById('progress-text').innerText = msg;
     };
 
     window.resetState = () => {
@@ -672,7 +668,14 @@
       try {
         const db = await openAuditDB();
         const tx = db.transaction('staging', 'readwrite');
-        tx.objectStore('staging').put(extractedData, 'rredco_audit_staging');
+        const store = tx.objectStore('staging');
+
+        const getReq = store.get('rredco_audit_staging');
+        getReq.onsuccess = () => {
+          const existingRecords = getReq.result || [];
+          const combinedRecords = [...existingRecords, ...extractedData];
+          store.put(combinedRecords, 'rredco_audit_staging');
+        };
 
         tx.oncomplete = () => {
           const btn = document.getElementById('btn-pass');
@@ -689,9 +692,9 @@
     window.downloadExcel = async () => {
       if (extractedData.length === 0) return;
       const workbook = new ExcelJS.Workbook();
-      const Worksheet = workbook.addWorksheet('Lighthouse Audit');
+      const sheet = workbook.addWorksheet('Lighthouse Audit');
 
-      Worksheet.columns = [
+      sheet.columns = [
         { header: 'Entity Context', key: 'entity_context', width: 14 },
         { header: 'Vendor / Entity Name', key: 'vendor', width: 28 },
         { header: 'Voucher Number', key: 'voucherNumber', width: 16 },
@@ -716,7 +719,7 @@
             evidence_state: record._evidenceState.status,
             parse_score: record._provenance.confidenceMetrics.parsingConfidence
         };
-        Worksheet.addRow(exportRow);
+        sheet.addRow(exportRow);
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
