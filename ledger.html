@@ -106,7 +106,7 @@
             <i data-lucide="paperclip" class="w-4 h-4"></i>
             Attached Evidence: <span id="inv-count" class="font-bold text-indigo-600 text-sm">0</span>
           </div>
-          <button onclick="saveAndCloseInvestigation()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+          <button onclick="saveAndCloseInvestigation()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-50 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="save" class="w-3.5 h-3.5"></i> Save Case
           </button>
         </div>
@@ -639,6 +639,13 @@
     function updateCounters() {
       document.getElementById('stat-matches').textContent = window.appState.filteredRecords.length.toLocaleString();
       document.getElementById('export-count').textContent = window.appState.filteredRecords.length.toLocaleString();
+      
+      const maxPage = Math.ceil(window.appState.filteredRecords.length / window.appState.pageSize) || 1;
+      const start = window.appState.filteredRecords.length === 0 ? 0 : ((window.appState.currentPage - 1) * window.appState.pageSize) + 1;
+      const end = Math.min(window.appState.currentPage * window.appState.pageSize, window.appState.filteredRecords.length);
+      
+      document.getElementById('pagination-info').textContent = `Showing ${start} to ${end} of ${window.appState.filteredRecords.length} records`;
+      document.getElementById('pagination-current-page').textContent = window.appState.currentPage;
     }
 
     function renderTable() {
@@ -719,6 +726,58 @@
       link.href = URL.createObjectURL(blob);
       link.download = `Evidence_Export_${window.appState.activeLocation}_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    });
+
+    // SEARCH MODE TOGGLES
+    document.getElementById('mode-omni').addEventListener('click', () => {
+      window.appState.searchMode = 'omni';
+      document.getElementById('container-omni-search').classList.remove('hidden');
+      document.getElementById('container-single-search').classList.add('hidden');
+      executeSearch();
+    });
+
+    document.getElementById('mode-single').addEventListener('click', () => {
+      window.appState.searchMode = 'single';
+      document.getElementById('container-omni-search').classList.add('hidden');
+      document.getElementById('container-single-search').classList.remove('hidden');
+      executeSearch();
+    });
+
+    // SINGLE FIELD TARGET SEARCH
+    document.getElementById('single-field-target-value').addEventListener('input', (e) => {
+      window.appState.singleTargetVal = e.target.value;
+      window.appState.singleTargetKey = document.getElementById('single-field-target-key').value;
+      setTimeout(executeSearch, 300);
+    });
+
+    document.getElementById('single-field-target-key').addEventListener('change', (e) => {
+      window.appState.singleTargetKey = e.target.value;
+      executeSearch();
+    });
+
+    // PAGINATION CONTROLS
+    document.getElementById('btn-prev-page').addEventListener('click', () => {
+      if (window.appState.currentPage > 1) {
+        window.appState.currentPage--;
+        renderTable();
+        updateCounters();
+      }
+    });
+
+    document.getElementById('btn-next-page').addEventListener('click', () => {
+      const maxPage = Math.ceil(window.appState.filteredRecords.length / window.appState.pageSize);
+      if (window.appState.currentPage < maxPage) {
+        window.appState.currentPage++;
+        renderTable();
+        updateCounters();
+      }
+    });
+
+    document.getElementById('pagination-page-size').addEventListener('change', (e) => {
+      window.appState.pageSize = parseInt(e.target.value);
+      window.appState.currentPage = 1;
+      renderTable();
+      updateCounters();
     });
 
     lucide.createIcons();
