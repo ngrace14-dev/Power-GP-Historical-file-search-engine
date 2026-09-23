@@ -55,7 +55,6 @@ export class ProvenanceEngine {
         if (!entity) {
             throw new Error("Governance Violation: Entity Context is required. Records may not be merged or processed without an entity domain.");
         }
-        // Note: The entity list expands over time, but strict boundaries must be maintained.
         if (!VALID_ENTITIES.has(entity)) {
             console.warn(`Warning: '${entity}' is not in the standard strict entity list, but isolation will be enforced.`);
         }
