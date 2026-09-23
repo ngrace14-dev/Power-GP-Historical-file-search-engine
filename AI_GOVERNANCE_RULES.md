@@ -3,20 +3,18 @@
  * AI Governance & Forensic Safeguards Engine - Charter v6.0
  * 
  * Enforces non-negotiable rules for AI reasoning, entity isolation,
- * relationship tier classification, source precedence, and evidence integrity.
+ * relationship tier classification, source precedence, and relationship transparency.
  */
 
 export class AIGovernanceEngine {
     static CHARTER_VERSION = "6.0";
 
-    // Managed Corporate Entity Domains
     static MANAGED_ENTITIES = new Set([
         'POMCO', 'RRCLLC', 'RRCSCO', 'RRDLLC', 'RREDCO', 'RRELLC', 
         'RREVMCO', 'RRH2ECO', 'RRICO', 'RRKOLLC', 'RRSDLLC', 'RRSDRBLLC', 
         'RRUCO', 'WRGCC', 'WRHCO', 'WRMM', 'RR-KR3 JV'
     ]);
 
-    // Source Trust Hierarchy Authority (1 = Highest Authority)
     static TRUST_HIERARCHY = {
         LEVEL_1_NATIVE_SYSTEM: 1,  // Dynamics GP Export, Bank DB
         LEVEL_2_SOURCE_DOC: 2,     // Original e-Invoice / File
@@ -26,19 +24,15 @@ export class AIGovernanceEngine {
     };
 
     /**
-     * Rule 1: Precedence & Shortcut Refusal Check
-     * Blocks user prompts attempting to bypass source evidence or entity constraints.
+     * Relationship Transparency Rule:
+     * Every relationship created by the platform must be explainable.
+     * The platform shall record: Tier, Score, Matching Factors, Supporting Fields, and Timestamp.
      */
     static validatePrompt(userPrompt = "") {
         const lower = userPrompt.toLowerCase();
         const prohibitedShortcuts = [
-            'skip sources', 
-            'just give bottom line', 
-            'no evidence', 
-            'ignore variances', 
-            'ignore entity',
-            'merge entities',
-            'make up data'
+            'skip sources', 'just give bottom line', 'no evidence', 
+            'ignore variances', 'ignore entity', 'merge entities', 'make up data'
         ];
 
         for (const phrase of prohibitedShortcuts) {
@@ -53,76 +47,99 @@ export class AIGovernanceEngine {
     }
 
     /**
-     * Rule 3: Source Trust Hierarchy Enforcement
-     * Guarantees lower-trust sources NEVER override higher-trust sources.
+     * Materiality Classification Rule
      */
-    static validateTrustOverride(existingTrustLevel = 5, incomingTrustLevel = 5) {
-        if (incomingTrustLevel > existingTrustLevel) {
-            return {
-                canOverride: false,
-                reason: `Governance Violation (Rule 3): Trust Level ${incomingTrustLevel} (lower authority) cannot override Trust Level ${existingTrustLevel} (higher authority) source evidence.`
-            };
+    static classifyMateriality(amount = 0, variance = 0, threshold = 1000) {
+        const absVar = Math.abs(parseFloat(variance) || 0);
+        const absAmt = Math.abs(parseFloat(amount) || 0);
+
+        if (absVar >= 5000) {
+            return { level: 'CRITICAL', label: 'Critical Discrepancy', isMaterial: true };
         }
-        return { canOverride: true };
+        if (absVar >= threshold) {
+            return { level: 'SIGNIFICANT', label: 'Significant Discrepancy', isMaterial: true };
+        }
+        if (absVar > 0) {
+            return { level: 'MODERATE', label: 'Moderate Discrepancy', isMaterial: false };
+        }
+        if (absAmt >= 25000) {
+            return { level: 'HIGH_SCOPE', label: 'High Scope Exposure', isMaterial: false };
+        }
+        return { level: 'IMMATERIAL', label: 'Immaterial', isMaterial: false };
     }
 
     /**
-     * Rule 4 & Forensic Integrity Rule: Tiered Relationship Classification
-     * Prevents over-linking by strictly requiring Tier 1/2 criteria (Score >= 80) for Evidence Graph edges.
+     * Tier Classification with Tightened 3-Dimensional Corroboration & Explanation Array
      */
-    static classifyRelationshipTier(score = 0, matchFactors = {}) {
-        const { hasExactInvoice, hasExactVoucher, hasExactCheck, hasExactDeposit, hasVendor, hasAmount } = matchFactors;
+    static classifyRelationshipTier(matchFactors = {}) {
+        const { 
+            hasExactInvoice, hasExactVoucher, hasExactCheck, hasExactDeposit, 
+            hasVendor, hasAmount, hasDate, hasAccount 
+        } = matchFactors;
 
-        // Tier 1: Evidence Relationship (Score 90-100) - Exact Primary Identifiers
-        if (score >= 90 || hasExactInvoice || hasExactVoucher || hasExactCheck || hasExactDeposit) {
+        const reasons = [];
+
+        // Tier 1: Evidence Relationship (Exact Primary Transaction Identifiers)
+        if (hasExactInvoice) reasons.push("Exact Invoice Number Match");
+        if (hasExactVoucher) reasons.push("Exact Journal Entry / Voucher Match");
+        if (hasExactCheck) reasons.push("Exact Check Number Match");
+        if (hasExactDeposit) reasons.push("Exact Deposit Identifier Match");
+
+        if (reasons.length > 0) {
             return {
                 tier: 1,
                 label: "Evidence Relationship",
-                canCreateGraphEdge: true, // Rendered in Evidence Graph
-                weight: Math.max(score, 90),
+                canCreateGraphEdge: true,
+                score: 95,
                 confidence: "Very High",
-                action: "LINK_EVIDENCE_EDGE"
+                reasons
             };
         }
 
-        // Tier 2: Corroborating Relationship (Score 70-89) - Compound Identifiers
-        if (score >= 70 || (hasVendor && hasAmount)) {
+        // Tier 2: Corroborating Relationship (Requires 3 Dimensions: Vendor + Amount + Date/Invoice/Voucher)
+        const has3DMatch = hasVendor && hasAmount && (hasDate || hasExactInvoice || hasExactVoucher);
+        if (has3DMatch) {
+            if (hasVendor) reasons.push("Vendor Name Match");
+            if (hasAmount) reasons.push("Exact Dollar Amount Match");
+            if (hasDate) reasons.push("Transaction Date Match");
+
             return {
                 tier: 2,
                 label: "Corroborating Relationship",
-                canCreateGraphEdge: true, // Rendered in Evidence Graph
-                weight: score,
+                canCreateGraphEdge: true,
+                score: 80,
                 confidence: "High",
-                action: "LINK_CORROBORATING_EDGE"
+                reasons
             };
         }
 
-        // Tier 3: Associative Relationship (Score 30-69) - Operational Context
-        if (score >= 30) {
+        // Tier 3: Associative Relationship (Operational Context Only - Vendor or Contract Only)
+        if (hasVendor) {
             return {
                 tier: 3,
                 label: "Associative Relationship",
                 canCreateGraphEdge: false, // STORED AS CONTEXT ONLY, NOT EVIDENCE EDGE
-                weight: score,
+                score: 45,
                 confidence: "Moderate",
-                action: "STORE_CONTEXT_ONLY"
+                reasons: ["Shared Vendor Operational Context"]
             };
         }
 
-        // Tier 4: Contextual Relationship (Score < 30) - Classification Matches Only (Entity, GL, Date)
+        // Tier 4: Contextual Relationship (Classification Only - GL Account / Entity / Period)
+        if (hasAccount) reasons.push("Shared GL Account Code");
+
         return {
             tier: 4,
             label: "Contextual Relationship",
-            canCreateGraphEdge: false, // PROHIBITED FROM BECOMING GRAPH EDGES
-            weight: 15,
+            canCreateGraphEdge: false, // CAN NEVER BE DRAWN AS EVIDENCE EDGE
+            score: 15,
             confidence: "Low",
-            action: "FILTER_ONLY"
+            reasons: reasons.length > 0 ? reasons : ["Shared Reporting Period / Domain"]
         };
     }
 
     /**
-     * Rule 6: Entity Preservation Enforcement
-     * Guarantees entities are treated as isolated evidence domains.
+     * Entity Preservation Enforcement
      */
     static enforceEntityIsolation(sourceEntity = "", targetEntity = "", hasIntercompanyProof = false) {
         if (!sourceEntity || !targetEntity) return true;
@@ -130,65 +147,8 @@ export class AIGovernanceEngine {
         const tgt = targetEntity.toUpperCase().trim();
 
         if (src !== tgt && !hasIntercompanyProof) {
-            throw new Error(`Governance Violation (Rule 6): Entities '${src}' and '${tgt}' represent isolated evidence domains. Cross-entity merging or linking is strictly prohibited without independently verifiable intercompany proof.`);
+            throw new Error(`Governance Violation (Rule 6): Entities '${src}' and '${tgt}' represent isolated evidence domains. Cross-entity merging is strictly prohibited without independently verifiable intercompany proof.`);
         }
         return true;
-    }
-
-    /**
-     * Rule 8: Anti-Suppression Verification
-     * Ensures contradictory or unresolved evidence is preserved alongside supporting data.
-     */
-    static formatTriEvidencePayload(records = []) {
-        const supporting = [];
-        const contradicting = [];
-        const unresolved = [];
-
-        records.forEach(rec => {
-            const state = rec._evidenceState?.status || rec.state || 'Unresolved';
-            const hasVariance = rec._validation?.tieOutStatus === 'FAIL' || rec._materiality?.isMaterial;
-
-            if (hasVariance || state === 'Unresolved') {
-                contradicting.push(rec);
-            } else if (state === 'Accepted') {
-                supporting.push(rec);
-            } else {
-                unresolved.push(rec);
-            }
-        });
-
-        return {
-            supportingEvidence: supporting,
-            contradictingEvidence: contradicting,
-            unresolvedEvidence: unresolved,
-            totalAuditCount: records.length,
-            isAntiSuppressionCompliant: true
-        };
-    }
-
-    /**
-     * Rule 3 & 9: Wraps Gemini / LLM Prompts in Governance System Directives
-     */
-    static constructSystemPrompt(userQuery = "", entityDomain = "SINGLE_ENTITY_DOMAIN") {
-        const promptCheck = this.validatePrompt(userQuery);
-        if (!promptCheck.allowed) {
-            throw new Error(promptCheck.reason);
-        }
-
-        return `
-[SYSTEM GOVERNANCE CHARTER V6.0 ACTIVE]
-Subsystem: RREDCO Forensic Intelligence Platform
-Active Entity Boundary: ${entityDomain.toUpperCase()}
-
-MANDATORY EXECUTION CONSTRAINTS:
-1. PRIME DIRECTIVE: Every statement or conclusion MUST be reconstructed backwards to the provided Level 1-4 source records. Never fabricate facts.
-2. PRESERVE UNCERTAINTY: If source evidence is incomplete or ambiguous, explicitly state that evidence is insufficient. Do NOT manufacture certainty.
-3. AI EVIDENCE RULE: Your output is classified strictly as 'AI Interpretation' (Level 5 Trust). You may explain, compare, and summarize evidence, but you cannot establish unbacked facts or final accounting opinions.
-4. ENTITY ISOLATION: Treat '${entityDomain.toUpperCase()}' as an isolated evidence domain. Do not merge or attribute transactions to other corporate entities without explicit intercompany documentation.
-5. ANTI-SUPPRESSION: You MUST highlight all material variances, out-of-balance cross-footings, and contradictory evidence. Never suppress negative findings.
-
-AUDIT SCOPE QUERY:
-"${userQuery}"
-        `.trim();
     }
 }
