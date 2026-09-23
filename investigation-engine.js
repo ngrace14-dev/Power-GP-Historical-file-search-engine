@@ -1,103 +1,173 @@
-// modules/investigation-engine.js
-
 /**
- * Investigation Engine
- * Enforces RREDCO System Governance Charter v5.0 - Rule 5
- * Tracks investigation lifecycles and preserves case history.
+ * Investigation Engine - Phase 8 (Governance v6.0 Compliant)
+ * Handles comprehensive case file lifecycle management:
+ * - Case Creation with strict Entity Boundary isolation
+ * - Tri-Evidence Logging (Supporting, Contradicting, Unresolved)
+ * - Mandatory Rationale Tracking for attached evidence
+ * - Structured Finding & Conclusion Stamping
+ * - Chain-of-Custody Event Audit Logging
  */
 
-export const INVESTIGATION_STATES = Object.freeze({
-    OPEN: 'Open',
-    GATHERING: 'Evidence Gathering',
-    VALIDATION: 'Validation',
-    CORROBORATION: 'Corroboration',
-    ESCALATED: 'Escalated',
-    RESOLVED: 'Resolved',
-    ARCHIVED: 'Archived'
-});
+import { AIGovernanceEngine } from './ai-governance.js';
+import { ChainOfCustody } from './chain-of-custody.js';
 
 export class InvestigationEngine {
-    
+
+    static CASE_STATES = [
+        'Open', 
+        'Evidence Gathering', 
+        'Validation', 
+        'Corroboration', 
+        'Escalated', 
+        'Resolved', 
+        'Archived'
+    ];
+
     /**
-     * Initializes a new investigation case.
-     * @param {String} title - Name of the investigation (e.g., "POMCO Missing Vendor Search")
-     * @param {String} entityContext - The entity boundary this investigation operates within
-     * @param {String} initiatedBy - User email or ID
-     * @returns {Object} A structured investigation case object
+     * Creates a new isolated Investigation Case
      */
-    static createInvestigation(title, entityContext, initiatedBy) {
-        if (!entityContext) {
-            throw new Error("Governance Violation: Investigations must be bound to a specific entity context.");
+    static createInvestigation(title, entityContext, authorEmail) {
+        if (!title || !entityContext || !authorEmail) {
+            throw new Error("Governance Violation (Rule 8): Investigation creation requires Title, Entity Domain, and Author Email.");
         }
 
-        return {
-            caseId: `INV_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-            title: title,
-            entityContext: entityContext,
-            state: INVESTIGATION_STATES.OPEN,
-            initiatedBy: initiatedBy,
+        const caseId = `CASE_${entityContext.toUpperCase()}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        const newCase = {
+            caseId,
+            title,
+            entityContext: entityContext.toUpperCase(),
+            authorEmail,
+            state: 'Open',
             createdAt: new Date().toISOString(),
-            evidenceLog: [],
-            stateHistory: [
-                {
-                    state: INVESTIGATION_STATES.OPEN,
-                    timestamp: new Date().toISOString(),
-                    user: initiatedBy,
-                    note: "Investigation opened."
-                }
-            ]
+            updatedAt: new Date().toISOString(),
+            evidenceLog: [],       // Attached Evidence Proxies with Rationale
+            contradictionLog: [],  // Linked Contradictions (Anti-Suppression)
+            findings: [],          // Validated Audit Findings
+            notes: [],             // Investigator Review Notes
+            resolutionSummary: null
         };
+
+        ChainOfCustody.recordEvent("INVESTIGATION_CASE_CREATED", {
+            caseId,
+            title,
+            entityContext: entityContext.toUpperCase()
+        }, authorEmail);
+
+        return newCase;
     }
 
     /**
-     * Attaches a validated evidence record to the investigation.
-     * @param {Object} investigation - The current case object
-     * @param {Object} evidenceRecord - The fully stamped provenance record
-     * @param {String} linkRationale - Why this evidence matters to the case
+     * Attaches evidence to an investigation with mandatory Governance rationale
      */
-    static attachEvidence(investigation, evidenceRecord, linkRationale) {
-        if (investigation.entityContext !== evidenceRecord._provenance?.entityContext) {
-            throw new Error(`Governance Violation: Cannot attach ${evidenceRecord._provenance?.entityContext} evidence to a ${investigation.entityContext} investigation.`);
+    static attachEvidence(caseObj, record, rationale, userEmail) {
+        if (!caseObj || !record) {
+            throw new Error("Invalid Case or Evidence Record.");
         }
 
-        // Auto-transition to Gathering state if it's currently Open
-        if (investigation.state === INVESTIGATION_STATES.OPEN) {
-            this.transitionState(investigation, INVESTIGATION_STATES.GATHERING, "First piece of evidence attached.", "System Auto-Trigger");
+        if (!rationale || rationale.trim().length < 5) {
+            throw new Error("Governance Violation (Rule 8): Attaching evidence requires a clear rationale (minimum 5 characters).");
         }
 
-        investigation.evidenceLog.push({
+        const recordEntity = (record._provenance?.entityContext || record._location || '').toUpperCase();
+        
+        // Enforce Entity Isolation Boundary
+        AIGovernanceEngine.enforceEntityIsolation(caseObj.entityContext, recordEntity, false);
+
+        const recordId = record._id || record.data?.row_id;
+        const isDuplicate = caseObj.evidenceLog.some(item => item.recordId === recordId);
+
+        if (isDuplicate) {
+            throw new Error(`Record ${recordId} is already attached to Case ${caseObj.caseId}.`);
+        }
+
+        const entry = {
+            attachedId: `LOG_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            recordId,
             attachedAt: new Date().toISOString(),
-            rationale: linkRationale || "No rationale provided.",
-            recordId: evidenceRecord.data?.row_id || "UNKNOWN_ID",
-            source: evidenceRecord._provenance?.sourceFile
-        });
+            attachedBy: userEmail || caseObj.authorEmail,
+            rationale: rationale.trim(),
+            snapshot: {
+                vendor: record.data?.vendor || record.data?.vendor_name || record['Originating Master Name'] || 'Vendor',
+                amount: parseFloat(record.data?.amount || record.data?.doc_amount || record['Debit Amount'] || record['Credit Amount'] || 0),
+                invoice: record.data?.invoiceNumber || record.data?.doc_number || record['Invoice Number'] || '-',
+                voucher: record.data?.voucherNumber || record.data?.voucher || record['Journal Entry'] || '-',
+                trustLevel: record._provenance?.trustLevel || record._trustLevel || 5,
+                corroborationLevel: record._corroboration?.corroborationLevel || 'A',
+                riskScore: record._risk?.riskScore || 0
+            }
+        };
 
-        return investigation;
+        caseObj.evidenceLog.push(entry);
+        caseObj.updatedAt = new Date().toISOString();
+
+        // Auto-link contradictions if present (Anti-Suppression)
+        if (record._contradictions?.hasContradictions) {
+            record._contradictions.flags.forEach(flag => {
+                caseObj.contradictionLog.push({
+                    flaggedAt: new Date().toISOString(),
+                    recordId,
+                    ...flag
+                });
+            });
+        }
+
+        // Progress case lifecycle state if gathering evidence
+        if (caseObj.state === 'Open') {
+            caseObj.state = 'Evidence Gathering';
+        }
+
+        ChainOfCustody.recordEvent("EVIDENCE_ATTACHED_TO_CASE", {
+            caseId: caseObj.caseId,
+            recordId,
+            rationale: rationale.trim()
+        }, userEmail || caseObj.authorEmail);
+
+        return entry;
     }
 
     /**
-     * Transitions the investigation to a new phase in the lifecycle.
-     * @param {Object} investigation - The current case object
-     * @param {String} newState - One of INVESTIGATION_STATES
-     * @param {String} justification - Required for state changes
-     * @param {String} user - User making the change
+     * Adds an investigator finding or review note
      */
-    static transitionState(investigation, newState, justification, user) {
-        if (!Object.values(INVESTIGATION_STATES).includes(newState)) {
-            throw new Error(`Governance Violation: Invalid investigation state '${newState}'.`);
-        }
-        if (!justification) {
-            throw new Error("Governance Violation: State transitions require a written justification.");
-        }
+    static addFinding(caseObj, findingText, userEmail) {
+        if (!findingText || findingText.trim().length === 0) return;
 
-        investigation.state = newState;
-        investigation.stateHistory.push({
-            state: newState,
+        const finding = {
+            findingId: `FINDING_${Date.now()}`,
             timestamp: new Date().toISOString(),
-            user: user,
-            note: justification
-        });
+            author: userEmail,
+            text: findingText.trim()
+        };
 
-        return investigation;
+        caseObj.findings.push(finding);
+        caseObj.updatedAt = new Date().toISOString();
+
+        ChainOfCustody.recordEvent("CASE_FINDING_ADDED", {
+            caseId: caseObj.caseId,
+            findingId: finding.findingId
+        }, userEmail);
+
+        return finding;
+    }
+
+    /**
+     * Advances Case Lifecycle State
+     */
+    static updateCaseState(caseObj, newState, userEmail) {
+        if (!this.CASE_STATES.includes(newState)) {
+            throw new Error(`Invalid Case State '${newState}'.`);
+        }
+
+        const oldState = caseObj.state;
+        caseObj.state = newState;
+        caseObj.updatedAt = new Date().toISOString();
+
+        ChainOfCustody.recordEvent("CASE_STATE_UPDATED", {
+            caseId: caseObj.caseId,
+            oldState,
+            newState
+        }, userEmail);
+
+        return caseObj;
     }
 }
