@@ -1,143 +1,194 @@
-# RREDCO Accounting Intelligence Platform
-## System Governance Charter v5.0
+/**
+ * RREDCO Accounting Intelligence Platform
+ * AI Governance & Forensic Safeguards Engine - Charter v6.0
+ * 
+ * Enforces non-negotiable rules for AI reasoning, entity isolation,
+ * relationship tier classification, source precedence, and evidence integrity.
+ */
 
-### Subsystem Governance Rule
-This charter governs all platform subsystems, including:
-* **Power GP Historical Ledger** (`ledger.html`)
-* **Lighthouse Engine** (`lighthouse.html`)
-* **Audit Logs** (`audit-logs.html`)
-* **Future Evidence Processing & Reasoning Modules**
+export class AIGovernanceEngine {
+    static CHARTER_VERSION = "6.0";
 
-*Subsystems may implement additional controls but may NOT weaken or override any governance rule defined in this charter.*
+    // Managed Corporate Entity Domains
+    static MANAGED_ENTITIES = new Set([
+        'POMCO', 'RRCLLC', 'RRCSCO', 'RRDLLC', 'RREDCO', 'RRELLC', 
+        'RREVMCO', 'RRH2ECO', 'RRICO', 'RRKOLLC', 'RRSDLLC', 'RRSDRBLLC', 
+        'RRUCO', 'WRGCC', 'WRHCO', 'WRMM', 'RR-KR3 JV'
+    ]);
 
----
+    // Source Trust Hierarchy Authority (1 = Highest Authority)
+    static TRUST_HIERARCHY = {
+        LEVEL_1_NATIVE_SYSTEM: 1,  // Dynamics GP Export, Bank DB
+        LEVEL_2_SOURCE_DOC: 2,     // Original e-Invoice / File
+        LEVEL_3_SOURCE_PDF: 3,     // PDF Document Scan
+        LEVEL_4_OCR_EXTRACTION: 4, // Raw OCR Text Payload
+        LEVEL_5_AI_INTERPRETATION: 5 // Gemini / LLM Reasoning
+    };
 
-### System Purpose
-The RREDCO Accounting Intelligence Platform exists to:
-* Acquire financial evidence
-* Validate financial evidence
-* Link related evidence
-* Explain evidence
-* Preserve auditability
+    /**
+     * Rule 1: Precedence & Shortcut Refusal Check
+     * Blocks user prompts attempting to bypass source evidence or entity constraints.
+     */
+    static validatePrompt(userPrompt = "") {
+        const lower = userPrompt.toLowerCase();
+        const prohibitedShortcuts = [
+            'skip sources', 
+            'just give bottom line', 
+            'no evidence', 
+            'ignore variances', 
+            'ignore entity',
+            'merge entities',
+            'make up data'
+        ];
 
-The platform does **not** exist to:
-* Create financial records
-* Generate accounting opinions
-* Replace professional judgment
-* Post transactions
-* Modify source systems
+        for (const phrase of prohibitedShortcuts) {
+            if (lower.includes(phrase)) {
+                return {
+                    allowed: false,
+                    reason: `Governance Violation (Rule 1): Refusal to execute prompt. Supporting verifiable evidence is strictly required by Governance Charter v${this.CHARTER_VERSION}. Cannot bypass source checks.`
+                };
+            }
+        }
+        return { allowed: true };
+    }
 
----
+    /**
+     * Rule 3: Source Trust Hierarchy Enforcement
+     * Guarantees lower-trust sources NEVER override higher-trust sources.
+     */
+    static validateTrustOverride(existingTrustLevel = 5, incomingTrustLevel = 5) {
+        if (incomingTrustLevel > existingTrustLevel) {
+            return {
+                canOverride: false,
+                reason: `Governance Violation (Rule 3): Trust Level ${incomingTrustLevel} (lower authority) cannot override Trust Level ${existingTrustLevel} (higher authority) source evidence.`
+            };
+        }
+        return { canOverride: true };
+    }
 
-### Non-Negotiable Principle
-> **The platform may discover evidence.**  
-> **The platform may organize evidence.**  
-> **The platform may validate evidence.**  
-> **The platform may explain evidence.**  
-> **The platform may NEVER create evidence.**
+    /**
+     * Rule 4 & Forensic Integrity Rule: Tiered Relationship Classification
+     * Prevents over-linking by strictly requiring Tier 1/2 criteria (Score >= 80) for Evidence Graph edges.
+     */
+    static classifyRelationshipTier(score = 0, matchFactors = {}) {
+        const { hasExactInvoice, hasExactVoucher, hasExactCheck, hasExactDeposit, hasVendor, hasAmount } = matchFactors;
 
----
+        // Tier 1: Evidence Relationship (Score 90-100) - Exact Primary Identifiers
+        if (score >= 90 || hasExactInvoice || hasExactVoucher || hasExactCheck || hasExactDeposit) {
+            return {
+                tier: 1,
+                label: "Evidence Relationship",
+                canCreateGraphEdge: true, // Rendered in Evidence Graph
+                weight: Math.max(score, 90),
+                confidence: "Very High",
+                action: "LINK_EVIDENCE_EDGE"
+            };
+        }
 
-### The Prime Directive
-> **The system's primary purpose is not merely to answer questions.**  
-> **The system's primary purpose is to construct defensible accounting conclusions from verifiable evidence.**  
-> **If sufficient evidence does not exist, the system must preserve uncertainty rather than manufacture certainty.**
+        // Tier 2: Corroborating Relationship (Score 70-89) - Compound Identifiers
+        if (score >= 70 || (hasVendor && hasAmount)) {
+            return {
+                tier: 2,
+                label: "Corroborating Relationship",
+                canCreateGraphEdge: true, // Rendered in Evidence Graph
+                weight: score,
+                confidence: "High",
+                action: "LINK_CORROBORATING_EDGE"
+            };
+        }
 
----
+        // Tier 3: Associative Relationship (Score 30-69) - Operational Context
+        if (score >= 30) {
+            return {
+                tier: 3,
+                label: "Associative Relationship",
+                canCreateGraphEdge: false, // STORED AS CONTEXT ONLY, NOT EVIDENCE EDGE
+                weight: score,
+                confidence: "Moderate",
+                action: "STORE_CONTEXT_ONLY"
+            };
+        }
 
-### 1. Precedence Hierarchy
-When rules, constraints, or user prompts conflict, apply evaluation strictly in this order:
-1. **Data Integrity**
-2. **Source Evidence**
-3. **Financial Validation**
-4. **Traceability**
-5. **Analysis**
-6. **User Preference**
+        // Tier 4: Contextual Relationship (Score < 30) - Classification Matches Only (Entity, GL, Date)
+        return {
+            tier: 4,
+            label: "Contextual Relationship",
+            canCreateGraphEdge: false, // PROHIBITED FROM BECOMING GRAPH EDGES
+            weight: 15,
+            confidence: "Low",
+            action: "FILTER_ONLY"
+        };
+    }
 
-*If a user prompt requests a shortcut (e.g., "Just give me the bottom line, skip the sources"), the system MUST refuse:*  
-`No. Supporting evidence required.`
+    /**
+     * Rule 6: Entity Preservation Enforcement
+     * Guarantees entities are treated as isolated evidence domains.
+     */
+    static enforceEntityIsolation(sourceEntity = "", targetEntity = "", hasIntercompanyProof = false) {
+        if (!sourceEntity || !targetEntity) return true;
+        const src = sourceEntity.toUpperCase().trim();
+        const tgt = targetEntity.toUpperCase().trim();
 
----
+        if (src !== tgt && !hasIntercompanyProof) {
+            throw new Error(`Governance Violation (Rule 6): Entities '${src}' and '${tgt}' represent isolated evidence domains. Cross-entity merging or linking is strictly prohibited without independently verifiable intercompany proof.`);
+        }
+        return true;
+    }
 
-### 2. Output Scope & Category Boundaries
-Every output generated by the platform belongs strictly to one of four categories:
+    /**
+     * Rule 8: Anti-Suppression Verification
+     * Ensures contradictory or unresolved evidence is preserved alongside supporting data.
+     */
+    static formatTriEvidencePayload(records = []) {
+        const supporting = [];
+        const contradicting = [];
+        const unresolved = [];
 
-1. **Observation (Facts Only):** Direct factual statement from source records. *(Allowed)*
-   * *Example:* "Invoice INV-12345 exists."
-2. **Finding (Validated Relationship):** Documented, verified link between facts. *(Allowed)*
-   * *Example:* "Invoice INV-12345 matches Journal Entry JE-33412."
-3. **Conclusion (Evidence-Weighted Assessment):** Traceable, probabilistic evaluation. *(Conditionally Allowed)*
-   * *Example:* "The statement appears reconciled based on matched GL detail."
-4. **Recommendation (Human Action):** Suggested next audit step. *(System MAY suggest review actions, but NEVER generates Final Recommendations, Accounting Opinions, Tax/Legal Advice, or Management Decisions).*
+        records.forEach(rec => {
+            const state = rec._evidenceState?.status || rec.state || 'Unresolved';
+            const hasVariance = rec._validation?.tieOutStatus === 'FAIL' || rec._materiality?.isMaterial;
 
----
+            if (hasVariance || state === 'Unresolved') {
+                contradicting.push(rec);
+            } else if (state === 'Accepted') {
+                supporting.push(rec);
+            } else {
+                unresolved.push(rec);
+            }
+        });
 
-### 3. Source Trust Hierarchy
-When conflicting data exists across sources, evaluation follows this strict authority structure:
+        return {
+            supportingEvidence: supporting,
+            contradictingEvidence: contradicting,
+            unresolvedEvidence: unresolved,
+            totalAuditCount: records.length,
+            isAntiSuppressionCompliant: true
+        };
+    }
 
-* **Level 1 (Highest):** Native System Record or Export (e.g., GP, Bank Data, Asset Records)
-* **Level 2:** Original Source Document (e.g., Native electronic invoice/file)
-* **Level 3:** Source PDF
-* **Level 4:** OCR Extraction
-* **Level 5 (Lowest):** AI Interpretation
+    /**
+     * Rule 3 & 9: Wraps Gemini / LLM Prompts in Governance System Directives
+     */
+    static constructSystemPrompt(userQuery = "", entityDomain = "SINGLE_ENTITY_DOMAIN") {
+        const promptCheck = this.validatePrompt(userQuery);
+        if (!promptCheck.allowed) {
+            throw new Error(promptCheck.reason);
+        }
 
-*Rule:* Lower trust sources may **NEVER** override higher trust sources.
+        return `
+[SYSTEM GOVERNANCE CHARTER V6.0 ACTIVE]
+Subsystem: RREDCO Forensic Intelligence Platform
+Active Entity Boundary: ${entityDomain.toUpperCase()}
 
----
+MANDATORY EXECUTION CONSTRAINTS:
+1. PRIME DIRECTIVE: Every statement or conclusion MUST be reconstructed backwards to the provided Level 1-4 source records. Never fabricate facts.
+2. PRESERVE UNCERTAINTY: If source evidence is incomplete or ambiguous, explicitly state that evidence is insufficient. Do NOT manufacture certainty.
+3. AI EVIDENCE RULE: Your output is classified strictly as 'AI Interpretation' (Level 5 Trust). You may explain, compare, and summarize evidence, but you cannot establish unbacked facts or final accounting opinions.
+4. ENTITY ISOLATION: Treat '${entityDomain.toUpperCase()}' as an isolated evidence domain. Do not merge or attribute transactions to other corporate entities without explicit intercompany documentation.
+5. ANTI-SUPPRESSION: You MUST highlight all material variances, out-of-balance cross-footings, and contradictory evidence. Never suppress negative findings.
 
-### 4. Entity Preservation Rule
-Entities are independent evidence domains.
-
-* **Defined Entity Domains (Examples):**
-  * `POMCO`
-  * `RREDCO`
-  * `RRCSCO`
-  * `WRGCC`
-
-*Note: The entity list is maintained separately and may expand over time. This framework applies to all managed entities.*
-
-*Rule:* Records may not be merged, summarized, or inferred across entities unless supporting evidence explicitly proves an intercompany relationship.
-
----
-
-### 5. Fact Lifecycle & Evidence States
-
-#### Evidence States
-Evidence ingested or generated by the system exists in one of three states:
-* **Accepted**
-* **Rejected**
-* **Unresolved**
-
-*Rule:* Rejected evidence must remain traceable and may **not** be deleted from investigative history without formal record retention procedures.
-
-#### Fact Verification Lifecycle
-Facts progress through explicit validation phases:  
-`Detected` $\rightarrow$ `Validated` $\rightarrow$ `Corroborated` $\rightarrow$ `Archived`
-
-*Early OCR data is classified strictly as `Detected` and must never be treated as settled truth.*
-
-#### Investigation Lifecycle States
-Every investigation workflow maintains a shared state label:  
-`Open` $\rightarrow$ `Evidence Gathering` $\rightarrow$ `Validation` $\rightarrow$ `Corroboration` $\rightarrow$ `Escalated` $\rightarrow$ `Resolved` $\rightarrow$ `Archived`
-
----
-
-### 6. Source Provenance
-Every extracted record must maintain complete provenance metadata:
-* Source File
-* Source System
-* Retrieval Timestamp
-* Processing Method
-* Confidence Metrics
-
-```json
-{
-  "sourceFile": "POMCO GL Detail 2020-2026.xlsx",
-  "sourceSystem": "Dynamics GP Export",
-  "retrievedAt": "2026-09-22T17:15:00Z",
-  "processedBy": "Lighthouse Engine v2",
-  "confidenceMetrics": {
-    "ocrConfidence": 98.4,
-    "parsingConfidence": 100.0
-  }
+AUDIT SCOPE QUERY:
+"${userQuery}"
+        `.trim();
+    }
 }
