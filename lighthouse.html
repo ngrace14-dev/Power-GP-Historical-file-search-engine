@@ -99,7 +99,7 @@
           <i class="ph ph-upload-simple text-2xl text-cyan-400 group-hover:text-white transition-colors"></i>
         </div>
         <h2 class="font-bold text-base text-white mb-1">Ingest External Trial Balance or Aged Schedule</h2>
-        <p class="text-xs text-slate-400 text-center max-w-md">Spatial OCR groups columns by coordinate geometry and validates row math ($Total = Current + Aging$).</p>
+        <p class="text-xs text-slate-400 text-center max-w-md">Spatial OCR groups columns by coordinate geometry and validates row math.</p>
         <input type="file" accept=".pdf" id="pdf-upload" class="hidden" onchange="handleFileUpload(event)">
       </label>
 
@@ -184,6 +184,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+    import { ProvenanceEngine } from './modules/provenance-engine.js'; // <-- NEW GOVERNANCE MODULE
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -317,7 +318,7 @@
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-          const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0] };
+          const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0], short: "UNKNOWN" };
 
           for (let r = 1; r < Math.min(2000, raw2D.length); r++) {
             const row = raw2D[r];
@@ -326,7 +327,8 @@
             let docAmt = parseFloat(row[7]) || 0;
             let curAmt = parseFloat(row[8]) || 0;
             
-            extractedData.push({
+            // 1. Construct raw payload
+            const rawRecord = {
               row_id: rowId++,
               vendor_id: String(row[0] || entityMatch.name),
               vendor_name: String(row[2] || 'MASTER GL RECORD'),
@@ -340,7 +342,19 @@
               days_61_90: 0,
               days_91_over: 0,
               _cross_foot_valid: true
+            };
+
+            // 2. Map through Governance Engine
+            const stampedRecord = ProvenanceEngine.stampRecord({
+              sourceFile: fileRef.name,
+              sourceSystem: "Firebase_Storage",
+              sourceType: "NATIVE_EXPORT", // Level 1 Trust
+              entityContext: entityMatch.short || "UNKNOWN", 
+              processedBy: "Lighthouse Engine v2 (Cloud Pull)",
+              extractedData: rawRecord
             });
+
+            extractedData.push(stampedRecord);
           }
           window.logSys(`Digitized ${fileRef.name} successfully.`, 'success');
         }
@@ -393,9 +407,23 @@
         }
 
         window.updateProgress(85, 'EXECUTING TIE-OUT PARSER...');
-        extractedData = window.parseLedgerText(fullText);
+        const parsedRows = window.parseLedgerText(fullText);
 
-        if (extractedData.length === 0) throw new Error("No transactions detected.");
+        if (parsedRows.length === 0) throw new Error("No transactions detected.");
+
+        // Apply Governance Stamp to Local PDF uploads
+        const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
+
+        extractedData = parsedRows.map(row => {
+            return ProvenanceEngine.stampRecord({
+              sourceFile: originalFileName,
+              sourceSystem: "Local_Upload",
+              sourceType: "SOURCE_PDF", // Level 3 Trust
+              entityContext: userSelectedEntity.toUpperCase(),
+              processedBy: "Lighthouse Engine v2 (Spatial OCR)",
+              extractedData: row
+            });
+        });
 
         window.updateProgress(100, 'EXTRACTION COMPLETE');
         window.renderResults(extractedData);
@@ -415,7 +443,26 @@
 
       window.updateProgress(50, 'PARSING PASTE BUFFER...');
       setTimeout(() => {
-        extractedData = window.parseLedgerText(text);
+        const parsedRows = window.parseLedgerText(text);
+        
+        if(parsedRows.length > 0) {
+            // Apply Governance Stamp to Raw Text Ingestion
+            const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
+            
+            extractedData = parsedRows.map(row => {
+                return ProvenanceEngine.stampRecord({
+                  sourceFile: "Pasted_Buffer.txt",
+                  sourceSystem: "Manual_Text_Entry",
+                  sourceType: "OCR_EXTRACTION", // Level 4 Trust
+                  entityContext: userSelectedEntity.toUpperCase(),
+                  processedBy: "Lighthouse Engine v2 (Text Parser)",
+                  extractedData: row
+                });
+            });
+        } else {
+            extractedData = [];
+        }
+
         window.updateProgress(100, 'COMPLETE');
         window.renderResults(extractedData);
       }, 300);
@@ -479,13 +526,18 @@
     window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted and cross-foot verified.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, cross-foot verified, and locked with provenance.`;
 
       const tbody = document.getElementById('table-body');
-      tbody.innerHTML = data.map(r => `
-        <tr class="hover:bg-slate-800/50 transition">
+      tbody.innerHTML = data.map(record => {
+        // Governance Extraction Wrapper
+        const r = record.data; 
+        const prov = record._provenance;
+
+        return `
+        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile} | Trust Level: ${prov.trustLevel}">
           <td class="p-3 pl-4">
-            <span class="text-cyan-400 font-mono text-[10px] block">${r.vendor_id}</span>
+            <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext} | ${r.vendor_id}</span>
             ${r.vendor_name}
           </td>
           <td class="p-3 text-slate-400">${r.voucher}</td>
@@ -500,7 +552,7 @@
               : `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30">VARIANCE</span>`}
           </td>
         </tr>
-      `).join('');
+      `}).join('');
 
       document.getElementById('btn-download').disabled = false;
       document.getElementById('btn-pass').disabled = false;
@@ -518,7 +570,7 @@
           btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
           btn.classList.remove('from-cyan-400', 'to-cyan-500');
           btn.classList.add('from-emerald-400', 'to-emerald-500');
-          window.logSys(`Successfully staged ${extractedData.length} records to IndexedDB for ledger.html terminal.`, 'success');
+          window.logSys(`Successfully staged ${extractedData.length} governance-locked records to IndexedDB for ledger.html terminal.`, 'success');
         };
       } catch (err) {
         window.logSys(`Failed to save staging data: ${err.message}`, 'error');
@@ -531,6 +583,7 @@
       const sheet = workbook.addWorksheet('Lighthouse Audit');
 
       sheet.columns = [
+        { header: 'Entity Context', key: 'entity_context', width: 14 },
         { header: 'Vendor/Entity ID', key: 'vendor_id', width: 16 },
         { header: 'Vendor Name', key: 'vendor_name', width: 28 },
         { header: 'Voucher', key: 'voucher', width: 16 },
@@ -541,7 +594,11 @@
         { header: 'Current Period', key: 'current_period', width: 16 }
       ];
 
-      extractedData.forEach(row => sheet.addRow(row));
+      extractedData.forEach(record => {
+        // Flatten the record slightly for the Excel export
+        const exportRow = { ...record.data, entity_context: record._provenance.entityContext };
+        sheet.addRow(exportRow);
+      });
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
