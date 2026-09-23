@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Human Review & Triage Queue</title>
+  <link rel="icon" type="image/png" href="RREDCO_Logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: { gp: { 50: '#f0f7ff', 100: '#e0effe', 500: '#0284c7', 600: '#0369a1', 700: '#075985', 800: '#0c4a6e', 900: '#082f49' } },
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700 flex items-center gap-1.5 text-xs font-semibold">
+          <i data-lucide="grid" class="w-4 h-4 text-amber-400"></i> Portal
+        </a>
+        <div class="h-6 w-px bg-slate-700 mx-1"></div>
+        <div class="h-10 px-3 rounded-lg bg-white flex items-center justify-center shadow-md">
+          <img src="RREDCO_Logo.png" alt="RREDCO Logo" class="h-7 w-auto object-contain">
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Human Review Queue</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-medium">Governance Rule 8 Triage</span>
+          </div>
+          <p class="text-xs text-slate-400">Triage Low-Confidence Records & Financial Tie-Out Failures</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700">
+        <span id="userEmail" class="text-xs text-slate-300 font-medium">Loading...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6">
+    
+    <!-- Metrics Panel -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold"><i data-lucide="alert-circle" class="w-6 h-6"></i></div>
+        <div><span class="text-xs text-slate-500 font-medium">Pending Review</span><p id="stat-pending" class="text-2xl font-bold text-slate-900 mt-0.5">0 Records</p></div>
+      </div>
+      <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold"><i data-lucide="calculator" class="w-6 h-6"></i></div>
+        <div><span class="text-xs text-slate-500 font-medium">Tie-Out Failures</span><p id="stat-failures" class="text-2xl font-bold text-slate-900 mt-0.5">0 Records</p></div>
+      </div>
+      <div class="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold"><i data-lucide="check-check" class="w-6 h-6"></i></div>
+        <div><span class="text-xs text-slate-500 font-medium">Resolved / Overridden</span><p id="stat-resolved" class="text-2xl font-bold text-slate-900 mt-0.5">0 Records</p></div>
+      </div>
+    </div>
+
+    <!-- Triage Table -->
+    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col flex-1">
+      <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Flagged Exceptions Requiring Sign-Off</span>
+      </div>
+      <div class="overflow-x-auto flex-1">
+        <table class="w-full text-left text-xs border-collapse whitespace-nowrap">
+          <thead class="bg-slate-100 text-slate-700 border-b border-slate-200 font-semibold select-none">
+            <tr>
+              <th class="py-2.5 px-3">Escalation Reason</th>
+              <th class="py-2.5 px-3">Entity</th>
+              <th class="py-2.5 px-3">Vendor / Account</th>
+              <th class="py-2.5 px-3">Doc / Invoice #</th>
+              <th class="py-2.5 px-3 text-right">Amount</th>
+              <th class="py-2.5 px-3">Confidence</th>
+              <th class="py-2.5 px-3 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="triage-table-body" class="divide-y divide-slate-100 font-sans">
+            <tr><td colspan="7" class="py-16 text-center text-slate-400">Loading triage queue...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Override / Correction Modal -->
+  <div id="modal-override" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-wider">Human Override & Correction</h3>
+        <button onclick="closeOverrideModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-5 space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Vendor / Entity Name</label>
+          <input type="text" id="edit-vendor" class="w-full p-2 bg-slate-50 border border-slate-200 rounded font-mono">
+        </div>
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Invoice / Document Number</label>
+          <input type="text" id="edit-doc" class="w-full p-2 bg-slate-50 border border-slate-200 rounded font-mono">
+        </div>
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Amount ($)</label>
+          <input type="number" step="0.01" id="edit-amount" class="w-full p-2 bg-slate-50 border border-slate-200 rounded font-mono">
+        </div>
+        <div>
+          <label class="block text-slate-600 font-bold mb-1">Manager Note / Justification (Required)</label>
+          <textarea id="edit-note" placeholder="State reason for field override or variance acceptance..." class="w-full p-2 bg-slate-50 border border-slate-200 rounded h-20 resize-none"></textarea>
+        </div>
+      </div>
+      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+        <button onclick="closeOverrideModal()" class="px-3 py-1.5 text-xs text-slate-600 border border-slate-200 rounded hover:bg-slate-100">Cancel</button>
+        <button onclick="submitOverride()" class="px-4 py-1.5 text-xs font-bold bg-amber-600 text-white rounded hover:bg-amber-500 shadow-sm">Save & Approve Exception</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { ReviewEngine } from './modules/review-engine.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
+      authDomain: "rredco-database.firebaseapp.com",
+      projectId: "rredco-database",
+      storageBucket: "rredco-database.firebasestorage.app",
+      appId: "1:96836268607:web:dea3fe719d8f8d619fbe8a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    let stagedRecords = [];
+    let activeRecordIndex = null;
+    let currentUserEmail = '';
+
+    function openAuditDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('RREDCO_Audit_Store', 1);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (user && user.email) {
+        currentUserEmail = user.email;
+        document.getElementById('userEmail').textContent = user.email;
+        loadTriageQueue();
+      } else {
+        window.location.href = 'index.html';
+      }
+    });
+
+    async function loadTriageQueue() {
+      try {
+        const db = await openAuditDB();
+        if (!db.objectStoreNames.contains('staging')) return;
+
+        const tx = db.transaction('staging', 'readonly');
+        const req = tx.objectStore('staging').get('rredco_audit_staging');
+
+        req.onsuccess = () => {
+          stagedRecords = req.result || [];
+          renderTriageTable();
+        };
+      } catch (err) {
+        console.error('Error loading triage queue:', err);
+      }
+    }
+
+    function renderTriageTable() {
+      const tbody = document.getElementById('triage-table-body');
+      let pendingCount = 0;
+      let failureCount = 0;
+      let resolvedCount = 0;
+
+      const flaggedRows = [];
+
+      stagedRecords.forEach((record, idx) => {
+        if (record._reviewResolution) {
+          resolvedCount++;
+          return;
+        }
+
+        const evaluation = ReviewEngine.evaluateEscalation(record);
+        if (evaluation.needsReview) {
+          pendingCount++;
+          if ((record._validation?.tieOutStatus) === 'FAIL') failureCount++;
+
+          flaggedRows.push({ record, idx, reasons: evaluation.reasons });
+        }
+      });
+
+      document.getElementById('stat-pending').textContent = `${pendingCount} Records`;
+      document.getElementById('stat-failures').textContent = `${failureCount} Records`;
+      document.getElementById('stat-resolved').textContent = `${resolvedCount} Records`;
+
+      if (flaggedRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-14 text-center text-slate-400">No records currently require human triage.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = flaggedRows.map(({ record, idx, reasons }) => {
+        const r = record.data || {};
+        const prov = record._provenance || {};
+        const conf = prov.confidenceMetrics?.parsingConfidence || 0;
+
+        return `
+          <tr class="hover:bg-amber-50/50">
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">${reasons[0]}</span>
+            </td>
+            <td class="py-2.5 px-3 font-semibold text-slate-800">${prov.entityContext || 'UNKNOWN'}</td>
+            <td class="py-2.5 px-3">${r.vendor || r.vendor_name || '-'}</td>
+            <td class="py-2.5 px-3 font-mono text-sky-700 font-semibold">${r.invoiceNumber || r.doc_number || '-'}</td>
+            <td class="py-2.5 px-3 font-mono text-right font-bold">$${(r.amount || r.doc_amount || 0).toFixed(2)}</td>
+            <td class="py-2.5 px-3 font-mono ${conf < 70 ? 'text-amber-600 font-bold' : 'text-slate-600'}">${conf}%</td>
+            <td class="py-2.5 px-3 text-center">
+              <button onclick="window.openOverrideModal(${idx})" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold shadow-2xs">Resolve / Override</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    window.openOverrideModal = (idx) => {
+      activeRecordIndex = idx;
+      const rec = stagedRecords[idx].data || {};
+
+      document.getElementById('edit-vendor').value = rec.vendor || rec.vendor_name || '';
+      document.getElementById('edit-doc').value = rec.invoiceNumber || rec.doc_number || '';
+      document.getElementById('edit-amount').value = rec.amount || rec.doc_amount || 0;
+      document.getElementById('edit-note').value = '';
+
+      document.getElementById('modal-override').classList.remove('hidden');
+    };
+
+    window.closeOverrideModal = () => {
+      document.getElementById('modal-override').classList.add('hidden');
+      activeRecordIndex = null;
+    };
+
+    window.submitOverride = async () => {
+      if (activeRecordIndex === null) return;
+
+      const note = document.getElementById('edit-note').value;
+      if (!note.trim()) return alert("Manager justification note is required.");
+
+      const correctedData = {
+        vendor: document.getElementById('edit-vendor').value,
+        vendor_name: document.getElementById('edit-vendor').value,
+        invoiceNumber: document.getElementById('edit-doc').value,
+        doc_number: document.getElementById('edit-doc').value,
+        amount: parseFloat(document.getElementById('edit-amount').value) || 0,
+        doc_amount: parseFloat(document.getElementById('edit-amount').value) || 0
+      };
+
+      try {
+        const updated = ReviewEngine.applyOverride(
+          stagedRecords[activeRecordIndex],
+          correctedData,
+          note,
+          currentUserEmail
+        );
+
+        stagedRecords[activeRecordIndex] = updated;
+
+        // Save back to IndexedDB
+        const db = await openAuditDB();
+        const tx = db.transaction('staging', 'readwrite');
+        tx.objectStore('staging').put(stagedRecords, 'rredco_audit_staging');
+
+        tx.oncomplete = () => {
+          closeOverrideModal();
+          renderTriageTable();
+          alert("Record resolution saved and approved.");
+        };
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>
