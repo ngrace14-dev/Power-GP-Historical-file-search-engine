@@ -121,7 +121,6 @@
           <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100">
             <button id="mode-omni" class="px-3 py-1 text-xs font-medium rounded-md bg-white text-slate-800 shadow-xs transition">Global Search</button>
             <button id="mode-single" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Target One Field</button>
-            <button id="mode-multi" class="px-3 py-1 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900 transition">Multi-Field Search</button>
           </div>
         </div>
         <div class="flex items-center gap-3 w-full sm:w-auto">
@@ -262,16 +261,16 @@
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     import { getDatabase, ref as dbRef, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
     
-    // UPDATED HOOKS: Pointing to root directory instead of ./modules/
+    // Flat-root imports
     import { InvestigationEngine } from './investigation-engine.js';
     import { ContradictionEngine } from './contradiction-engine.js';
     import { RelationshipEngine } from './relationship-engine.js'; 
-    import { GeminiService } from './gemini-service.js'; // Phase 7 Engine
+    import { GeminiService } from './gemini-service.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
       authDomain: "rredco-database.firebaseapp.com",
-      databaseURL: "https://rredco-database-default-rtdb.firebaseio.com",
+      databaseURL: "https://rredco-database.firebaseio.com",
       projectId: "rredco-database",
       storageBucket: "rredco-database.firebasestorage.app",
       messagingSenderId: "96836268607",
@@ -348,19 +347,134 @@
           });
 
           if (addedCount > 0) {
-            // Build Phase 5 Graph relationships if not pre-populated
             window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
             updateLocationDropdown();
             runContradictionEngine();
             const badge = document.getElementById('sync-badge');
             if (badge) {
-              badge.textContent = `${addedCount} Evidence Rows Staged`;
+              badge.textContent = `${addedCount} Staged Evidence Rows`;
               badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800';
             }
           }
         };
       } catch (err) {
         console.warn('Error reading audit staging memory:', err);
+      }
+    }
+
+    // FIREBASE STORAGE CLOUD SYNC HANDLER
+    async function syncCloudLedgers() {
+      const badge = document.getElementById('sync-badge');
+      if (badge) {
+        badge.textContent = 'Syncing Cloud...';
+        badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 animate-pulse';
+      }
+
+      try {
+        let folderRef = ref(storage, 'RREDCO Power GP');
+        let result;
+        try {
+          result = await listAll(folderRef);
+        } catch (e) {
+          folderRef = ref(storage, 'master_csvs');
+          result = await listAll(folderRef);
+        }
+
+        let loadedCount = 0;
+        for (const itemRef of result.items) {
+          const url = await getDownloadURL(itemRef);
+          const fileName = itemRef.name;
+
+          const entityMatch = window.COMPANY_ENTITIES.find(e => fileName.toUpperCase().includes(e.short)) || { short: fileName.split('.')[0].toUpperCase() };
+          const entityCode = entityMatch.short || 'UNKNOWN';
+
+          if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+            jsonRows.forEach((row, idx) => {
+              const rec = {
+                _id: `CLOUD_${entityCode}_${idx}_${Date.now()}`,
+                _location: entityCode,
+                _sourceFile: fileName,
+                _trustLevel: 5,
+                _state: 'Accepted',
+                
+                'Department': row['Department'] || row['Dept'] || 'General',
+                'Journal Entry': String(row['Journal Entry'] || row['JRNENTRY'] || row['Voucher'] || row[1] || '-'),
+                'Invoice Number': String(row['Invoice Number'] || row['DOCNUMBR'] || row['Doc Number'] || row[3] || '-'),
+                'Originating Master Name': String(row['Originating Master Name'] || row['ORMSTRNM'] || row['Vendor Name'] || row[2] || '-'),
+                'TRX Date': row['TRX Date'] || row['TRXDATE'] || row['Doc Date'] || row[4] || '-',
+                'Account Number': String(row['Account Number'] || row['ACTNUMST'] || row['Vendor ID'] || row[0] || '-'),
+                'Account Description': String(row['Account Description'] || row['ACTDESCR'] || 'GL Ledger Record'),
+                'Debit Amount': row['Debit Amount'] || row['DEBITAMT'] || (parseFloat(row['Amount'] || row[7] || 0) > 0 ? String(row['Amount'] || row[7]) : ''),
+                'Credit Amount': row['Credit Amount'] || row['CRDTAMNT'] || (parseFloat(row['Amount'] || row[7] || 0) < 0 ? String(Math.abs(parseFloat(row['Amount'] || row[7]))) : ''),
+                'Reference': String(row['Reference'] || row['REFRENCE'] || '-'),
+                'Description': String(row['Description'] || row['DSCRIPTN'] || '-'),
+                'Originating TRX Source': 'Power GP Cloud',
+                'User Who Posted': row['User Who Posted'] || row['USWHPSTD'] || 'System'
+              };
+              window.appState.records.push(rec);
+              window.appState.locations.add(entityCode);
+              loadedCount++;
+            });
+          } else if (fileName.endsWith('.csv')) {
+            const response = await fetch(url);
+            const text = await response.text();
+            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+            (parsed.data || []).forEach((row, idx) => {
+              const loc = row['Location'] || row['Entity'] || entityCode;
+              const rec = {
+                _id: `CLOUD_CSV_${idx}_${Date.now()}`,
+                _location: loc,
+                _sourceFile: fileName,
+                _trustLevel: 5,
+                _state: 'Accepted',
+                'Department': row['Department'] || '-',
+                'Journal Entry': String(row['Journal Entry'] || row['Voucher'] || '-'),
+                'Invoice Number': String(row['Invoice Number'] || '-'),
+                'Originating Master Name': String(row['Originating Master Name'] || row['Vendor'] || '-'),
+                'TRX Date': row['TRX Date'] || row['Transaction Date'] || '-',
+                'Account Number': String(row['Account Number'] || row['GL Code'] || '-'),
+                'Account Description': String(row['Account Description'] || '-'),
+                'Debit Amount': String(row['Debit Amount'] || ''),
+                'Credit Amount': String(row['Credit Amount'] || ''),
+                'Reference': String(row['Reference'] || row['Reference ID'] || '-'),
+                'Description': String(row['Description'] || '-'),
+                'Originating TRX Source': 'Power GP Cloud CSV',
+                'User Who Posted': row['User Who Posted'] || 'System'
+              };
+              window.appState.records.push(rec);
+              window.appState.locations.add(loc);
+              loadedCount++;
+            });
+          }
+        }
+
+        if (loadedCount > 0) {
+          window.appState.records = RelationshipEngine.buildRelationships(window.appState.records);
+          updateLocationDropdown();
+          runContradictionEngine();
+          if (badge) {
+            badge.textContent = `${loadedCount} Cloud Rows Synced`;
+            badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800';
+          }
+        } else {
+          if (badge) {
+            badge.textContent = 'No Cloud Files Found';
+            badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800';
+          }
+        }
+      } catch (err) {
+        console.error('Cloud Sync Error:', err);
+        if (badge) {
+          badge.textContent = 'Cloud Sync Failed';
+          badge.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800';
+        }
+        alert('Cloud Sync Error: ' + err.message);
       }
     }
 
@@ -381,7 +495,7 @@
         lucide.createIcons();
 
         try {
-            const gemini = new GeminiService(); // Initiated without a key
+            const gemini = new GeminiService();
             const activeEntity = window.appState.activeLocation;
             
             logUserActivity('AI_QUERY', `Executed AI Audit Query: "${userQuery}"`);
@@ -392,7 +506,6 @@
                 activeEntity
             );
 
-            // Simple markdown formatting replacement for HTML display
             let formattedHtml = responseText
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -640,7 +753,6 @@
       document.getElementById('stat-matches').textContent = window.appState.filteredRecords.length.toLocaleString();
       document.getElementById('export-count').textContent = window.appState.filteredRecords.length.toLocaleString();
       
-      const maxPage = Math.ceil(window.appState.filteredRecords.length / window.appState.pageSize) || 1;
       const start = window.appState.filteredRecords.length === 0 ? 0 : ((window.appState.currentPage - 1) * window.appState.pageSize) + 1;
       const end = Math.min(window.appState.currentPage * window.appState.pageSize, window.appState.filteredRecords.length);
       
@@ -727,6 +839,9 @@
       link.download = `Evidence_Export_${window.appState.activeLocation}_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
     });
+
+    // CLOUD SYNC BUTTON
+    document.getElementById('btn-pull-cloud').addEventListener('click', syncCloudLedgers);
 
     // SEARCH MODE TOGGLES
     document.getElementById('mode-omni').addEventListener('click', () => {
