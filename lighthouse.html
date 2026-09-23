@@ -148,7 +148,7 @@
                 <th class="p-3 pl-4">Entity / Vendor</th>
                 <th class="p-3">Voucher / JE</th>
                 <th class="p-3">Doc / Invoice No.</th>
-                <th class="p-3">Type</th>
+                <th class="p-3">Doc Type</th>
                 <th class="p-3">TRX Date</th>
                 <th class="p-3 text-right">Debit / Doc Amount</th>
                 <th class="p-3 text-right">Credit / Current</th>
@@ -184,8 +184,12 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+    
+    // GOVERNANCE MODULES
     import { ProvenanceEngine } from './modules/provenance-engine.js'; 
-    import { EvidenceStateEngine } from './modules/evidence-state-engine.js'; // <-- NEW GOVERNANCE MODULE
+    import { EvidenceStateEngine } from './modules/evidence-state-engine.js'; 
+    import { ConfidenceEngine } from './modules/confidence-engine.js';
+    import { ClassificationEngine } from './modules/classification-engine.js'; // <-- NEW
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -207,7 +211,6 @@
     let originalFileName = "";
     let fullDebugLog = [];
 
-    // Helper: Native IndexedDB for unlimited capacity staging
     function openAuditDB() {
       return new Promise((resolve, reject) => {
         const req = indexedDB.open('RREDCO_Audit_Store', 1);
@@ -312,6 +315,10 @@
           const pct = 10 + Math.round(((idx + 1) / xlsxFiles.length) * 80);
           window.updateProgress(pct, `DOWNLOADING & DIGITIZING ${fileRef.name} (${idx + 1}/${xlsxFiles.length})`);
 
+          // Cloud Pulls are automatically assumed to be GL Exports by nature of the storage bucket
+          const classification = ClassificationEngine.classifyDocument('', fileRef.name);
+          const docType = classification.documentType === 'Unknown Document' ? 'General Ledger Export' : classification.documentType;
+
           const url = await getDownloadURL(fileRef);
           const response = await fetch(url);
           const arrayBuffer = await response.arrayBuffer();
@@ -328,14 +335,13 @@
             let docAmt = parseFloat(row[7]) || 0;
             let curAmt = parseFloat(row[8]) || 0;
             
-            // 1. Construct raw payload
             const rawRecord = {
               row_id: rowId++,
               vendor_id: String(row[0] || entityMatch.name),
               vendor_name: String(row[2] || 'MASTER GL RECORD'),
               voucher: String(row[1] || 'JE-CLK'),
               doc_number: String(row[3] || 'INV-CLK'),
-              type: 'GL',
+              type: docType, // Assigned by Classification Engine
               doc_date: row[4] ? String(row[4]) : new Date().toLocaleDateString(),
               doc_amount: docAmt,
               current_period: curAmt,
@@ -345,17 +351,22 @@
               _cross_foot_valid: true
             };
 
-            // 2. Map through Governance Engine (which deeply freezes _provenance and data)
+            const scores = ConfidenceEngine.calculateScores({
+                sourceType: "NATIVE_EXPORT",
+                parsedRecord: rawRecord
+            });
+
             const stampedRecord = ProvenanceEngine.stampRecord({
               sourceFile: fileRef.name,
               sourceSystem: "Firebase_Storage",
               sourceType: "NATIVE_EXPORT", 
               entityContext: entityMatch.short || "UNKNOWN", 
               processedBy: "Lighthouse Engine v2 (Cloud Pull)",
+              ocrConfidence: scores.ocrConfidence,
+              parsingConfidence: scores.parsingConfidence,
               extractedData: rawRecord
             });
 
-            // 3. Construct the final record with Evidence State added alongside the frozen chunks
             const finalRecord = {
                 _provenance: stampedRecord._provenance,
                 data: stampedRecord.data,
@@ -366,7 +377,7 @@
 
             extractedData.push(finalRecord);
           }
-          window.logSys(`Digitized ${fileRef.name} successfully.`, 'success');
+          window.logSys(`Digitized ${fileRef.name} as [${docType}].`, 'success');
         }
 
         window.updateProgress(100, 'CLOUD DIGITIZATION COMPLETE');
@@ -416,21 +427,32 @@
           });
         }
 
+        // PHASE 2: Classification Execution
+        const classification = ClassificationEngine.classifyDocument(fullText.substring(0, 1000), file.name);
+        window.logSys(`Classification Engine identified document as [${classification.documentType}] with ${(classification.confidence * 100)}% confidence.`);
+
         window.updateProgress(85, 'EXECUTING TIE-OUT PARSER...');
-        const parsedRows = window.parseLedgerText(fullText);
+        const parsedRows = window.parseLedgerText(fullText, classification.documentType); // Pass type to parser
 
         if (parsedRows.length === 0) throw new Error("No transactions detected.");
 
-        // Apply Governance Stamp to Local PDF uploads
         const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
 
         extractedData = parsedRows.map(row => {
+            const scores = ConfidenceEngine.calculateScores({
+                sourceType: "SOURCE_PDF",
+                rawText: fullText.substring(0, 500), 
+                parsedRecord: row
+            });
+
             const stampedRecord = ProvenanceEngine.stampRecord({
               sourceFile: originalFileName,
               sourceSystem: "Local_Upload",
               sourceType: "SOURCE_PDF", 
               entityContext: userSelectedEntity.toUpperCase(),
               processedBy: "Lighthouse Engine v2 (Spatial OCR)",
+              ocrConfidence: scores.ocrConfidence,
+              parsingConfidence: scores.parsingConfidence,
               extractedData: row
             });
             
@@ -461,19 +483,30 @@
 
       window.updateProgress(50, 'PARSING PASTE BUFFER...');
       setTimeout(() => {
-        const parsedRows = window.parseLedgerText(text);
+        // PHASE 2: Classification Execution
+        const classification = ClassificationEngine.classifyDocument(text.substring(0, 1000), 'Pasted_Buffer.txt');
+        window.logSys(`Classification Engine identified buffer as [${classification.documentType}] with ${(classification.confidence * 100)}% confidence.`);
+
+        const parsedRows = window.parseLedgerText(text, classification.documentType);
         
         if(parsedRows.length > 0) {
-            // Apply Governance Stamp to Raw Text Ingestion
             const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
             
             extractedData = parsedRows.map(row => {
+                const scores = ConfidenceEngine.calculateScores({
+                    sourceType: "OCR_EXTRACTION",
+                    rawText: text.substring(0, 500),
+                    parsedRecord: row
+                });
+
                 const stampedRecord = ProvenanceEngine.stampRecord({
                   sourceFile: "Pasted_Buffer.txt",
                   sourceSystem: "Manual_Text_Entry",
                   sourceType: "OCR_EXTRACTION", 
                   entityContext: userSelectedEntity.toUpperCase(),
                   processedBy: "Lighthouse Engine v2 (Text Parser)",
+                  ocrConfidence: scores.ocrConfidence,
+                  parsingConfidence: scores.parsingConfidence,
                   extractedData: row
                 });
                 
@@ -494,7 +527,8 @@
       }, 300);
     };
 
-    window.parseLedgerText = (rawText) => {
+    // Modified to accept dynamic document type from Classification Engine
+    window.parseLedgerText = (rawText, classifiedDocType = "Unknown Document") => {
       const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       const rows = [];
       let currentVendor = "GENERAL VENDOR";
@@ -537,7 +571,7 @@
             vendor_name: currentVendor,
             voucher: "VCH-" + Math.floor(100000 + Math.random() * 900000),
             doc_number: "DOC-" + Math.floor(10000 + Math.random() * 90000),
-            type: "INV",
+            type: classifiedDocType, // Dynamically applied from Classification Engine
             doc_date: new Date(dateMatch[1]).toISOString(),
             doc_amount: docAmt,
             current_period: curAmt,
@@ -556,20 +590,24 @@
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
-        // Governance Extraction Wrapper
         const r = record.data; 
         const prov = record._provenance;
         const state = record._evidenceState;
 
+        // Visual flag for lower parsing scores
+        const scoreColor = prov.confidenceMetrics.parsingConfidence < 70 ? 'text-amber-400' : 'text-emerald-400';
+
         return `
-        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile} | Trust Level: ${prov.trustLevel} | State: ${state.status}">
+        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile} | Parse Score: ${prov.confidenceMetrics.parsingConfidence}% | State: ${state.status}">
           <td class="p-3 pl-4">
             <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext} | ${r.vendor_id}</span>
             ${r.vendor_name}
           </td>
           <td class="p-3 text-slate-400">${r.voucher}</td>
           <td class="p-3 text-slate-200 font-bold">${r.doc_number}</td>
-          <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">${r.type}</span></td>
+          <td class="p-3">
+            <span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] ${scoreColor}">${r.type}</span>
+          </td>
           <td class="p-3 text-slate-300">${r.doc_date}</td>
           <td class="p-3 text-right font-bold ${r.doc_amount < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${r.doc_amount.toFixed(2)}</td>
           <td class="p-3 text-right text-slate-300">$${r.current_period.toFixed(2)}</td>
@@ -615,19 +653,20 @@
         { header: 'Vendor Name', key: 'vendor_name', width: 28 },
         { header: 'Voucher', key: 'voucher', width: 16 },
         { header: 'Doc Number', key: 'doc_number', width: 18 },
-        { header: 'Type', key: 'type', width: 10 },
+        { header: 'Doc Type', key: 'type', width: 22 },
         { header: 'TRX Date', key: 'doc_date', width: 14 },
         { header: 'Doc Amount', key: 'doc_amount', width: 16 },
         { header: 'Current Period', key: 'current_period', width: 16 },
-        { header: 'Evidence State', key: 'evidence_state', width: 16 }
+        { header: 'Evidence State', key: 'evidence_state', width: 16 },
+        { header: 'Parse Score', key: 'parse_score', width: 12 }
       ];
 
       extractedData.forEach(record => {
-        // Flatten the record slightly for the Excel export
         const exportRow = { 
             ...record.data, 
             entity_context: record._provenance.entityContext,
-            evidence_state: record._evidenceState.status 
+            evidence_state: record._evidenceState.status,
+            parse_score: record._provenance.confidenceMetrics.parsingConfidence
         };
         sheet.addRow(exportRow);
       });
