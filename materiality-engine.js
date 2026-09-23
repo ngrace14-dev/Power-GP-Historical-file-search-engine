@@ -1,49 +1,59 @@
 /**
- * Materiality Engine - Phase 1
- * Evaluates financial variances, document amounts, and entity cross-footings
- * against configurable materiality thresholds to distinguish trivial rounding from material audit risk.
+ * Materiality Engine - Governance v6.0 Compliant
+ * Combines Absolute Dollar Thresholds with Relative Percentage Exposure
+ * to prevent false alarms on high-volume account balances.
  */
 
 export class MaterialityEngine {
     static DEFAULT_THRESHOLDS = {
-        lineItemMateriality: 1000,      // Variances >= $1,000 trigger Elevated Materiality
-        entityVarianceThreshold: 5000,  // Aggregate variances >= $5,000 trigger Critical Materiality
-        overallScopeThreshold: 25000    // High-value exposure threshold
+        absCriticalThreshold: 5000,      // $5,000 dollar variance
+        absSignificantThreshold: 1000,   // $1,000 dollar variance
+        relCriticalPercent: 5.0,         // 5.0% relative variance
+        relSignificantPercent: 1.0,     // 1.0% relative variance
+        highScopeAmount: 25000           // High-value audit scope threshold
     };
 
     /**
-     * Evaluates a single record against materiality thresholds
+     * Evaluates a single record using compound Absolute + Relative Materiality
      */
     static evaluateRecord(record, customThresholds = {}) {
         const config = { ...this.DEFAULT_THRESHOLDS, ...customThresholds };
         const data = record.data || record;
         
-        // Extract variance and total amounts
         const variance = Math.abs(parseFloat(record._validation?.variance || data.variance || 0));
         const amount = Math.abs(parseFloat(data.amount || data.doc_amount || data['Debit Amount'] || data['Credit Amount'] || 0));
 
+        const baseAmount = amount > 0 ? amount : 1;
+        const variancePercent = (variance / baseAmount) * 100;
+
         let materialityLevel = 'IMMATERIAL';
         let isMaterial = false;
-        let reason = 'Variance is below reporting threshold.';
+        let reason = 'Variance is below reporting and relative threshold.';
 
-        if (variance >= config.entityVarianceThreshold) {
+        // Compound Check: Requires BOTH Dollar Variance AND Relative % Variance
+        if (variance >= config.absCriticalThreshold && variancePercent >= config.relCriticalPercent) {
             materialityLevel = 'CRITICAL';
             isMaterial = true;
-            reason = `Material variance ($${variance.toFixed(2)}) exceeds entity threshold ($${config.entityVarianceThreshold.toFixed(2)}).`;
-        } else if (variance >= config.lineItemMateriality) {
-            materialityLevel = 'ELEVATED';
+            reason = `Critical: Variance ($${variance.toFixed(2)}) is ${variancePercent.toFixed(1)}% of base amount ($${amount.toFixed(2)}).`;
+        } else if (variance >= config.absSignificantThreshold && variancePercent >= config.relSignificantPercent) {
+            materialityLevel = 'SIGNIFICANT';
             isMaterial = true;
-            reason = `Variance ($${variance.toFixed(2)}) exceeds line-item threshold ($${config.lineItemMateriality.toFixed(2)}).`;
-        } else if (amount >= config.overallScopeThreshold) {
-            materialityLevel = 'HIGH_EXPOSURE';
-            isMaterial = false; // Significant exposure, but no balance variance
-            reason = `High-value exposure transaction ($${amount.toFixed(2)}).`;
+            reason = `Significant: Variance ($${variance.toFixed(2)}) is ${variancePercent.toFixed(1)}% of base amount ($${amount.toFixed(2)}).`;
+        } else if (variancePercent >= 10.0 && variance >= 100) {
+            materialityLevel = 'MODERATE';
+            isMaterial = true;
+            reason = `Relative Discrepancy: Variance ($${variance.toFixed(2)}) represents ${variancePercent.toFixed(1)}% of transaction total ($${amount.toFixed(2)}).`;
+        } else if (amount >= config.highScopeAmount) {
+            materialityLevel = 'HIGH_SCOPE';
+            isMaterial = false; // High exposure transaction, but no balance variance
+            reason = `High-value exposure scope ($${amount.toFixed(2)}).`;
         }
 
         return {
             isMaterial,
             materialityLevel,
             varianceAmount: variance,
+            variancePercent: parseFloat(variancePercent.toFixed(2)),
             recordAmount: amount,
             reason,
             thresholdsUsed: config
@@ -51,7 +61,7 @@ export class MaterialityEngine {
     }
 
     /**
-     * Evaluates an entire dataset and appends materiality metadata
+     * Evaluates a dataset and appends materiality metadata
      */
     static evaluateDataset(records = [], customThresholds = {}) {
         if (!Array.isArray(records) || records.length === 0) {
