@@ -185,7 +185,7 @@
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     
-    // UPDATED HOOKS: Pointing to root directory instead of ./modules/
+    // Flat-root imports for GitHub Pages compatibility
     import { ProvenanceEngine } from './provenance-engine.js'; 
     import { EvidenceStateEngine } from './evidence-state-engine.js'; 
     import { ConfidenceEngine } from './confidence-engine.js';
@@ -267,6 +267,7 @@
     window.logSys = (msg, type = 'info') => {
       fullDebugLog.push(`[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`);
       const terminal = document.getElementById('terminal-logs');
+      if (!terminal) return;
       const el = document.createElement('div');
       el.className = type === 'error' ? 'text-rose-400' : (type === 'success' ? 'text-emerald-400' : (type === 'warning' ? 'text-amber-400' : 'text-slate-400'));
       el.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
@@ -275,9 +276,12 @@
     };
 
     window.updateProgress = (pct, msg) => {
-      document.getElementById('progress-pct').innerText = `${Math.round(pct)}%`;
-      document.getElementById('progress-bar').style.width = `${pct}%`;
-      if (msg) document.getElementById('progress-text').innerText = msg;
+      const pctEl = document.getElementById('progress-pct');
+      const barEl = document.getElementById('progress-bar');
+      const textEl = document.getElementById('progress-text');
+      if (pctEl) pctEl.innerText = `${Math.round(pct)}%`;
+      if (barEl) barEl.style.width = `${pct}%`;
+      if (textEl && msg) textEl.innerText = msg;
     };
 
     window.resetState = () => {
