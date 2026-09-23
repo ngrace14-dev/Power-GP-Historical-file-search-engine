@@ -1,5 +1,3 @@
-// confidence-engine.js
-
 /**
  * Confidence Engine
  * Phase 1 Roadmap Requirement - OCR & Parsing Scoring
