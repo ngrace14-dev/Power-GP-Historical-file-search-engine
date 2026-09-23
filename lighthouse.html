@@ -11,7 +11,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -49,7 +48,7 @@
       </div>
       <div>
         <h1 class="text-sm sm:text-base font-bold tracking-wider text-white leading-tight">LIGHTHOUSE WORKSTATION</h1>
-        <p class="text-[10px] text-cyan-400 uppercase tracking-widest font-mono">Spatial Parsing & Relational Evidence Graph</p>
+        <p class="text-[10px] text-cyan-400 uppercase tracking-widest font-mono">Spatial Parsing & Evidence Graph Engine</p>
       </div>
     </div>
 
@@ -155,9 +154,10 @@
                 <th class="p-3">Doc Type</th>
                 <th class="p-3">TRX Date</th>
                 <th class="p-3 text-right">Amount</th>
-                <th class="p-3">Relational Graph Links</th>
-                <th class="p-3 text-center">Phase 1 Materiality Risk</th>
-                <th class="p-3 text-center">Phase 4 Validation Status</th>
+                <th class="p-3">Evidence Graph Links</th>
+                <th class="p-3 text-center">Corroboration</th>
+                <th class="p-3 text-center">Materiality</th>
+                <th class="p-3 text-center">Tie-Out Status</th>
               </tr>
             </thead>
             <tbody id="table-body" class="text-xs divide-y divide-slate-800 font-mono">
@@ -169,7 +169,7 @@
 
   </main>
 
-  <!-- GRAPH INSPECTOR MODAL WITH PRIMARY ANCHOR CONTEXT -->
+  <!-- GRAPH INSPECTOR MODAL WITH EXPLAINABILITY & TRANSPARENCY -->
   <div id="modal-relationship-inspector" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-cyan-500/30 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-100">
       <div class="px-5 py-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
@@ -188,7 +188,7 @@
 
         <div>
           <h4 class="font-bold text-slate-300 mb-2 flex items-center gap-1.5">
-            <i data-lucide="link" class="w-3.5 h-3.5 text-cyan-400"></i> Connected Relational Edges (<span id="graph-modal-count">0</span>)
+            <i data-lucide="link" class="w-3.5 h-3.5 text-cyan-400"></i> Validated Relational Edges
           </h4>
           <div id="graph-modal-links" class="space-y-2"></div>
         </div>
@@ -196,25 +196,6 @@
 
       <div class="px-5 py-3 border-t border-slate-800 bg-slate-950 flex justify-end">
         <button onclick="closeGraphModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Inspector</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- AI AUDIT ASSISTANT REASONING MODAL -->
-  <div id="modal-ai-result" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-100">
-      <div class="px-5 py-3 border-b border-slate-800 bg-gradient-to-r from-purple-950 to-slate-900 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
-          <h3 class="text-xs font-bold uppercase tracking-wider text-purple-200">AI Audit & Financial Reasoning Engine</h3>
-        </div>
-        <button onclick="closeAiModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-sm font-sans leading-relaxed text-slate-300" id="ai-response-content">
-        Loading...
-      </div>
-      <div class="px-5 py-3 border-t border-slate-800 bg-slate-950 flex justify-end">
-        <button onclick="closeAiModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Report</button>
       </div>
     </div>
   </div>
@@ -249,7 +230,7 @@
     import { ValidationEngine } from './validation-engine.js';
     import { RelationshipEngine } from './relationship-engine.js';
     import { GeminiService } from './gemini-service.js';
-    import { MaterialityEngine } from './materiality-engine.js'; // Phase 1 Import
+    import { AIGovernanceEngine } from './ai-governance.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -293,52 +274,53 @@
       }
     });
 
-    // GRAPH INSPECTOR MODAL HANDLER WITH ANCHOR CONTEXT
+    // GRAPH INSPECTOR WITH EXPLICIT REASON TRACEABILITY
     window.viewGraphLinks = (recordId) => {
       const record = extractedData.find(r => r._id === recordId || r.data?.row_id === recordId);
       if (!record || !record._relationships) return;
 
       const r = record.data || record;
       const rel = record._relationships;
-      const invNum = r.invoiceNumber || r.doc_number || r['Invoice Number'] || '-';
-      const voucherNum = r.voucherNumber || r.voucher || r['Journal Entry'] || '-';
+      const invNum = r.invoiceNumber || r.doc_number || '-';
+      const voucherNum = r.voucherNumber || r.voucher || '-';
       
       document.getElementById('graph-modal-primary').innerHTML = `
         <div class="flex justify-between items-center text-sm">
-          <span class="text-cyan-300 font-bold">${record._provenance?.entityContext || 'ENTITY'} | ${r.vendor || r.vendor_name || r['Originating Master Name'] || 'Vendor'}</span>
-          <span class="text-emerald-400 font-bold">$${parseFloat(r.amount || r.doc_amount || r['Debit Amount'] || r['Credit Amount'] || 0).toFixed(2)}</span>
+          <span class="text-cyan-300 font-bold">${record._provenance?.entityContext || 'ENTITY'} | ${r.vendor || r.vendor_name || 'Vendor'}</span>
+          <span class="text-emerald-400 font-bold">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</span>
         </div>
         <div class="text-[11px] text-slate-400 mt-1 font-mono">
-          Matched Edge Key: <span class="text-cyan-400 font-bold">Invoice #${invNum}</span> | Voucher / JE: ${voucherNum}
+          Ref Invoice #${invNum} | JE: ${voucherNum} | Corroboration Level: <span class="text-amber-400 font-bold">Level ${record._corroboration?.corroborationLevel || 'A'} (${record._corroboration?.sourceCount || 1} Source)</span>
         </div>
       `;
 
-      document.getElementById('graph-modal-count').textContent = rel.totalConnectedRecords;
-
-      const allLinkedIds = [
-        ...rel.linkedInvoices,
-        ...rel.linkedJournalEntries,
-        ...rel.linkedVendorRecords,
-        ...rel.linkedAccountRecords
-      ];
-
-      const uniqueIds = Array.from(new Set(allLinkedIds));
+      const allValidEdges = [...rel.tier1Edges, ...rel.tier2Edges];
 
       let linksHtml = '';
-      if (uniqueIds.length === 0) {
-        linksHtml = `<div class="p-4 text-center text-slate-500">No cross-document links discovered for this record.</div>`;
+      if (allValidEdges.length === 0) {
+        linksHtml = `<div class="p-4 text-center text-slate-500">No Tier 1 or Tier 2 evidence links discovered for this record.</div>`;
       } else {
-        linksHtml = uniqueIds.map(id => {
-          const linkedRec = extractedData.find(item => item._id === id || item.data?.row_id === id);
+        linksHtml = allValidEdges.map(edge => {
+          const linkedRec = extractedData.find(item => item._id === edge.targetId || item.data?.row_id === edge.targetId);
           if (!linkedRec) return '';
           const lr = linkedRec.data || linkedRec;
+          const tierBadge = edge.tier === 1 
+            ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">Tier 1 Evidence</span>`
+            : `<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">Tier 2 Corroboration</span>`;
+
           return `
-            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between hover:border-slate-700 transition">
-              <div>
-                <span class="font-bold text-cyan-400 text-[11px]">${linkedRec._provenance?.entityContext || 'ENTITY'} | ${lr.vendor || lr.vendor_name || lr['Originating Master Name'] || 'Vendor'}</span>
-                <p class="text-[10px] font-mono text-slate-400 mt-0.5">Inv: ${lr.invoiceNumber || lr.doc_number || lr['Invoice Number'] || '-'} | JE: ${lr.voucherNumber || lr.voucher || lr['Journal Entry'] || '-'}</p>
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col gap-1.5 hover:border-slate-700 transition">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  ${tierBadge}
+                  <span class="font-bold text-cyan-400 text-[11px]">${linkedRec._provenance?.entityContext || 'ENTITY'} | ${lr.vendor || lr.vendor_name}</span>
+                </div>
+                <span class="text-xs font-mono font-bold text-emerald-400">$${parseFloat(lr.amount || lr.doc_amount || 0).toFixed(2)}</span>
               </div>
-              <span class="text-xs font-mono font-bold text-emerald-400">$${parseFloat(lr.amount || lr.doc_amount || lr['Debit Amount'] || lr['Credit Amount'] || 0).toFixed(2)}</span>
+              <div class="text-[10px] font-mono text-slate-400 bg-slate-900/60 p-2 rounded border border-slate-800/80">
+                <span class="text-slate-300 font-semibold block mb-0.5">Audit Reason Trace:</span>
+                ${edge.reasons.map(res => `<div>&bull; ${res}</div>`).join('')}
+              </div>
             </div>
           `;
         }).join('');
@@ -353,483 +335,49 @@
       document.getElementById('modal-relationship-inspector').classList.add('hidden');
     };
 
-    window.askAiAssistant = async () => {
-      if (!extractedData || extractedData.length === 0) {
-        return alert("No extracted data available to analyze. Please pull cloud ledgers or ingest a document first.");
-      }
-
-      const userQuery = prompt("Ask AI Audit Assistant (e.g. 'Identify anomalies or variance flags across these digitized ledgers', 'Summarize top vendor exposure'):");
-      if (!userQuery) return;
-
-      const modal = document.getElementById('modal-ai-result');
-      const content = document.getElementById('ai-response-content');
-      
-      modal.classList.remove('hidden');
-      content.innerHTML = '<div class="flex items-center gap-3 text-purple-400 font-bold justify-center py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Analyzing digitized Lighthouse records with AI reasoning engine...</div>';
-      lucide.createIcons();
-
-      try {
-        const gemini = new GeminiService();
-        const payloadToAnalyze = extractedData.map(d => d.data || d);
-        
-        const responseText = await gemini.queryEvidence(
-          userQuery, 
-          payloadToAnalyze, 
-          "LIGHTHOUSE_STUDIO"
-        );
-
-        let formattedHtml = responseText
-          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.*?)\*/g, '<em>$1</em>')
-          .replace(/\n/g, '<br/>')
-          .replace(/- /g, '&bull; ');
-
-        content.innerHTML = `<div class="bg-purple-950/50 p-4 rounded-xl mb-4 text-purple-200 border border-purple-500/20 font-mono text-xs"><i data-lucide="message-square-text" class="w-4 h-4 inline mr-1"></i> Audit Scope: "${userQuery}"</div>${formattedHtml}`;
-        lucide.createIcons();
-      } catch (err) {
-        content.innerHTML = `<div class="p-5 text-rose-400 font-bold bg-rose-950/50 border border-rose-500/30 rounded-xl"><i data-lucide="alert-triangle" class="w-5 h-5 inline mr-2"></i> Error: ${err.message}</div>`;
-        lucide.createIcons();
-      }
-    };
-
-    window.closeAiModal = () => {
-      document.getElementById('modal-ai-result').classList.add('hidden');
-    };
-
-    window.switchTab = (tab) => {
-      const tabCloud = document.getElementById('tab-cloud');
-      const tabPdf = document.getElementById('tab-pdf');
-      const tabText = document.getElementById('tab-text');
-      const viewCloud = document.getElementById('view-cloud');
-      const viewPdf = document.getElementById('view-pdf');
-      const viewText = document.getElementById('view-text');
-
-      tabCloud.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
-      tabPdf.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
-      tabText.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
-
-      viewCloud.classList.add('hidden'); viewCloud.classList.remove('flex');
-      viewPdf.classList.add('hidden'); viewPdf.classList.remove('flex');
-      viewText.classList.add('hidden'); viewText.classList.remove('flex');
-
-      if (tab === 'cloud') {
-        tabCloud.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
-        viewCloud.classList.remove('hidden'); viewCloud.classList.add('flex');
-      } else if (tab === 'pdf') {
-        tabPdf.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
-        viewPdf.classList.remove('hidden'); viewPdf.classList.add('flex');
-      } else {
-        tabText.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
-        viewText.classList.remove('hidden'); viewText.classList.add('flex');
-      }
-    };
-
-    window.logSys = (msg, type = 'info') => {
-      fullDebugLog.push(`[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`);
-      const terminal = document.getElementById('terminal-logs');
-      const el = document.createElement('div');
-      el.className = type === 'error' ? 'text-rose-400' : (type === 'success' ? 'text-emerald-400' : (type === 'warning' ? 'text-amber-400' : 'text-slate-400'));
-      el.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      terminal.appendChild(el);
-      terminal.scrollTop = terminal.scrollHeight;
-    };
-
-    window.updateProgress = (pct, msg) => {
-      document.getElementById('progress-pct').innerText = `${Math.round(pct)}%`;
-      document.getElementById('progress-bar').style.width = `${pct}%`;
-      if (msg) document.getElementById('progress-text').innerText = msg;
-    };
-
-    window.resetState = () => {
-      extractedData = [];
-      originalFileName = "";
-      fullDebugLog = [];
-      document.getElementById('pdf-upload').value = '';
-      document.getElementById('raw-text-input').value = '';
-      document.getElementById('upload-section').classList.remove('hidden');
-      document.getElementById('progress-section').classList.add('hidden');
-      document.getElementById('results-section').classList.add('hidden');
-      document.getElementById('terminal-logs').innerHTML = '<div>System initialized. Connected to Firebase Storage.</div>';
-      document.getElementById('table-body').innerHTML = '';
-      document.getElementById('btn-download').disabled = true;
-      document.getElementById('btn-pass').disabled = true;
-      window.updateProgress(0, 'ANALYZING DOCUMENT...');
-    };
-
-    window.pullCloudLedgers = async () => {
-      document.getElementById('upload-section').classList.add('hidden');
-      document.getElementById('progress-section').classList.remove('hidden');
-      document.getElementById('results-section').classList.add('hidden');
-
-      extractedData = [];
-      window.logSys('Connecting to Firebase Storage bucket: RREDCO Power GP...');
-      window.updateProgress(10, 'FETCHING CLOUD FILES...');
-
-      try {
-        const folderRef = ref(storage, 'RREDCO Power GP');
-        const result = await listAll(folderRef);
-        const xlsxFiles = result.items.filter(item => item.name.endsWith('.xlsx'));
-
-        window.logSys(`Found ${xlsxFiles.length} entity ledger files in Cloud Storage.`);
-
-        let rowId = 1;
-        for (let idx = 0; idx < xlsxFiles.length; idx++) {
-          const fileRef = xlsxFiles[idx];
-          const pct = 10 + Math.round(((idx + 1) / xlsxFiles.length) * 80);
-          window.updateProgress(pct, `DOWNLOADING & DIGITIZING ${fileRef.name} (${idx + 1}/${xlsxFiles.length})`);
-
-          const classification = ClassificationEngine.classifyDocument('', fileRef.name);
-          const docType = classification.documentType === 'Unknown Document' ? 'General Ledger Export' : classification.documentType;
-
-          const url = await getDownloadURL(fileRef);
-          const response = await fetch(url);
-          const arrayBuffer = await response.arrayBuffer();
-          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-          const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0], short: "UNKNOWN" };
-          const batchRows = [];
-
-          for (let r = 1; r < Math.min(2000, raw2D.length); r++) {
-            const row = raw2D[r];
-            if (!row || row.length === 0 || row.every(c => c === null || c === undefined || String(c).trim() === '')) continue;
-
-            let docAmt = parseFloat(row[7]) || 0;
-            let curAmt = parseFloat(row[8]) || 0;
-            
-            const rawRecord = {
-              row_id: `ROW_${rowId++}`,
-              vendor_id: String(row[0] || entityMatch.name),
-              vendor_name: String(row[2] || 'MASTER GL RECORD'),
-              voucher: String(row[1] || 'JE-CLK'),
-              doc_number: String(row[3] || 'INV-CLK'),
-              type: docType,
-              doc_date: row[4] ? String(row[4]) : new Date().toLocaleDateString(),
-              doc_amount: docAmt,
-              current_period: curAmt,
-              _cross_foot_valid: true
-            };
-
-            const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
-            normalizedRecord.type = docType;
-            batchRows.push(normalizedRecord);
-          }
-
-          const validation = ValidationEngine.validatePayload(batchRows, docType);
-          window.logSys(`Phase 4 Validation for ${fileRef.name}: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
-
-          batchRows.forEach(normalizedRecord => {
-            const scores = ConfidenceEngine.calculateScores({
-                sourceType: "NATIVE_EXPORT",
-                parsedRecord: normalizedRecord
-            });
-
-            const stampedRecord = ProvenanceEngine.stampRecord({
-              sourceFile: fileRef.name,
-              sourceSystem: "Firebase_Storage",
-              sourceType: "NATIVE_EXPORT", 
-              entityContext: entityMatch.short || "UNKNOWN", 
-              processedBy: "Lighthouse Engine v2 (Phase 5 Graph Enriched)",
-              ocrConfidence: scores.ocrConfidence,
-              parsingConfidence: scores.parsingConfidence,
-              extractedData: normalizedRecord
-            });
-
-            const finalRecord = {
-                _id: stampedRecord.data?.row_id || `LH_REC_${Date.now()}_${Math.random()}`,
-                _provenance: stampedRecord._provenance,
-                data: stampedRecord.data,
-                _validation: validation,
-                _evidenceState: EvidenceStateEngine.initializeState({
-                    hasVariance: validation.tieOutStatus === 'FAIL'
-                })
-            };
-
-            extractedData.push(finalRecord);
-          });
-        }
-
-        // Phase 5 Relationship Engine Discovery
-        extractedData = RelationshipEngine.buildRelationships(extractedData);
-        
-        // Phase 1 Materiality Evaluation
-        const materialityRes = MaterialityEngine.evaluateDataset(extractedData);
-        extractedData = materialityRes.records;
-        window.logSys(`Phase 1 Materiality Evaluation complete. Flagged ${materialityRes.totalMaterialCount} material audit variances.`, materialityRes.totalMaterialCount > 0 ? 'warning' : 'success');
-
-        window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
-        window.renderResults(extractedData);
-
-      } catch (err) {
-        window.logSys(`Cloud Pull Error: ${err.message}`, 'error');
-        window.updateProgress(0, 'PULL FAILED');
-      }
-    };
-
-    window.handleFileUpload = async (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      originalFileName = file.name;
-      document.getElementById('upload-section').classList.add('hidden');
-      document.getElementById('progress-section').classList.remove('hidden');
-
-      window.logSys(`Ingesting file: ${file.name}`);
-      window.updateProgress(10, 'LOADING PDF ENGINE...');
-
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-        let fullText = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-          window.updateProgress(10 + ((i / pdf.numPages) * 70), `SPATIAL OCR - PAGE ${i}/${pdf.numPages}`);
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-
-          let rows = [];
-          textContent.items.forEach(item => {
-            let str = item.str.trim();
-            if (str.length === 0) return;
-            let y = item.transform[5], x = item.transform[4];
-            let foundRow = rows.find(r => Math.abs(r.y - y) < 8);
-            if (foundRow) foundRow.items.push({ x: x, str: item.str });
-            else rows.push({ y: y, items: [{ x: x, str: item.str }] });
-          });
-
-          rows.sort((a, b) => b.y - a.y);
-          rows.forEach(r => {
-            r.items.sort((a, b) => a.x - b.x);
-            fullText += r.items.map(it => it.str).join(' ') + '\n';
-          });
-        }
-
-        const classification = ClassificationEngine.classifyDocument(fullText.substring(0, 1000), file.name);
-        window.logSys(`Classification Engine identified document as [${classification.documentType}] with ${(classification.confidence * 100)}% confidence.`);
-
-        window.updateProgress(85, 'EXECUTING PARSER & VALIDATION...');
-        const parsedRows = window.parseLedgerText(fullText, classification.documentType);
-
-        if (parsedRows.length === 0) throw new Error("No transactions detected.");
-
-        const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
-
-        const normalizedRows = parsedRows.map(row => {
-            const norm = ExtractionEngine.extractFields(row, classification.documentType, userSelectedEntity.toUpperCase());
-            norm.type = classification.documentType;
-            return norm;
-        });
-
-        const validation = ValidationEngine.validatePayload(normalizedRows, classification.documentType);
-        window.logSys(`Phase 4 Validation Result: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
-
-        extractedData = normalizedRows.map((row, idx) => {
-            const scores = ConfidenceEngine.calculateScores({
-                sourceType: "SOURCE_PDF",
-                rawText: fullText.substring(0, 500), 
-                parsedRecord: row
-            });
-
-            const stampedRecord = ProvenanceEngine.stampRecord({
-              sourceFile: originalFileName,
-              sourceSystem: "Local_Upload",
-              sourceType: "SOURCE_PDF", 
-              entityContext: userSelectedEntity.toUpperCase(),
-              processedBy: "Lighthouse Engine v2 (Phase 5 Graph Enriched)",
-              ocrConfidence: scores.ocrConfidence,
-              parsingConfidence: scores.parsingConfidence,
-              extractedData: row
-            });
-            
-            return {
-                _id: `PDF_REC_${idx}_${Date.now()}`,
-                _provenance: stampedRecord._provenance,
-                data: stampedRecord.data,
-                _validation: validation,
-                _evidenceState: EvidenceStateEngine.initializeState({
-                    hasVariance: validation.tieOutStatus === 'FAIL'
-                })
-            };
-        });
-
-        extractedData = RelationshipEngine.buildRelationships(extractedData);
-        extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
-
-        window.updateProgress(100, 'EXTRACTION & GRAPH MAPPING COMPLETE');
-        window.renderResults(extractedData);
-
-      } catch (err) {
-        window.logSys(`Extraction Error: ${err.message}`, 'error');
-        window.updateProgress(0, 'PARSING FAILED');
-      }
-    };
-
-    window.handleTextProcess = () => {
-      const text = document.getElementById('raw-text-input').value;
-      if (!text.trim()) return window.logSys('No text provided', 'warning');
-
-      document.getElementById('upload-section').classList.add('hidden');
-      document.getElementById('progress-section').classList.remove('hidden');
-
-      window.updateProgress(50, 'PARSING PASTE BUFFER...');
-      setTimeout(() => {
-        const classification = ClassificationEngine.classifyDocument(text.substring(0, 1000), 'Pasted_Buffer.txt');
-        window.logSys(`Classification Engine identified buffer as [${classification.documentType}] with ${(classification.confidence * 100)}% confidence.`);
-
-        const parsedRows = window.parseLedgerText(text, classification.documentType);
-        
-        if(parsedRows.length > 0) {
-            const userSelectedEntity = window.prompt("Enter Entity Code (e.g., POMCO, RREDCO) to satisfy Governance rules:", "POMCO") || "UNKNOWN";
-            
-            const normalizedRows = parsedRows.map(row => {
-                const norm = ExtractionEngine.extractFields(row, classification.documentType, userSelectedEntity.toUpperCase());
-                norm.type = classification.documentType;
-                return norm;
-            });
-
-            const validation = ValidationEngine.validatePayload(normalizedRows, classification.documentType);
-            window.logSys(`Phase 4 Validation Result: [${validation.tieOutStatus}] - ${validation.message}`, validation.tieOutStatus === 'PASS' ? 'success' : 'warning');
-
-            extractedData = normalizedRows.map((row, idx) => {
-                const scores = ConfidenceEngine.calculateScores({
-                    sourceType: "OCR_EXTRACTION",
-                    rawText: text.substring(0, 500),
-                    parsedRecord: row
-                });
-
-                const stampedRecord = ProvenanceEngine.stampRecord({
-                  sourceFile: "Pasted_Buffer.txt",
-                  sourceSystem: "Manual_Text_Entry",
-                  sourceType: "OCR_EXTRACTION", 
-                  entityContext: userSelectedEntity.toUpperCase(),
-                  processedBy: "Lighthouse Engine v2 (Phase 5 Graph Enriched)",
-                  ocrConfidence: scores.ocrConfidence,
-                  parsingConfidence: scores.parsingConfidence,
-                  extractedData: row
-                });
-                
-                return {
-                    _id: `TXT_REC_${idx}_${Date.now()}`,
-                    _provenance: stampedRecord._provenance,
-                    data: stampedRecord.data,
-                    _validation: validation,
-                    _evidenceState: EvidenceStateEngine.initializeState({
-                        hasVariance: validation.tieOutStatus === 'FAIL'
-                    })
-                };
-            });
-
-            extractedData = RelationshipEngine.buildRelationships(extractedData);
-            extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
-        } else {
-            extractedData = [];
-        }
-
-        window.updateProgress(100, 'COMPLETE');
-        window.renderResults(extractedData);
-      }, 300);
-    };
-
-    window.parseLedgerText = (rawText, classifiedDocType = "Unknown Document") => {
-      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      const rows = [];
-      let currentVendor = "GENERAL VENDOR";
-      let currentVendorId = "UNKNOWN";
-      let rowId = 1;
-
-      const dateRegex = /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/;
-      const amountRegex = /(\(?-?\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})\)?)/g;
-
-      lines.forEach(line => {
-        const lower = line.toLowerCase();
-        if (lower.includes("vendor") || lower.includes("name:")) {
-          let vMatch = line.match(/Vendor\s*ID:?\s*([A-Z0-9.-]+)/i);
-          if (vMatch) currentVendorId = vMatch[1];
-          let nMatch = line.replace(/Vendor\s*ID:?\s*[A-Z0-9.-]+/ig, '').replace(/Name:/ig, '').trim();
-          if (nMatch) currentVendor = nMatch;
-          return;
-        }
-
-        let dateMatch = line.match(dateRegex);
-        let amounts = [...line.matchAll(amountRegex)].map(m => m[1]);
-
-        if (dateMatch && amounts.length > 0) {
-          const parseAmt = (s) => {
-            let isNeg = s.includes('(') || s.includes('-');
-            let clean = parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
-            return isNeg ? -clean : clean;
-          };
-
-          let numAmounts = amounts.map(parseAmt);
-          let docAmt = numAmounts[0] || 0;
-          let curAmt = numAmounts[1] || docAmt;
-          let d31 = numAmounts[2] || 0, d61 = numAmounts[3] || 0, d91 = numAmounts[4] || 0;
-
-          let isCrossFootValid = Math.abs(docAmt - (curAmt + d31 + d61 + d91)) < 0.05;
-
-          rows.push({
-            row_id: `RAW_ROW_${rowId++}`,
-            vendor_id: currentVendorId,
-            vendor_name: currentVendor,
-            voucher: "VCH-" + Math.floor(100000 + Math.random() * 900000),
-            doc_number: "DOC-" + Math.floor(10000 + Math.random() * 90000),
-            type: classifiedDocType,
-            doc_date: new Date(dateMatch[1]).toISOString(),
-            doc_amount: docAmt,
-            current_period: curAmt,
-            days_31_60: d31, days_61_90: d61, days_91_over: d91,
-            _cross_foot_valid: isCrossFootValid
-          });
-        }
-      });
-      return rows;
-    };
-
     window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted, normalized, validated, and materiality evaluated.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, normalized, validated, and relationship graph mapped.`;
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
         const r = record.data || record; 
         const prov = record._provenance || {};
         const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
-        const rel = record._relationships || { hasLinks: false, totalConnectedRecords: 0 };
-        const mat = record._materiality || { materialityLevel: 'IMMATERIAL', isMaterial: false, reason: '' };
+        const rel = record._relationships || { hasLinks: false, evidenceCount: 0, corroboratingCount: 0 };
+        const mat = AIGovernanceEngine.classifyMateriality(r.amount || r.doc_amount, val.variance);
+        const corr = record._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
         const recId = record._id || r.row_id;
 
-        const scoreColor = (prov.confidenceMetrics?.parsingConfidence || 100) < 70 ? 'text-amber-400' : 'text-emerald-400';
-
-        let materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400 border border-slate-700">Immaterial</span>`;
-        if (mat.materialityLevel === 'CRITICAL') {
-          materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold" title="${mat.reason}">CRITICAL VAR</span>`;
-        } else if (mat.materialityLevel === 'ELEVATED') {
-          materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold" title="${mat.reason}">ELEVATED VAR</span>`;
-        } else if (mat.materialityLevel === 'HIGH_EXPOSURE') {
-          materialityBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold" title="${mat.reason}">HIGH SCOPE</span>`;
+        let linkDisplay = `<span class="text-slate-500 text-[10px]">Unlinked</span>`;
+        if (rel.hasLinks) {
+          linkDisplay = `
+            <button onclick="viewGraphLinks('${recId}')" class="flex items-center gap-1 cursor-pointer">
+              ${rel.evidenceCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">${rel.evidenceCount} Evid</span>` : ''}
+              ${rel.corroboratingCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">${rel.corroboratingCount} Corrob</span>` : ''}
+            </button>
+          `;
         }
 
+        let matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400">Immaterial</span>`;
+        if (mat.level === 'CRITICAL') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">Critical</span>`;
+        else if (mat.level === 'SIGNIFICANT') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">Significant</span>`;
+
         return `
-        <tr class="hover:bg-slate-800/50 transition" title="Source: ${prov.sourceFile || 'Local'} | Connected Links: ${rel.totalConnectedRecords}">
+        <tr class="hover:bg-slate-800/50 transition">
           <td class="p-3 pl-4">
             <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext || 'ENTITY'} | ${r.accountNumber || r.vendor_id}</span>
             ${r.vendor || r.vendor_name}
           </td>
           <td class="p-3 text-slate-400">${r.voucherNumber || r.voucher}</td>
           <td class="p-3 text-slate-200 font-bold">${r.invoiceNumber || r.doc_number}</td>
-          <td class="p-3">
-            <span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] ${scoreColor}">${r.type}</span>
-          </td>
+          <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300">${r.type}</span></td>
           <td class="p-3 text-slate-300">${r.transactionDate || r.doc_date}</td>
           <td class="p-3 text-right font-bold ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
-          <td class="p-3 text-slate-300">
-            ${rel.hasLinks 
-              ? `<button onclick="viewGraphLinks('${recId}')" class="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 font-bold flex items-center gap-1 transition shadow-xs cursor-pointer"><i class="ph ph-tree-structure text-xs"></i> ${rel.totalConnectedRecords} Links</button>` 
-              : `<span class="text-slate-500 text-[10px]">Unlinked</span>`}
-          </td>
-          <td class="p-3 text-center">${materialityBadge}</td>
+          <td class="p-3">${linkDisplay}</td>
+          <td class="p-3 text-center"><span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span></td>
+          <td class="p-3 text-center">${matBadge}</td>
           <td class="p-3 text-center">
             ${val.tieOutStatus === 'PASS' 
               ? `<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">PASS</span>`
@@ -841,76 +389,6 @@
       document.getElementById('btn-download').disabled = false;
       document.getElementById('btn-pass').disabled = false;
       lucide.createIcons();
-    };
-
-    window.stageAuditData = async () => {
-      if (extractedData.length === 0) return;
-      try {
-        const db = await openAuditDB();
-        const tx = db.transaction('staging', 'readwrite');
-        const store = tx.objectStore('staging');
-
-        const getReq = store.get('rredco_audit_staging');
-        getReq.onsuccess = () => {
-          const existingRecords = getReq.result || [];
-          const combinedRecords = [...existingRecords, ...extractedData];
-          store.put(combinedRecords, 'rredco_audit_staging');
-        };
-
-        tx.oncomplete = () => {
-          const btn = document.getElementById('btn-pass');
-          btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
-          btn.classList.remove('from-cyan-400', 'to-cyan-500');
-          btn.classList.add('from-emerald-400', 'to-emerald-500');
-          window.logSys(`Successfully staged ${extractedData.length} graph-enriched records to IndexedDB for ledger.html terminal.`, 'success');
-        };
-      } catch (err) {
-        window.logSys(`Failed to save staging data: ${err.message}`, 'error');
-      }
-    };
-
-    window.downloadExcel = async () => {
-      if (extractedData.length === 0) return;
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('Lighthouse Audit');
-
-      sheet.columns = [
-        { header: 'Entity Context', key: 'entity_context', width: 14 },
-        { header: 'Vendor / Entity Name', key: 'vendor', width: 28 },
-        { header: 'Voucher Number', key: 'voucherNumber', width: 16 },
-        { header: 'Invoice Number', key: 'invoiceNumber', width: 18 },
-        { header: 'Doc Type', key: 'type', width: 22 },
-        { header: 'TRX Date', key: 'transactionDate', width: 14 },
-        { header: 'Amount', key: 'amount', width: 16 },
-        { header: 'Connected Links', key: 'links_count', width: 16 },
-        { header: 'Materiality Risk', key: 'materiality_risk', width: 16 },
-        { header: 'Tie-Out Status', key: 'tie_out_status', width: 14 },
-        { header: 'Variance', key: 'variance', width: 12 },
-        { header: 'Evidence State', key: 'evidence_state', width: 16 },
-        { header: 'Parse Score', key: 'parse_score', width: 12 }
-      ];
-
-      extractedData.forEach(record => {
-        const r = record.data || record;
-        const exportRow = { 
-            ...r, 
-            entity_context: record._provenance?.entityContext || 'ENTITY',
-            links_count: record._relationships?.totalConnectedRecords || 0,
-            materiality_risk: record._materiality?.materialityLevel || 'IMMATERIAL',
-            tie_out_status: record._validation?.tieOutStatus || 'PASS',
-            variance: record._validation?.variance || 0,
-            evidence_state: record._evidenceState?.status || 'Accepted',
-            parse_score: record._provenance?.confidenceMetrics?.parsingConfidence || 100
-        };
-        sheet.addRow(exportRow);
-      });
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `Digitized_Lighthouse_Schedule_${Date.now()}.xlsx`;
-      a.click();
     };
 
     lucide.createIcons();
