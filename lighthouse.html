@@ -168,9 +168,9 @@
 
   </main>
 
-  <!-- GRAPH INSPECTOR MODAL -->
+  <!-- GRAPH INSPECTOR MODAL WITH PRIMARY ANCHOR CONTEXT -->
   <div id="modal-relationship-inspector" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-cyan-500/30 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col overflow-hidden text-slate-100">
+    <div class="bg-slate-900 border border-cyan-500/30 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-100">
       <div class="px-5 py-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <i data-lucide="git-fork" class="w-4 h-4 text-cyan-400"></i>
@@ -178,16 +178,24 @@
         </div>
         <button onclick="closeGraphModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
+      
       <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
-        <div class="bg-slate-950 border border-cyan-500/20 rounded-xl p-3">
-          <span class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Primary Reference Record</span>
-          <div id="graph-modal-primary" class="mt-1 font-mono text-slate-200"></div>
+        <!-- PRIMARY REFERENCE RECORD (ANCHOR CONTEXT) -->
+        <div class="bg-cyan-950/40 border border-cyan-500/40 rounded-xl p-3.5 shadow-inner">
+          <span class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider block mb-1">Primary Reference Record (Clicked Line Item)</span>
+          <div id="graph-modal-primary" class="font-mono text-slate-100 font-semibold">
+            <!-- Dynamically populated with clicked record entity, vendor, amount, and matching edge -->
+          </div>
         </div>
+
         <div>
-          <h4 class="font-bold text-slate-300 mb-2 flex items-center gap-1.5"><i data-lucide="link" class="w-3.5 h-3.5 text-cyan-400"></i> Connected Evidence Edges (<span id="graph-modal-count">0</span>)</h4>
+          <h4 class="font-bold text-slate-300 mb-2 flex items-center gap-1.5">
+            <i data-lucide="link" class="w-3.5 h-3.5 text-cyan-400"></i> Connected Relational Edges (<span id="graph-modal-count">0</span>)
+          </h4>
           <div id="graph-modal-links" class="space-y-2"></div>
         </div>
       </div>
+
       <div class="px-5 py-3 border-t border-slate-800 bg-slate-950 flex justify-end">
         <button onclick="closeGraphModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">Close Inspector</button>
       </div>
@@ -286,17 +294,25 @@
       }
     });
 
-    // GRAPH INSPECTOR MODAL HANDLER FOR LIGHTHOUSE
+    // GRAPH INSPECTOR MODAL HANDLER WITH ANCHOR CONTEXT
     window.viewGraphLinks = (recordId) => {
       const record = extractedData.find(r => r._id === recordId || r.data?.row_id === recordId);
       if (!record || !record._relationships) return;
 
       const r = record.data || record;
       const rel = record._relationships;
+      const invNum = r.invoiceNumber || r.doc_number || r['Invoice Number'] || '-';
+      const voucherNum = r.voucherNumber || r.voucher || r['Journal Entry'] || '-';
       
+      // ANCHOR HEADER POPULATION
       document.getElementById('graph-modal-primary').innerHTML = `
-        <div class="font-bold text-cyan-300">${record._provenance?.entityContext || 'UNKNOWN'} | ${r.vendor || r.vendor_name || 'Vendor'}</div>
-        <div class="text-[11px] text-slate-400 mt-0.5">Inv: ${r.invoiceNumber || r.doc_number || '-'} | JE: ${r.voucherNumber || r.voucher || '-'} | Amt: $${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</div>
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-cyan-300 font-bold">${record._provenance?.entityContext || 'ENTITY'} | ${r.vendor || r.vendor_name || r['Originating Master Name'] || 'Vendor'}</span>
+          <span class="text-emerald-400 font-bold">$${parseFloat(r.amount || r.doc_amount || r['Debit Amount'] || r['Credit Amount'] || 0).toFixed(2)}</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1 font-mono">
+          Matched Edge Key: <span class="text-cyan-400 font-bold">Invoice #${invNum}</span> | Voucher / JE: ${voucherNum}
+        </div>
       `;
 
       document.getElementById('graph-modal-count').textContent = rel.totalConnectedRecords;
@@ -319,12 +335,12 @@
           if (!linkedRec) return '';
           const lr = linkedRec.data || linkedRec;
           return `
-            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between hover:border-slate-700 transition">
               <div>
-                <span class="font-bold text-cyan-400 text-[11px]">${linkedRec._provenance?.entityContext || 'ENTITY'} | ${lr.vendor || lr.vendor_name}</span>
-                <p class="text-[10px] font-mono text-slate-400 mt-0.5">Inv: ${lr.invoiceNumber || lr.doc_number || '-'} | JE: ${lr.voucherNumber || lr.voucher || '-'}</p>
+                <span class="font-bold text-cyan-400 text-[11px]">${linkedRec._provenance?.entityContext || 'ENTITY'} | ${lr.vendor || lr.vendor_name || lr['Originating Master Name'] || 'Vendor'}</span>
+                <p class="text-[10px] font-mono text-slate-400 mt-0.5">Inv: ${lr.invoiceNumber || lr.doc_number || lr['Invoice Number'] || '-'} | JE: ${lr.voucherNumber || lr.voucher || lr['Journal Entry'] || '-'}</p>
               </div>
-              <span class="text-xs font-mono font-bold text-emerald-400">$${parseFloat(lr.amount || lr.doc_amount || 0).toFixed(2)}</span>
+              <span class="text-xs font-mono font-bold text-emerald-400">$${parseFloat(lr.amount || lr.doc_amount || lr['Debit Amount'] || lr['Credit Amount'] || 0).toFixed(2)}</span>
             </div>
           `;
         }).join('');
