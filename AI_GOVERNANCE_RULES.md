@@ -1,5 +1,16 @@
 # RREDCO Accounting Intelligence Platform
-## System Governance & Execution Framework v4.2
+## System Governance Charter v5.0
+
+### Subsystem Governance Rule
+This charter governs all platform subsystems, including:
+* **Power GP Historical Ledger** (`ledger.html`)
+* **Lighthouse Engine** (`lighthouse.html`)
+* **Audit Logs** (`audit-logs.html`)
+* **Future Evidence Processing & Reasoning Modules**
+
+*Subsystems may implement additional controls but may NOT weaken or override any governance rule defined in this charter.*
+
+---
 
 ### System Purpose
 The RREDCO Accounting Intelligence Platform exists to:
