@@ -1,7 +1,7 @@
 /**
  * Relationship Engine - Governance v6.0 Compliant
  * Features Independent Corroboration Tracking, Attribute Frequency Decay,
- * and Cross-Entity Edge Protection on Tier 1 matches.
+ * Cross-Entity Edge Protection, and O(1) Memory-Safe Graph Resolution.
  */
 
 import { AIGovernanceEngine } from './ai-governance.js';
@@ -32,11 +32,12 @@ export class RelationshipEngine {
     static buildRelationships(records = []) {
         if (!Array.isArray(records) || records.length === 0) return records;
 
+        const recordMap = new Map(); // O(1) Master Lookup
         const invoiceMap = new Map();
         const voucherMap = new Map();
         const tuple3DMap = new Map(); 
         const vendorMap = new Map();
-        const vendorFrequencyMap = new Map(); // Relationship Decay Tracking
+        const vendorFrequencyMap = new Map();
 
         const invKeys = ['Invoice Number', 'invoiceNumber', 'doc_number'];
         const jeKeys = ['Journal Entry', 'voucherNumber', 'voucher'];
@@ -44,10 +45,13 @@ export class RelationshipEngine {
         const dateKeys = ['TRX Date', 'transactionDate', 'doc_date'];
         const amtKeys = ['Debit Amount', 'Credit Amount', 'amount', 'doc_amount'];
 
-        // Step 1: Index primary identifiers and calculate vendor attribute frequency
+        // Step 1: Index primary identifiers into O(1) Hash Maps
         records.forEach((rec, idx) => {
             const id = this.getRecordId(rec, idx);
             if (!rec._id) rec._id = id;
+            
+            // Store direct memory reference to prevent O(N) Array.find() lookups later
+            recordMap.set(id, rec); 
 
             const inv = this.getFieldValue(rec, invKeys);
             const je = this.getFieldValue(rec, jeKeys);
@@ -55,7 +59,9 @@ export class RelationshipEngine {
             const date = this.getFieldValue(rec, dateKeys);
             const amt = this.getFieldValue(rec, amtKeys);
 
-            if (vendor && vendor !== '-' && !vendor.toLowerCase().includes('general vendor')) {
+            const isGeneric = (val) => val === '-' || val === '000' || val.toLowerCase().includes('unknown');
+
+            if (vendor && !isGeneric(vendor) && !vendor.toLowerCase().includes('general vendor')) {
                 const cleanVendor = vendor.toLowerCase();
                 vendorFrequencyMap.set(cleanVendor, (vendorFrequencyMap.get(cleanVendor) || 0) + 1);
                 
@@ -63,17 +69,17 @@ export class RelationshipEngine {
                 vendorMap.get(vendor).push(id);
             }
 
-            if (inv && inv !== '-' && !inv.toLowerCase().includes('inv-clk')) {
+            if (inv && !isGeneric(inv) && !inv.toLowerCase().includes('inv-clk')) {
                 if (!invoiceMap.has(inv)) invoiceMap.set(inv, []);
                 invoiceMap.get(inv).push(id);
             }
 
-            if (je && je !== '-' && !je.toLowerCase().includes('je-clk')) {
+            if (je && !isGeneric(je) && !je.toLowerCase().includes('je-clk')) {
                 if (!voucherMap.has(je)) voucherMap.set(je, []);
                 voucherMap.get(je).push(id);
             }
 
-            if (vendor && amt && date && vendor !== '-' && amt !== '0' && amt !== '0.00') {
+            if (vendor && amt && date && !isGeneric(vendor) && amt !== '0' && amt !== '0.00') {
                 const tupleKey = `${vendor.toLowerCase()}_${parseFloat(amt).toFixed(2)}_${date}`;
                 if (!tuple3DMap.has(tupleKey)) tuple3DMap.set(tupleKey, []);
                 tuple3DMap.get(tupleKey).push(id);
@@ -97,37 +103,35 @@ export class RelationshipEngine {
             const tier2Edges = [];
             const tier3Edges = [];
 
-            // Helper to determine independent source corroboration
             const checkIndependence = (targetRec) => {
                 const tgtFile = targetRec?._provenance?.sourceFile || targetRec?._sourceFile || '';
                 return srcFile !== '' && tgtFile !== '' && srcFile !== tgtFile;
             };
 
-            // Check Tier 1 Matches with Entity Preservation Protection
-            if (inv && invoiceMap.get(inv)) {
-                invoiceMap.get(inv).filter(targetId => targetId !== id).forEach(targetId => {
-                    const targetRec = records.find(r => r._id === targetId);
+            // Check Tier 1 Matches
+            if (inv && invoiceMap.has(inv)) {
+                // Hard cap at 50 edges to prevent Cartesian explosion on identical generic invoices
+                const targets = invoiceMap.get(inv);
+                const safeTargets = targets.length > 50 ? targets.slice(0, 50) : targets;
+
+                safeTargets.filter(targetId => targetId !== id).forEach(targetId => {
+                    const targetRec = recordMap.get(targetId); // O(1) Lookup
+                    if (!targetRec) return;
+
                     const tgtEntity = (targetRec?._provenance?.entityContext || targetRec?._location || '').toUpperCase();
                     const isSameEntity = (srcEntity === tgtEntity) && srcEntity !== '';
                     const isIndependent = checkIndependence(targetRec);
 
                     if (isSameEntity) {
                         tier1Edges.push({
-                            targetId,
-                            tier: 1,
-                            score: 95,
-                            label: "Evidence Relationship",
+                            targetId, tier: 1, score: 95, label: "Evidence Relationship",
                             isIndependentCorroboration: isIndependent,
                             reasons: [`Exact Invoice Match (${inv}) within ${srcEntity}`],
                             timestamp: new Date().toISOString()
                         });
                     } else {
-                        // Flag as Cross-Entity Collision Contradiction edge instead of Tier 1 Evidence
                         tier1Edges.push({
-                            targetId,
-                            tier: 1,
-                            score: 40,
-                            label: "Cross-Entity Invoice Collision",
+                            targetId, tier: 1, score: 40, label: "Cross-Entity Invoice Collision",
                             isIndependentCorroboration: isIndependent,
                             reasons: [`Invoice #${inv} matches record in Entity ${tgtEntity} (Cross-Entity Contradiction)`],
                             timestamp: new Date().toISOString()
@@ -136,17 +140,17 @@ export class RelationshipEngine {
                 });
             }
 
-            if (je && voucherMap.get(je)) {
-                voucherMap.get(je).filter(targetId => targetId !== id).forEach(targetId => {
-                    const targetRec = records.find(r => r._id === targetId);
-                    const isIndependent = checkIndependence(targetRec);
+            if (je && voucherMap.has(je)) {
+                const targets = voucherMap.get(je);
+                const safeTargets = targets.length > 50 ? targets.slice(0, 50) : targets;
 
+                safeTargets.filter(targetId => targetId !== id).forEach(targetId => {
+                    const targetRec = recordMap.get(targetId);
+                    if (!targetRec) return;
+                    
                     tier1Edges.push({
-                        targetId,
-                        tier: 1,
-                        score: 90,
-                        label: "Evidence Relationship",
-                        isIndependentCorroboration: isIndependent,
+                        targetId, tier: 1, score: 90, label: "Evidence Relationship",
+                        isIndependentCorroboration: checkIndependence(targetRec),
                         reasons: [`Exact Journal Entry Match (${je})`],
                         timestamp: new Date().toISOString()
                     });
@@ -156,18 +160,18 @@ export class RelationshipEngine {
             // Check Tier 2 Corroborating Matches (3-Dimensional)
             if (vendor && amt && date) {
                 const tupleKey = `${vendor.toLowerCase()}_${parseFloat(amt).toFixed(2)}_${date}`;
-                if (tuple3DMap.get(tupleKey)) {
-                    tuple3DMap.get(tupleKey).filter(targetId => targetId !== id).forEach(targetId => {
+                if (tuple3DMap.has(tupleKey)) {
+                    const targets = tuple3DMap.get(tupleKey);
+                    const safeTargets = targets.length > 50 ? targets.slice(0, 50) : targets;
+
+                    safeTargets.filter(targetId => targetId !== id).forEach(targetId => {
                         if (!tier1Edges.some(e => e.targetId === targetId)) {
-                            const targetRec = records.find(r => r._id === targetId);
-                            const isIndependent = checkIndependence(targetRec);
+                            const targetRec = recordMap.get(targetId);
+                            if (!targetRec) return;
 
                             tier2Edges.push({
-                                targetId,
-                                tier: 2,
-                                score: 80,
-                                label: "Corroborating Relationship",
-                                isIndependentCorroboration: isIndependent,
+                                targetId, tier: 2, score: 80, label: "Corroborating Relationship",
+                                isIndependentCorroboration: checkIndependence(targetRec),
                                 reasons: ["3D Corroboration Match (Vendor + Dollar Amount + TRX Date)"],
                                 timestamp: new Date().toISOString()
                             });
@@ -177,19 +181,19 @@ export class RelationshipEngine {
             }
 
             // Check Tier 3 Associative Matches with Frequency Decay
-            if (vendor && vendorMap.get(vendor)) {
+            if (vendor && vendorMap.has(vendor)) {
                 const freq = vendorFrequencyMap.get(vendor.toLowerCase()) || 1;
-                // Relationship Decay Penalty: high-frequency vendors decay in score
                 const decayPenalty = Math.min(30, Math.floor(Math.log10(freq) * 15));
                 const decayedScore = Math.max(10, 45 - decayPenalty);
 
-                vendorMap.get(vendor).filter(targetId => targetId !== id).forEach(targetId => {
+                const targets = vendorMap.get(vendor);
+                // Aggressive cap on Tier 3 to prevent vendor bucket memory explosions
+                const safeTargets = targets.length > 25 ? targets.slice(0, 25) : targets;
+
+                safeTargets.filter(targetId => targetId !== id).forEach(targetId => {
                     if (!tier1Edges.some(e => e.targetId === targetId) && !tier2Edges.some(e => e.targetId === targetId)) {
                         tier3Edges.push({
-                            targetId,
-                            tier: 3,
-                            score: decayedScore,
-                            label: "Associative Relationship",
+                            targetId, tier: 3, score: decayedScore, label: "Associative Relationship",
                             isIndependentCorroboration: false,
                             reasons: [`Shared Vendor Context (${vendor}) [Decay Penalty: -${decayPenalty} pts for ${freq} records]`],
                             timestamp: new Date().toISOString()
@@ -204,14 +208,14 @@ export class RelationshipEngine {
 
             validEvidenceEdges.forEach(edge => {
                 if (edge.isIndependentCorroboration) {
-                    const targetRec = records.find(r => r._id === edge.targetId);
+                    const targetRec = recordMap.get(edge.targetId);
                     const tgtFile = targetRec?._provenance?.sourceFile || targetRec?._sourceFile || '';
                     if (tgtFile) distinctIndependentSources.add(tgtFile);
                 }
             });
 
             const sourceCount = distinctIndependentSources.size;
-            let corroborationLevel = 'A'; // Level A = 1 source
+            let corroborationLevel = 'A'; 
             if (sourceCount === 2) corroborationLevel = 'B';
             else if (sourceCount >= 3) corroborationLevel = 'C';
 
