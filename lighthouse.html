@@ -1004,7 +1004,10 @@
       section.classList.remove('hidden');
       badge.textContent = `${flags.length} Flags`;
 
-      cards.innerHTML = flags.map(f => `
+      // FIX: Only render the first 100 flags to prevent V8 "Invalid string length" memory crashes
+      const safeFlags = flags.slice(0, 100);
+
+      cards.innerHTML = safeFlags.map(f => `
         <div class="p-3 bg-slate-900 rounded-xl border border-rose-500/30 flex items-start justify-between text-xs font-mono">
           <div>
             <div class="flex items-center gap-2">
@@ -1016,6 +1019,12 @@
           </div>
         </div>
       `).join('');
+      
+      // Add a warning if we truncated the list
+      if (flags.length > 100) {
+          cards.innerHTML += `<div class="p-3 mt-2 text-center text-[10px] text-rose-400/70 font-mono border border-dashed border-rose-500/30 rounded-xl bg-rose-950/20">... plus ${(flags.length - 100).toLocaleString()} additional flags safely hidden from UI.</div>`;
+      }
+
       lucide.createIcons();
     }
 
