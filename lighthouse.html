@@ -78,7 +78,7 @@
 
   <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
 
-    <!-- Active Investigation Case Panel (Hidden by default) -->
+    <!-- Active Investigation Case Panel -->
     <section id="case-section" class="hidden bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-5 shadow-xl">
       <div class="flex justify-between items-center">
         <div>
@@ -324,7 +324,8 @@
     import { ContradictionEngine } from './contradiction-engine.js';
     import { MemoWriter } from './memo-writer.js';
     import { ChainOfCustody } from './chain-of-custody.js';
-    import { InvestigationEngine } from './investigation-engine.js'; // Phase 8 Import
+    import { InvestigationEngine } from './investigation-engine.js';
+    import { EvidenceGraph } from './evidence-graph.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
@@ -347,6 +348,7 @@
     let fullDebugLog = [];
     let currentUserEmail = "SYSTEM_USER";
     let activeCase = null;
+    let activeEvidenceGraph = null;
 
     function openAuditDB() {
       return new Promise((resolve, reject) => {
@@ -371,7 +373,6 @@
       }
     });
 
-    // PHASE 8 INVESTIGATION WORKSPACE HANDLERS
     window.startInvestigationUI = () => {
       const title = prompt("Enter a title for this Investigation Case:");
       if (!title) return;
@@ -471,6 +472,7 @@
 
     window.resetState = () => {
       extractedData = [];
+      activeEvidenceGraph = null;
       originalFileName = "";
       fullDebugLog = [];
       document.getElementById('pdf-upload').value = '';
@@ -726,13 +728,17 @@
         const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
         renderContradictionPanel(contradictionFlags);
 
-        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS", {
+        activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
+
+        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_GRAPH", {
             fileCount: xlsxFiles.length,
             recordCount: extractedData.length,
+            graphNodeCount: activeEvidenceGraph.nodes.size,
+            graphEdgeCount: activeEvidenceGraph.edges.length,
             flaggedContradictions: contradictionFlags.length
         }, currentUserEmail);
 
-        window.logSys(`Phase 7 Chain-of-Custody event recorded. Digitized ${extractedData.length} total records across 17 entities.`, 'success');
+        window.logSys(`Phase 9 Node-Edge Evidence Graph created with ${activeEvidenceGraph.nodes.size} nodes and ${activeEvidenceGraph.edges.length} directed edges.`, 'success');
 
         window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
         window.renderResults(extractedData);
@@ -834,9 +840,13 @@
         extractedData = RiskEngine.evaluateDataset(extractedData).records;
         extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
 
-        await ChainOfCustody.recordEvent("INGEST_PDF_SCHEDULE", {
+        activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
+
+        await ChainOfCustody.recordEvent("INGEST_PDF_SCHEDULE_GRAPH", {
             filename: file.name,
             recordCount: extractedData.length,
+            graphNodeCount: activeEvidenceGraph.nodes.size,
+            graphEdgeCount: activeEvidenceGraph.edges.length,
             entity: userSelectedEntity.toUpperCase()
         }, currentUserEmail);
 
@@ -909,8 +919,12 @@
             extractedData = RiskEngine.evaluateDataset(extractedData).records;
             extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
 
-            await ChainOfCustody.recordEvent("INGEST_TEXT_BUFFER", {
+            activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
+
+            await ChainOfCustody.recordEvent("INGEST_TEXT_BUFFER_GRAPH", {
                 recordCount: extractedData.length,
+                graphNodeCount: activeEvidenceGraph.nodes.size,
+                graphEdgeCount: activeEvidenceGraph.edges.length,
                 entity: userSelectedEntity.toUpperCase()
             }, currentUserEmail);
         } else {
@@ -1008,7 +1022,7 @@
     window.renderResults = (data) => {
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted, validated, risk scored, and contradiction evaluated.`;
+      document.getElementById('results-meta').innerText = `${data.length} records extracted, validated, and graph mapped (${activeEvidenceGraph ? activeEvidenceGraph.nodes.size : 0} Nodes / ${activeEvidenceGraph ? activeEvidenceGraph.edges.length : 0} Edges).`;
 
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = data.map(record => {
@@ -1155,7 +1169,7 @@
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob blow([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `Digitized_Lighthouse_Schedule_${Date.now()}.xlsx`;
