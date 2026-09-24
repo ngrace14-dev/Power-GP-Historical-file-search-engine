@@ -21,6 +21,29 @@ export class AIGovernanceEngine {
     };
 
     /**
+     * Standardized Materiality Classifier based on amount thresholds and variance.
+     * Required by lighthouse.html Phase 1 Materiality checks.
+     */
+    static classifyMateriality(amount, variance = 0) {
+        const amt = Math.abs(parseFloat(amount) || 0);
+        const varAmt = Math.abs(parseFloat(variance) || 0);
+        
+        let level = 'IMMATERIAL';
+        let isMaterial = false;
+
+        // Base materiality thresholds (can be linked to dynamic entity profiles later)
+        if (amt >= 50000 || varAmt >= 10000) {
+            level = 'CRITICAL';
+            isMaterial = true;
+        } else if (amt >= 10000 || varAmt >= 2500) {
+            level = 'SIGNIFICANT';
+            isMaterial = true;
+        }
+
+        return { level, isMaterial };
+    }
+
+    /**
      * Relationship Transparency Rule Enforcement
      */
     static validateRelationshipTransparency(edge = {}) {
@@ -106,7 +129,7 @@ export class AIGovernanceEngine {
         }
 
         return `
-[SYSTEM GOVERNANCE CHARTER V6.0 ACTIVE]
+[SYSTEM GOVERNANCE CHARTER V${this.CHARTER_VERSION} ACTIVE]
 Subsystem: RREDCO Forensic Intelligence Platform
 Active Entity Boundary: ${entityDomain.toUpperCase()}
 
