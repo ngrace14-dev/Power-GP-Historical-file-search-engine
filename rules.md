@@ -1,0 +1,134 @@
+# Development Rules: RREDCO Enterprise Portal & Lighthouse Workstation
+
+## 1. Project Overview & Philosophy
+The RREDCO Enterprise Portal is a high-stakes corporate financial governance and forensic audit platform. Accuracy, traceability, memory efficiency, and strict regulatory compliance (Governance Charter v6.0) are the highest priorities. 
+
+**Core Tenets:**
+- **Auditable by Default:** Every record, transformation, and AI generation must have a verifiable "birth certificate."
+- **Modular Engine Architecture:** Logic must be compartmentalized into single-responsibility engines.
+- **Client-Side Heavy, Memory Conscious:** The app processes massive financial ledgers in-browser. Memory management is critical.
+
+---
+
+## 2. Tech Stack & Formats
+- **Frontend Framework:** Vanilla JavaScript (ES Modules). **DO NOT** use React, Vue, or Angular.
+- **Styling:** Tailwind CSS. Do not write custom CSS unless absolutely necessary.
+- **Icons:** Use Lucide and Phosphor Icons exclusively.
+- **Backend/Services:** Firebase (Auth, Realtime DB, Storage).
+- **Local Storage:** Use IndexedDB for large audit datasets. Limit `localStorage` to lightweight user preferences.
+- **File Parsing:** `pdf.js` for spatial OCR, `exceljs`/`xlsx` for spreadsheets.
+
+---
+
+## 3. Directory Structure & File Placement
+Maintain strict separation of concerns. AI agents and developers must adhere to this structure:
+- `/src/engines/` - Pure business logic, math, and data transformations (e.g., `validation-engine.js`).
+- `/src/ui/` - DOM manipulation, rendering, and event listeners.
+- `/src/workers/` - Web Workers for offloading heavy computation.
+- `/src/services/` - External API wrappers (e.g., `gemini-service.js`, `firebase.js`).
+- `/src/models/` - JSDoc typedefs and schema validators for the RREDCO JSON standard.
+- `/src/utils/` - Shared helpers (e.g., formatting currency, date parsing).
+
+---
+
+## 4. Architectural Guidelines
+
+### The Engine Pattern
+All core business logic must reside in specific engines. Do not blur the lines between processing phases. When creating or modifying features, adhere to this pipeline order:
+1. **Ingestion (`classification-engine.js`, `extraction-engine.js`):** Normalize heterogeneous data into the standard RREDCO JSON schema.
+2. **Validation (`confidence-engine.js`, `validation-engine.js`):** Score OCR and perform cross-footing/tie-out math.
+3. **Forensics (`materiality-engine.js`, `risk-engine.js`, `authority-engine.js`):** Classify impact, map to ASC standards, and flag risks.
+4. **Graph Construction (`relationship-engine.js`, `evidence-graph.js`):** Convert flat records into Nodes and Edges. 
+
+### Inter-Engine Communication (State & Events)
+- **Decoupled Architecture:** Engines must not tightly couple or directly mutate each other's state. 
+- Use a central Event Bus (Pub/Sub pattern) or standard DOM CustomEvents to pass data between the UI and the processing engines.
+
+### Evidence Graph Strictures
+- Multi-hop audit trails are foundational. Never render forensic connections as flat lists if they can be represented as Node-Edge relationships.
+- Use `corroboration-engine.js` and `contradiction-engine.js` to automatically assert relationships between distinct records.
+
+---
+
+## 5. Governance & Data Integrity
+
+### Provenance & Chain of Custody
+- **Rule of Provenance:** *No orphan data.* Every record must pass through `provenance-engine.js` and be stamped with its source file, system of origin, and a baseline trust score.
+- **Tamper-Evident Logging:** Any significant state change, triage decision, or validation failure must be logged via `chain-of-custody.js` and synced to Firebase Realtime DB.
+
+### Evidence Confidence Policy
+Confidence scores are mandatory for all extracted records and dictate their permissible use in the audit lifecycle.
+- **Required Confidence Tiers:**
+  - **90-100 =** Authoritative
+  - **75-89 =** Strong
+  - **60-74 =** Probable
+  - **40-59 =** Weak
+  - **0-39 =** Unreliable
+- **Utilization Constraints:** 
+  - Records scoring **below 60** may not be used as sole supporting evidence.
+  - Critical findings require at least one supporting record with a confidence score **>= 75**.
+- **Visibility:** Confidence scores must be explicitly visible in all Evidence Graph views and forensic audit exports.
+
+### Decision Authority
+Engines may emit:
+- Observations
+- Scores
+- Warnings
+- Recommendations
+
+Engines may not independently declare:
+- Fraud
+- Financial Misstatement
+- Regulatory Violation
+- Final Audit Conclusion
+
+Final findings must be produced through a Decision Engine or documented Human Review process. 
+
+All contributing engines must be recorded.
+
+### AI Ethics & Integration
+- **Gemini Pro Wrapping:** Direct calls to the Gemini API are forbidden in UI components. All AI queries must be routed through `gemini-service.js`.
+- **AI Governance:** AI outputs must pass through `ai-governance.js` to enforce transparency. UI elements displaying AI insights must clearly indicate they are AI-generated.
+
+---
+
+## 6. Security, Performance & Error Handling
+
+### DOM Security (XSS Prevention)
+- **NO `innerHTML`:** Ingested financial data (OCR text, Excel cells) is untrusted user input. You must use `textContent`, `innerText`, or safe DOM creation methods (`document.createElement`) to prevent Cross-Site Scripting (XSS) attacks.
+
+### Main Thread Protection
+- **Use Web Workers:** Heavy computations—such as parsing multi-megabyte Excel files (`exceljs`), executing spatial OCR via `pdf.js`, or calculating large Evidence Graphs—must be offloaded to Web Workers (`/src/workers/`) to prevent UI freezing.
+
+### Zero Silent Failure Policy
+System failures must **never** be suppressed. Application continuity is acceptable, but silent continuation is strictly prohibited. When an engine encounters an exception (e.g., an unparseable row or validation crash), it must instantly execute the following sequence:
+1. Log the failure explicitly via `chain-of-custody.js`.
+2. Assign a confidence score of `0` to the affected record.
+3. Flag the record and push it to the Human Review Queue.
+4. Surface the error in UI diagnostics so the user is aware of the ingestion failure.
+
+### General UI Limits
+- **Memory Limits:** Hard-cap DOM rendering for large datasets. Implement pagination, virtual scrolling, or strict list truncation (e.g., Contradiction Panel must truncate at 100 items) to prevent browser crashes.
+
+---
+
+## 7. Coding Standards & Testing
+
+### JSDoc, Linting & Typing
+- **Strict Linting:** Code must pass ESLint and Prettier formatting rules before commit.
+- **JSDoc Mandate:** Because this project uses Vanilla JS, strict JSDoc annotations are **mandatory** on all engine functions to ensure type safety and IDE autocompletion. Document all inputs, outputs, and expected exceptions.
+
+### Testing Requirements
+- **Core Math & Logic:** `validation-engine.js`, `materiality-engine.js`, and `risk-engine.js` must have 100% test coverage for their core mathematical and classification functions.
+- **Mocking:** Do not test against live Firebase databases. Mock all external services and provide sample localized JSON ledgers for unit tests.
+
+### Commit Conventions
+- Prefix commits with the affected domain to maintain a clear audit trail of software changes (e.g., `[Engine: Validation]`, `[UI: Graph]`, `[Gov: Ethics]`).
+
+---
+
+## 8. Roadmap Alignment (Phase 9+)
+When writing new features, ensure the architecture supports upcoming roadmap items:
+- **Centralized Persistence:** Isolate data storage modules so we can easily swap IndexedDB for a cloud-based SQL/NoSQL backend in the future.
+- **Real-Time Collaboration:** Keep local state management pure so that "Active Cases" can eventually be synced across sockets/Firebase RTDB for multi-user auditing.
+- **Vision-based OCR:** Keep the `extraction-engine.js` interface clean so `pdf.js` spatial parsing can be swapped or augmented with vision AI models later.
