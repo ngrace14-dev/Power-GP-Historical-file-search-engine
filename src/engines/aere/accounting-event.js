@@ -34,6 +34,10 @@ export class AccountingEvent {
         this.anchorQuality = data.anchorQuality || 'LOW'; // HIGH, MEDIUM, LOW
         this.collisionRisk = data.collisionRisk || 0;     // 0.0 to 1.0
 
+        // Intent-Based Classification (Phase 2.7)
+        this.eventIntent = data.eventIntent || 'INVOICE_LIFECYCLE'; // COMPOUND_ENTRY, INVOICE_LIFECYCLE, RECON_PACKAGE
+        this.lineCount = data.lineCount || 0;
+
         // Variance Separation: Distinct from Ledger-wide contradictions
         this.varianceAnalysis = {
             contributesToLedgerVariance: data.varianceAnalysis?.contributesToLedgerVariance || false,
@@ -70,6 +74,8 @@ export class AccountingEvent {
             eventNarrative: this.eventNarrative,
             anchorQuality: this.anchorQuality,
             collisionRisk: this.collisionRisk,
+            eventIntent: this.eventIntent,
+            lineCount: this.lineCount,
             varianceAnalysis: this.varianceAnalysis,
             confidence: this.confidence,
             nodes: this.nodes,

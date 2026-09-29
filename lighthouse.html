@@ -158,12 +158,17 @@
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Net Economic Impact</div>
                           <div id="drawer-net-impact" class="text-xs font-bold text-emerald-400">$0.00</div>
                       </div>
-                      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Complexity</div>
                           <div id="drawer-complexity" class="text-xs font-bold text-white">3 Entries</div>
                       </div>
-                                            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                          <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Classification</div>
+                          <div id="drawer-intent" class="text-xs font-bold text-cyan-400">INVOICE</div>
+                      </div>
+                      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Confidence</div>
+
                           <div id="drawer-confidence" class="text-xs font-bold text-cyan-400">92%</div>
                       </div>
                       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
@@ -1475,8 +1480,10 @@
 
         // Section 1: Flag Status Summary
         document.getElementById('drawer-event-id').textContent = event.eventId;
-        document.getElementById('drawer-status').textContent = event.finalEconomicState.status;
+                document.getElementById('drawer-status').textContent = event.finalEconomicState.status;
+        document.getElementById('drawer-intent').textContent = event.eventIntent?.replace('_', ' ');
         document.getElementById('drawer-net-impact').textContent = `$${event.netEconomicImpact.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+
         document.getElementById('drawer-complexity').textContent = `${event.finalEconomicState.determinedFrom} Entries`;
                 document.getElementById('drawer-confidence').textContent = `${Math.round(event.confidence.total * 100)}%`;
         

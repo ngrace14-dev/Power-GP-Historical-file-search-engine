@@ -133,6 +133,9 @@ export class AEREEngine {
             return dateA - dateB;
         });
 
+        // Phase 2.7: Intent Detection
+        const intent = this.determineIntent(sortedNodes);
+
         // Extract anchor metadata from the first node
         const first = sortedNodes[0].data || sortedNodes[0];
         const prov = sortedNodes[0]._provenance || {};
@@ -154,7 +157,10 @@ export class AEREEngine {
             gross += Math.abs(amount);
             net += amount;
 
-            const role = this.determineRole(amount, index, sortedNodes);
+            // Suppress lifecycle roles for compound entries
+            const role = (intent === 'COMPOUND_ENTRY') 
+                ? 'ACCOUNT_LINE' 
+                : this.determineRole(amount, index, sortedNodes);
             
             return {
                 ...node,
@@ -164,11 +170,14 @@ export class AEREEngine {
         });
 
         // Determine Final Economic State
-        const status = this.determineStatus(classifiedNodes, net);
+        const status = (intent === 'COMPOUND_ENTRY') 
+            ? (Math.abs(net) < 0.01 ? 'BALANCED' : 'UNBALANCED')
+            : this.determineStatus(classifiedNodes, net);
+
         const finalAmount = status === 'VOIDED' ? 0 : (classifiedNodes[classifiedNodes.length - 1].amount || net);
 
         // Generate Narrative
-        const narrative = this.generateNarrative(anchor, classifiedNodes, finalAmount, status);
+        const narrative = this.generateNarrative(anchor, classifiedNodes, finalAmount, status, intent);
 
         // Calculate Confidence
         const confidence = ConfidenceModel.calculate({
@@ -188,19 +197,38 @@ export class AEREEngine {
                 amount: finalAmount,
                 status: status,
                 determinedFrom: classifiedNodes.length,
-                methodology: 'NET_IMPACT_ANALYSIS'
+                methodology: intent === 'COMPOUND_ENTRY' ? 'BALANCE_VALIDATION' : 'NET_IMPACT_ANALYSIS'
             },
             grossActivity: gross,
             netEconomicImpact: net,
             eventNarrative: narrative,
             anchorQuality: anchorQuality,
             collisionRisk: collisionRisk,
+            eventIntent: intent,
+            lineCount: classifiedNodes.length,
             varianceAnalysis: varianceContribution,
             confidence: confidence,
             nodes: classifiedNodes,
             eventFlags: this.extractEventFlags(classifiedNodes),
             ledgerFlags: this.extractLedgerFlags(classifiedNodes)
         });
+    }
+
+    /**
+     * Phase 2.7: Detects if a cluster is a single Compound Entry vs a Lifecycle
+     */
+    static determineIntent(nodes) {
+        const uniqueVouchers = new Set(nodes.map(n => (n.data || n).voucherNumber || (n.data || n).voucher));
+        const uniqueDates = new Set(nodes.map(n => (n.data || n).transactionDate || (n.data || n).doc_date));
+        
+        if (uniqueVouchers.size === 1 && uniqueDates.size === 1) {
+            return 'COMPOUND_ENTRY';
+        }
+
+        const doc = this.normalizeDoc((nodes[0].data || nodes[0]).invoiceNumber || 'UNKNOWN');
+        if (['RECON', 'RECONCILIATION', 'MONTH END'].includes(doc)) return 'RECON_PACKAGE';
+
+        return 'INVOICE_LIFECYCLE';
     }
 
     /**
@@ -249,11 +277,17 @@ export class AEREEngine {
     /**
      * Generates a human-readable event narrative
      */
-    static generateNarrative(anchor, nodes, finalAmount, status) {
-        const startAmount = parseFloat((nodes[0].data || nodes[0]).amount || 0).toLocaleString();
-        const endAmount = finalAmount.toLocaleString();
+    static generateNarrative(anchor, nodes, finalAmount, status, intent = 'INVOICE_LIFECYCLE') {
         const count = nodes.length;
 
+        if (intent === 'COMPOUND_ENTRY') {
+            const balanceNote = status === 'BALANCED' ? 'The entry is balanced.' : `The entry is UNBALANCED by $${Math.abs(finalAmount).toLocaleString()}.`;
+            return `${count}-Line Journal Entry recorded on ${(nodes[0].data || nodes[0]).transactionDate || 'unknown date'}. ${balanceNote}`;
+        }
+
+        const startAmount = parseFloat((nodes[0].data || nodes[0]).amount || 0).toLocaleString();
+        const endAmount = finalAmount.toLocaleString();
+        
         let narrative = `Document ${anchor.docNumber} was originally recorded for $${startAmount}. `;
         
         if (count > 1) {
