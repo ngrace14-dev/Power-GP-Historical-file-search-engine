@@ -32,50 +32,65 @@ export class AEREEngine {
     }
 
     /**
+     * Phase 4.1F: Classifies anchors into IDENTITY, PROCESS, or CATEGORY
+     */
+    static classifyAnchor(doc) {
+        const docUpper = String(doc || '').toUpperCase();
+        
+        // Blacklists for CATEGORY and PROCESS
+        const categories = ['SHIPPING', 'UTILITIES', 'MAINTENANCE', 'SUPPLIES', 'ADVERTISING', 'TRAVEL', 'MEALS', 'EXPENSE', 'MISC'];
+        const processes = ['COMPUTER CHECKS', 'PAYROLL', 'PAYMENT', 'VOID', 'INTEREST', 'BALANCE', 'RECON', 'RECONCILIATION'];
+        
+        if (categories.some(c => docUpper.includes(c))) return 'CATEGORY';
+        if (processes.some(p => docUpper.includes(p))) return 'PROCESS';
+        
+        // Identity logic: High entropy usually means IDENTITY
+        const quality = this.calculateAnchorQuality(docUpper);
+        if (quality === 'HIGH' || quality === 'MEDIUM') return 'IDENTITY';
+        
+        return 'CATEGORY'; // Default to category for very low-quality anchors
+    }
+
+    /**
      * Phase 2.6: Partitions a broad group into distinct events if collisions are detected
+     * Refined in Phase 4.1F to support IDENTITY/PROCESS/CATEGORY logic
      */
     static partitionGroup(members) {
-        const doc = this.normalizeDoc((members[0].data || members[0]).invoiceNumber || (members[0].data || members[0]).doc_number || 'UNKNOWN');
-        const quality = this.calculateAnchorQuality(doc);
+        const doc = (members[0].data || members[0]).invoiceNumber || (members[0].data || members[0]).doc_number || 'UNKNOWN';
+        const anchorType = this.classifyAnchor(doc);
+        const quality = this.calculateAnchorQuality(this.normalizeDoc(doc));
 
-        // Scenario 1: Stable High-Quality Anchor -> Keep together
-        if (quality === 'HIGH') return [members];
+        // IDENTITY with HIGH quality -> Keep as a single lifecycle
+        if (anchorType === 'IDENTITY' && quality === 'HIGH') return [members];
 
-        // Scenario 2: Generic Anchor -> Partition by Voucher first
+        // PROCESS anchors -> Always partition by Voucher (Batch Separation)
+        if (anchorType === 'PROCESS') {
+            return this.splitByVoucher(members);
+        }
+
+        // CATEGORY anchors -> 
+        // 1. For "EXPENSE_SERIES" we could keep them together, 
+        // 2. But for Forensic accuracy we split by Voucher.
+        // We will split by Voucher to prevent AI "Lifecycle" hallucinations.
+        if (anchorType === 'CATEGORY') {
+            return this.splitByVoucher(members);
+        }
+
+        // Default: Partition by Voucher for safety
+        return this.splitByVoucher(members);
+    }
+
+    /**
+     * Helper to split a group by Voucher Number
+     */
+    static splitByVoucher(members) {
         const voucherGroups = {};
         members.forEach(node => {
             const v = (node.data || node).voucherNumber || (node.data || node).voucher || 'NO_VCH';
             if (!voucherGroups[v]) voucherGroups[v] = [];
             voucherGroups[v].push(node);
         });
-
-        // Scenario 3: Temporal Windowing (90 Day Gap)
-        const finalPartitions = [];
-        Object.values(voucherGroups).forEach(vNodes => {
-            const sorted = [...vNodes].sort((a, b) => {
-                const da = new Date((a.data || a).transactionDate || (a.data || a).doc_date);
-                const db = new Date((b.data || b).transactionDate || (b.data || b).doc_date);
-                return da - db;
-            });
-
-            let currentPartition = [sorted[0]];
-            for (let i = 1; i < sorted.length; i++) {
-                const prevDate = new Date((sorted[i-1].data || sorted[i-1]).transactionDate || (sorted[i-1].data || sorted[i-1]).doc_date);
-                const currDate = new Date((sorted[i].data || sorted[i]).transactionDate || (sorted[i].data || sorted[i]).doc_date);
-                
-                const diffDays = (currDate - prevDate) / (1000 * 60 * 60 * 24);
-                
-                if (diffDays > 90) {
-                    finalPartitions.push(currentPartition);
-                    currentPartition = [sorted[i]];
-                } else {
-                    currentPartition.push(sorted[i]);
-                }
-            }
-            finalPartitions.push(currentPartition);
-        });
-
-        return finalPartitions;
+        return Object.values(voucherGroups);
     }
 
     /**
@@ -223,6 +238,7 @@ export class AEREEngine {
 
     /**
      * Phase 2.7: Detects if a cluster is a single Compound Entry vs a Lifecycle
+     * Refined in 4.1F to include EXPENSE_SERIES
      */
     static determineIntent(nodes) {
         const uniqueVouchers = new Set(nodes.map(n => (n.data || n).voucherNumber || (node.data || node).voucher));
@@ -230,6 +246,8 @@ export class AEREEngine {
         const sources = new Set(nodes.map(n => (n.data || n)['Originating TRX Source'] || ''));
         const refs = nodes.map(n => String((n.data || n).Reference || (n.data || n).referenceNumber || '').toUpperCase());
         const descriptions = nodes.map(n => String((n.data || n).Description || (n.data || n).description || '').toUpperCase());
+        const doc = (nodes[0].data || nodes[0]).invoiceNumber || (nodes[0].data || nodes[0]).doc_number || 'UNKNOWN';
+        const anchorType = this.classifyAnchor(doc);
 
         // 1. SETTLEMENT_PACKAGE (Payments/Checks)
         if (sources.has('PMCHK') || sources.has('PMPAY') || refs.some(r => r.includes('COMPUTER CHECKS') || r.includes('PAYMENT ENTRY'))) {
@@ -262,8 +280,12 @@ export class AEREEngine {
         }
 
         // 7. RECON_PACKAGE (Generic broad clusters)
-        const doc = this.normalizeDoc((nodes[0].data || nodes[0]).invoiceNumber || 'UNKNOWN');
-        if (['RECON', 'RECONCILIATION', 'MONTH END', 'BALANCE'].includes(doc)) return 'RECON_PACKAGE';
+        if (['RECON', 'RECONCILIATION', 'MONTH END', 'BALANCE'].includes(doc.toUpperCase())) return 'RECON_PACKAGE';
+
+        // 8. EXPENSE_SERIES (Phase 4.1F: High-level category aggregation)
+        if (anchorType === 'CATEGORY' && nodes.length > 3) {
+            return 'EXPENSE_SERIES';
+        }
 
         return 'INVOICE_LIFECYCLE';
     }
@@ -340,6 +362,10 @@ export class AEREEngine {
 
         if (intent === 'CAPITALIZATION_EVENT') {
             return `Asset treatment transition: Expenditure identified for capitalization as Fixed Asset or CIP.`;
+        }
+
+        if (intent === 'EXPENSE_SERIES') {
+            return `Expense series identified: This cluster represents a sequence of related ${anchor.docNumber.toLowerCase()} expenditures captured under a common category anchor.`;
         }
 
         const startAmount = parseFloat((nodes[0].data || nodes[0]).amount || 0).toLocaleString();

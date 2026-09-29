@@ -143,7 +143,19 @@ export class GeminiService {
                 "Verify item meets corporate capitalization threshold.",
                 "Ensure asset is recorded in Fixed Asset Register."
             ];
+                } else if (eventData.eventIntent === 'EXPENSE_SERIES') {
+            interpretation = `This event represents an aggregated sequence of ${eventData.anchor.docNumber.toLowerCase()} expenses. Unlike a single invoice lifecycle, this reflects recurring operational spend categorized under a common descriptive anchor.`;
+            recommendations = [
+                "Analyze spend velocity for this expense category.",
+                "Review individual voucher lines for outliers within the series.",
+                "Verify consistent account coding across the series."
+            ];
+            hypotheses = [
+                { explanation: "Recurring Operational Expenditure", confidence: "High" },
+                { explanation: "Category-Based Allocation", confidence: "Medium" }
+            ];
         } else {
+
             interpretation = `Standard ${eventData.eventIntent.toLowerCase()} activity for ${eventData.anchor.vendorName}.`;
             mostLikely = { explanation: "Standard Ledger Activity", supportingEvidence: "Matches expected vendor lifecycle patterns." };
             recommendations = [
