@@ -127,13 +127,19 @@ export class EvidenceGraph {
             }
         });
 
-        // Step 2: Map Relational Edges from Relationship Engine Pipeline
+                // Step 2: Map Relational Edges from Relationship Engine Pipeline (Forensic Priority Pass)
         records.forEach(rec => {
             const rel = rec._relationships || {};
-            const validEdges = [...(rel.tier1Edges || []), ...(rel.tier2Edges || [])];
+            
+            // Prioritize Forensic/Anomaly Edges over Classification in Graph rendering
+            const edgesToRender = [
+                ...(rel.forensicEdges || []),
+                ...(rel.anomalyEdges || []),
+                ...(rel.classificationEdges || [])
+            ];
 
-            validEdges.forEach(edge => {
-                const targetRec = records.find(r => r._id === edge.targetId);
+            edgesToRender.forEach(edge => {
+                const targetRec = records.find(r => r._id === edge.targetNode);
                 if (!targetRec) return;
 
                 const srcData = rec.data || rec;
@@ -145,17 +151,25 @@ export class EvidenceGraph {
                 const srcEntity = (rec._provenance?.entityContext || rec._location || 'UNKNOWN').toUpperCase();
                 const tgtEntity = (targetRec._provenance?.entityContext || targetRec._location || 'UNKNOWN').toUpperCase();
 
+                // If both are invoices, map to the specific Invoice Nodes
                 if (srcInv !== '-' && tgtInv !== '-') {
                     const srcNodeId = `NODE_INV_${srcEntity}_${srcInv}`;
                     const tgtNodeId = `NODE_INV_${tgtEntity}_${tgtInv}`;
 
                     if (graph.nodes.has(srcNodeId) && graph.nodes.has(tgtNodeId)) {
-                        const relType = edge.label === "Cross-Entity Invoice Collision" ? 'CROSS_ENTITY_LEAK' : 'SUPPORTS';
-                        graph.addEdge(srcNodeId, tgtNodeId, relType, edge.tier, edge.score, edge.reasons);
+                        graph.addEdge(
+                            srcNodeId, 
+                            tgtNodeId, 
+                            edge.relationshipType, 
+                            edge.investigativePriority === 'HIGH' ? 1 : 3, 
+                            edge.confidence, 
+                            edge.evidence
+                        );
                     }
                 }
             });
         });
+
 
         return graph;
     }

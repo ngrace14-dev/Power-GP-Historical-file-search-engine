@@ -307,14 +307,13 @@
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getStorage, ref, listAll, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
     
-    // FLAT ROOT MODULE HOOKS
+        // FLAT ROOT MODULE HOOKS
     import { ProvenanceEngine } from './provenance-engine.js'; 
     import { EvidenceStateEngine } from './evidence-state-engine.js'; 
     import { ConfidenceEngine } from './confidence-engine.js';
     import { ClassificationEngine } from './classification-engine.js';
     import { ExtractionEngine } from './extraction-engine.js';
     import { ValidationEngine } from './validation-engine.js';
-    import { RelationshipEngine } from './relationship-engine.js';
     import { GeminiService } from './gemini-service.js';
     import { AIGovernanceEngine } from './ai-governance.js';
     import { MaterialityEngine } from './materiality-engine.js';
@@ -326,6 +325,10 @@
     import { ChainOfCustody } from './chain-of-custody.js';
     import { InvestigationEngine } from './investigation-engine.js';
     import { EvidenceGraph } from './evidence-graph.js';
+    
+    // NEW MODULAR ENGINES
+    import { RelationshipEngine } from './src/engines/relationship/relationship-engine.js';
+
 
     const firebaseConfig = {
       apiKey: "AIzaSyAslKhO_Wn2l1paJkqWj5lhxX_2YSekynk",
