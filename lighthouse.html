@@ -259,7 +259,7 @@
       </div>
     </section>
 
-    <!-- Results Data Table -->
+        <!-- Results Data Table -->
     <section id="results-section" class="hidden space-y-4">
       <div class="flex justify-between items-end">
         <div>
@@ -268,7 +268,18 @@
           </h2>
           <p class="text-xs text-slate-400 font-mono mt-0.5" id="results-meta">0 records extracted and cross-foot verified.</p>
         </div>
+        
+        <!-- Render Mode Toggle -->
+        <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800 shadow-inner">
+            <button onclick="window.setRenderMode('EVENT')" id="mode-event" class="px-3 py-1.5 rounded-md text-[10px] font-bold bg-cyan-500 text-slate-950 transition-all duration-200 flex items-center gap-1.5">
+                <i class="ph ph-tree-structure text-sm"></i> ACCOUNTING EVENT VIEW
+            </button>
+            <button onclick="window.setRenderMode('TRANSACTION')" id="mode-txn" class="px-3 py-1.5 rounded-md text-[10px] font-bold text-slate-400 hover:text-white transition-all duration-200 flex items-center gap-1.5">
+                <i class="ph ph-list-numbers text-sm"></i> RAW TRANSACTION VIEW
+            </button>
+        </div>
       </div>
+
 
       <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         <div class="overflow-x-auto max-h-[480px]">
@@ -412,6 +423,8 @@
     
     // NEW MODULAR ENGINES
     import { RelationshipEngine } from './src/engines/relationship/relationship-engine.js';
+    import { AEREEngine } from './src/engines/aere/aere-engine.js';
+
 
 
     const firebaseConfig = {
@@ -434,9 +447,12 @@
     let extractedData = [];
     let originalFileName = "";
     let fullDebugLog = [];
-    let currentUserEmail = "SYSTEM_USER";
+        let currentUserEmail = "SYSTEM_USER";
     let activeCase = null;
     let activeEvidenceGraph = null;
+    let renderMode = 'EVENT'; // 'EVENT' or 'TRANSACTION'
+    let reconstructedEvents = [];
+
 
     function openAuditDB() {
       return new Promise((resolve, reject) => {
@@ -559,9 +575,11 @@
       if (msg) document.getElementById('progress-text').innerText = msg;
     };
 
-    window.resetState = () => {
+        window.resetState = () => {
       extractedData = [];
+      reconstructedEvents = [];
       activeEvidenceGraph = null;
+
       originalFileName = "";
       fullDebugLog = [];
       document.getElementById('pdf-upload').value = '';
@@ -1254,20 +1272,174 @@
 
         const MAX_VISIBLE_ROWS = 250;
 
+        window.setRenderMode = (mode) => {
+        renderMode = mode;
+        const btnEvent = document.getElementById('mode-event');
+        const btnTxn = document.getElementById('mode-txn');
+        
+        if (mode === 'EVENT') {
+            btnEvent.classList.add('bg-cyan-500', 'text-slate-950');
+            btnEvent.classList.remove('text-slate-400');
+            btnTxn.classList.remove('bg-cyan-500', 'text-slate-950');
+            btnTxn.classList.add('text-slate-400');
+        } else {
+            btnTxn.classList.add('bg-cyan-500', 'text-slate-950');
+            btnTxn.classList.remove('text-slate-400');
+            btnEvent.classList.remove('bg-cyan-500', 'text-slate-950');
+            btnEvent.classList.add('text-slate-400');
+        }
+        
+        window.renderResults(extractedData);
+    };
+
     window.renderResults = (data) => {
       console.time("Render Results");
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
       
+      const tbody = document.getElementById('table-body');
+      const thead = document.querySelector('#results-section thead tr');
+
+      if (renderMode === 'EVENT') {
+          reconstructedEvents = AEREEngine.reconstruct(data);
+          renderEventResults(reconstructedEvents);
+      } else {
+          renderTransactionResults(data);
+      }
+      
+      console.timeEnd("Render Results");
+      lucide.createIcons();
+    };
+
+    function renderEventResults(events) {
+        const tbody = document.getElementById('table-body');
+        const thead = document.querySelector('#results-section thead tr');
+        
+        // Update Headers for Event View
+        thead.innerHTML = `
+            <th class="p-3 pl-4 text-center">Action</th>
+            <th class="p-3">Economic Anchor / Vendor</th>
+            <th class="p-3 text-center">Status</th>
+            <th class="p-3 text-center">Lifecycle Complexity</th>
+            <th class="p-3">Chronology Preview</th>
+            <th class="p-3 text-right">Gross Activity</th>
+            <th class="p-3 text-right">Net Economic Impact</th>
+            <th class="p-3 text-center">Recon Confidence</th>
+            <th class="p-3 text-center">Variance Impact</th>
+        `;
+
+        document.getElementById('results-meta').innerHTML = `
+            Reconstructed ${events.length.toLocaleString()} Economic Events from ${extractedData.length.toLocaleString()} Journal Lines 
+            <span class="text-cyan-500 font-bold ml-2">| Forensic Event Mode Active</span>
+        `;
+
+        tbody.innerHTML = events.map(event => {
+            const a = event.anchor;
+            const es = event.finalEconomicState;
+            const conf = event.confidence;
+            const varAn = event.varianceAnalysis;
+
+            let statusColor = 'bg-slate-800 text-slate-400';
+            if (es.status === 'CORRECTED') statusColor = 'bg-amber-500/10 text-amber-400 border border-amber-500/30';
+            if (es.status === 'VOIDED') statusColor = 'bg-rose-500/10 text-rose-400 border border-rose-500/30';
+            if (es.status === 'SETTLED') statusColor = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
+            if (es.status === 'VOLATILE') statusColor = 'bg-purple-500/10 text-purple-400 border border-purple-500/30 animate-pulse';
+
+            // Lifecycle Breadcrumb
+            const breadcrumbs = event.nodes.map(n => {
+                const role = n.lifecycleRole;
+                let char = 'O';
+                let color = 'text-slate-500';
+                if (role === 'REVERSAL') { char = 'R'; color = 'text-rose-400'; }
+                if (role === 'CORRECTION') { char = 'C'; color = 'text-amber-400'; }
+                if (role === 'RE_ENTRY') { char = 'E'; color = 'text-cyan-400'; }
+                if (role === 'FINAL_ENTRY') { char = 'F'; color = 'text-emerald-400'; }
+                return `<span class="${color} font-bold" title="${role}">${char}</span>`;
+            }).join('<span class="text-slate-700 mx-1">→</span>');
+
+            const confPct = Math.round(conf.total * 100);
+            let confColor = 'text-rose-400';
+            if (confPct > 80) confColor = 'text-emerald-400';
+            else if (confPct > 50) confColor = 'text-amber-400';
+
+            return `
+                <tr class="hover:bg-slate-800/50 transition border-b border-slate-800/50">
+                    <td class="p-4 text-center">
+                        <button class="p-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 text-slate-400 hover:text-cyan-400 transition" title="Inspect Event Lifecycle">
+                            <i data-lucide="microscope" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                    <td class="p-4">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-white">${a.vendorName}</span>
+                            <span class="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">${a.entityContext} | REF: ${a.docNumber}</span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor}">${es.status}</span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="text-xs font-mono text-slate-300">${es.determinedFrom} Entries</span>
+                    </td>
+                    <td class="p-4">
+                        <div class="flex items-center font-mono text-[10px] bg-slate-950/50 p-2 rounded border border-slate-800/50">
+                            ${breadcrumbs}
+                        </div>
+                    </td>
+                    <td class="p-4 text-right">
+                        <span class="text-xs font-mono text-slate-500">$${event.grossActivity.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </td>
+                    <td class="p-4 text-right">
+                        <span class="text-sm font-mono font-bold ${event.netEconomicImpact < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${event.netEconomicImpact.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <div class="flex flex-col items-center">
+                            <span class="text-xs font-bold ${confColor}">${confPct}%</span>
+                            <div class="w-12 h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                                <div class="h-full bg-current ${confColor}" style="width: ${confPct}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="p-4 text-center">
+                        ${varAn.contributesToLedgerVariance 
+                            ? `<span class="text-[10px] font-bold text-rose-400">+$${varAn.contributionAmount.toLocaleString()}</span>`
+                            : `<span class="text-[10px] text-slate-600">ZERO</span>`}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderTransactionResults(data) {
+      const tbody = document.getElementById('table-body');
+      const thead = document.querySelector('#results-section thead tr');
+      
+      // Restore Original Transaction Headers
+      thead.innerHTML = `
+        <th class="p-3 pl-4 text-center">Case Action</th>
+        <th class="p-3">Entity / Vendor</th>
+        <th class="p-3">Voucher / JE</th>
+        <th class="p-3">Doc / Invoice No.</th>
+        <th class="p-3">Doc Type</th>
+        <th class="p-3">TRX Date</th>
+        <th class="p-3 text-right">Amount</th>
+        <th class="p-3">Evidence Graph Links</th>
+        <th class="p-3 text-center">Phase 4 Corroboration</th>
+        <th class="p-3 text-center">Phase 5 Contradictions</th>
+        <th class="p-3 text-center">Phase 1 Materiality</th>
+        <th class="p-3 text-center">Phase 2 Forensic Risk</th>
+        <th class="p-3 text-center">Phase 3 Authority</th>
+        <th class="p-3 text-center">Tie-Out Status</th>
+      `;
+
       const visibleData = data.slice(0, MAX_VISIBLE_ROWS);
       const totalCount = data.length;
 
       document.getElementById('results-meta').innerHTML = `
         Showing ${visibleData.length.toLocaleString()} of ${totalCount.toLocaleString()} records 
-        <span class="text-slate-500">| Graph Analysis: Deferred</span>
+        <span class="text-slate-500">| Raw Ledger View Active</span>
       `;
 
-      const tbody = document.getElementById('table-body');
       tbody.innerHTML = visibleData.map(record => {
         const r = record.data || record; 
         const prov = record._provenance || {};
@@ -1345,10 +1517,8 @@
           `;
           tbody.appendChild(loadMoreRow);
       }
+    }
 
-      console.timeEnd("Render Results");
-      lucide.createIcons();
-    };
 
     window.renderAllResults = () => {
         const loadMore = document.getElementById('load-more-row');
