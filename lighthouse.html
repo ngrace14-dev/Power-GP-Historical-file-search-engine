@@ -517,9 +517,14 @@
       viewPdf.classList.add('hidden'); viewPdf.classList.remove('flex');
       viewText.classList.add('hidden'); viewText.classList.remove('flex');
 
-      if (tab === 'cloud') {
+            if (tab === 'cloud') {
         tabCloud.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
         viewCloud.classList.remove('hidden'); viewCloud.classList.add('flex');
+        
+        // Auto-pull catalog when tab is switched to
+        if (cloudCatalog.length === 0) {
+            window.fetchCloudCatalog();
+        }
       } else if (tab === 'pdf') {
         tabPdf.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
         viewPdf.classList.remove('hidden'); viewPdf.classList.add('flex');
@@ -716,10 +721,16 @@
                 document.getElementById('forensic-loader').classList.add('hidden');
             };
 
-            async function fetchCloudCatalog() {
+                        window.fetchCloudCatalog = async () => {
                 console.count('fetchCloudCatalog');
                 if (cloudCatalog.length > 0) return; 
         
+                const initialView = document.getElementById('catalog-initial');
+                if (initialView) {
+                    initialView.classList.add('hidden');
+                    initialView.classList.remove('flex');
+                }
+
                 document.getElementById('catalog-loading').classList.remove('hidden');
                 document.getElementById('catalog-loading').classList.add('flex');
                 document.getElementById('catalog-view').classList.add('hidden');
@@ -736,8 +747,14 @@
                     }));
                 } catch (err) {
                     window.logSys(`Catalog Error: ${err.message}`, 'error');
+                    if (initialView) {
+                        initialView.classList.remove('hidden');
+                        initialView.classList.add('flex');
+                    }
+                    document.getElementById('catalog-loading').classList.add('hidden');
+                    document.getElementById('catalog-loading').classList.remove('flex');
                 }
-            }
+            };
 
             function renderCatalog() {
                 console.count('renderCatalog');
