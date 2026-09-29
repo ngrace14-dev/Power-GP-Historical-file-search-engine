@@ -143,7 +143,7 @@
           <!-- Drawer Content (Scrollable) -->
           <div class="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
               
-              <!-- Section 1: Flag Status Summary -->
+                            <!-- Section 1: Flag Status Summary -->
               <section class="space-y-3">
                   <div class="flex items-center gap-2 mb-1">
                       <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400"></i>
@@ -158,7 +158,7 @@
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Net Economic Impact</div>
                           <div id="drawer-net-impact" class="text-xs font-bold text-emerald-400">$0.00</div>
                       </div>
-                                            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Complexity</div>
                           <div id="drawer-complexity" class="text-xs font-bold text-white">3 Entries</div>
                       </div>
@@ -168,7 +168,6 @@
                       </div>
                       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Confidence</div>
-
                           <div id="drawer-confidence" class="text-xs font-bold text-cyan-400">92%</div>
                       </div>
                       <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
@@ -184,13 +183,12 @@
                       <p class="text-[9px] text-rose-300/80 mt-1">This event cluster contains potentially unrelated transactions merged under a generic document reference.</p>
                   </div>
                   <div class="flex gap-2">
-
                       <div class="flex-1 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800 flex justify-between items-center">
-                          <span class="text-[10px] text-slate-500 uppercase font-bold">Corrections</span>
+                          <span id="metric-label-left" class="text-[10px] text-slate-500 uppercase font-bold">Corrections</span>
                           <span id="drawer-count-corrections" class="text-xs font-mono font-bold text-amber-400">0</span>
                       </div>
                       <div class="flex-1 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800 flex justify-between items-center">
-                          <span class="text-[10px] text-slate-500 uppercase font-bold">Reversals</span>
+                          <span id="metric-label-right" class="text-[10px] text-slate-500 uppercase font-bold">Reversals</span>
                           <span id="drawer-count-reversals" class="text-xs font-mono font-bold text-rose-400">0</span>
                       </div>
                   </div>
@@ -205,11 +203,11 @@
                   <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
                       <div class="grid grid-cols-2 gap-4">
                           <div>
-                              <div class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Original Intent</div>
+                              <div id="economic-label-1" class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Original Intent</div>
                               <div id="drawer-original-amt" class="text-xs font-mono text-slate-300">$0.00</div>
                           </div>
                           <div>
-                              <div class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Final Settled State</div>
+                              <div id="economic-label-2" class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Final Settled State</div>
                               <div id="drawer-final-amt" class="text-sm font-mono font-bold text-white">$0.00</div>
                           </div>
                           <div>
@@ -217,10 +215,11 @@
                               <div id="drawer-gross-activity" class="text-xs font-mono text-slate-500">$0.00</div>
                           </div>
                           <div>
-                              <div class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Variance Contribution</div>
+                              <div id="economic-label-3" class="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Variance Contribution</div>
                               <div id="drawer-variance-impact" class="text-xs font-mono text-rose-400">$0.00</div>
                           </div>
                       </div>
+
                       <div class="pt-3 border-t border-slate-800/50">
                           <p id="drawer-narrative" class="text-[11px] leading-relaxed text-slate-300 font-sans italic">"Reconstructing event narrative..."</p>
                       </div>
@@ -1478,15 +1477,66 @@
         drawer.classList.remove('hidden');
         setTimeout(() => drawer.classList.remove('translate-x-full'), 10);
 
-        // Section 1: Flag Status Summary
+                // Section 1: Flag Status Summary
         document.getElementById('drawer-event-id').textContent = event.eventId;
-                document.getElementById('drawer-status').textContent = event.finalEconomicState.status;
+        document.getElementById('drawer-status').textContent = event.finalEconomicState.status;
         document.getElementById('drawer-intent').textContent = event.eventIntent?.replace('_', ' ');
         document.getElementById('drawer-net-impact').textContent = `$${event.netEconomicImpact.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-
         document.getElementById('drawer-complexity').textContent = `${event.finalEconomicState.determinedFrom} Entries`;
-                document.getElementById('drawer-confidence').textContent = `${Math.round(event.confidence.total * 100)}%`;
+        document.getElementById('drawer-confidence').textContent = `${Math.round(event.confidence.total * 100)}%`;
         
+        // Intent-Aware Metric Labels (Phase 2.8b)
+        const metricLabelL = document.getElementById('metric-label-left');
+        const metricLabelR = document.getElementById('metric-label-right');
+        const econLabel1 = document.getElementById('economic-label-1');
+        const econLabel2 = document.getElementById('economic-label-2');
+        const econLabel3 = document.getElementById('economic-label-3');
+
+        if (event.eventIntent === 'COMPOUND_ENTRY') {
+            metricLabelL.textContent = 'Account Lines';
+            metricLabelR.textContent = 'Unbalanced By';
+            econLabel1.textContent = 'Total Debits';
+            econLabel2.textContent = 'Total Credits';
+            econLabel3.textContent = 'Balance Difference';
+
+            const debits = event.nodes.reduce((acc, n) => acc + (n.amount > 0 ? n.amount : 0), 0);
+            const credits = event.nodes.reduce((acc, n) => acc + (n.amount < 0 ? Math.abs(n.amount) : 0), 0);
+            
+            document.getElementById('drawer-count-corrections').textContent = event.nodes.length;
+            document.getElementById('drawer-count-reversals').textContent = `$${Math.abs(event.netEconomicImpact).toFixed(2)}`;
+            document.getElementById('drawer-original-amt').textContent = `$${debits.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('drawer-final-amt').textContent = `$${credits.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('drawer-variance-impact').textContent = `$${Math.abs(event.netEconomicImpact).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        } else if (event.eventIntent === 'SETTLEMENT_PACKAGE') {
+            metricLabelL.textContent = 'Settlement Events';
+            metricLabelR.textContent = 'Net Settlement';
+            econLabel1.textContent = 'Original Intent';
+            econLabel2.textContent = 'Final Settled State';
+            econLabel3.textContent = 'Variance Contribution';
+
+            document.getElementById('drawer-count-corrections').textContent = event.nodes.length;
+            document.getElementById('drawer-count-reversals').textContent = `$${event.netEconomicImpact.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            
+            const original = parseFloat((event.nodes[0].data || event.nodes[0]).amount || 0);
+            document.getElementById('drawer-original-amt').textContent = `$${original.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('drawer-final-amt').textContent = `$${event.finalEconomicState.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('drawer-variance-impact').textContent = `$${event.varianceAnalysis.contributionAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        } else {
+            metricLabelL.textContent = 'Corrections';
+            metricLabelR.textContent = 'Reversals';
+            econLabel1.textContent = 'Original Intent';
+            econLabel2.textContent = 'Final Settled State';
+            econLabel3.textContent = 'Variance Contribution';
+
+            document.getElementById('drawer-count-corrections').textContent = event.nodes.filter(n => n.lifecycleRole === 'CORRECTION').length;
+            document.getElementById('drawer-count-reversals').textContent = event.nodes.filter(n => n.lifecycleRole === 'REVERSAL').length;
+
+            const original = parseFloat((event.nodes[0].data || event.nodes[0]).amount || 0);
+            document.getElementById('drawer-original-amt').textContent = `$${original.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('drawer-final-amt').textContent = `$${event.finalEconomicState.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('drawer-variance-impact').textContent = `$${event.varianceAnalysis.contributionAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        }
+
         // Anchor Quality & Collision Warnings (Phase 2.6)
         const aqEl = document.getElementById('drawer-anchor-quality');
         aqEl.textContent = event.anchorQuality;
@@ -1501,17 +1551,9 @@
             collisionWarning.classList.add('hidden');
         }
 
-        document.getElementById('drawer-count-corrections').textContent = event.nodes.filter(n => n.lifecycleRole === 'CORRECTION').length;
-
-        document.getElementById('drawer-count-reversals').textContent = event.nodes.filter(n => n.lifecycleRole === 'REVERSAL').length;
-
-        // Section 2: Economic Reality
-        const original = parseFloat((event.nodes[0].data || event.nodes[0]).amount || 0);
-        document.getElementById('drawer-original-amt').textContent = `$${original.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        document.getElementById('drawer-final-amt').textContent = `$${event.finalEconomicState.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
         document.getElementById('drawer-gross-activity').textContent = `$${event.grossActivity.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        document.getElementById('drawer-variance-impact').textContent = `$${event.varianceAnalysis.contributionAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
         document.getElementById('drawer-narrative').textContent = `"${event.eventNarrative}"`;
+
 
         // Section 3: Timeline
         const timeline = document.getElementById('drawer-timeline');
@@ -1547,19 +1589,22 @@
             ...(n._relationships?.classificationEdges || [])
         ]);
 
-        if (allEdges.length === 0) {
+                if (allEdges.length === 0) {
             relContainer.innerHTML = '<div class="text-[10px] text-slate-600 text-center py-4 italic">No external graph relationships identified for this event cluster.</div>';
         } else {
-            relContainer.innerHTML = allEdges.slice(0, 10).map(edge => `
+            relContainer.innerHTML = allEdges.slice(0, 10).map(edge => {
+                const safeId = (edge.targetId || 'UNKNOWN').toString();
+                return `
                 <div class="p-2.5 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between group hover:border-indigo-500/40 transition">
                     <div class="flex items-center gap-2">
                         <div class="px-1.5 py-0.5 rounded text-[8px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${edge.type}</div>
-                        <span class="text-[10px] text-slate-400 font-mono">${edge.targetId.substring(0, 12)}...</span>
+                        <span class="text-[10px] text-slate-400 font-mono">${safeId.substring(0, 12)}${safeId.length > 12 ? '...' : ''}</span>
                     </div>
                     <i data-lucide="chevron-right" class="w-3 h-3 text-slate-700 group-hover:text-indigo-400 transition"></i>
                 </div>
-            `).join('');
+            `;}).join('');
         }
+
 
         // Section 5: Event-Level Flags
         const flagContainer = document.getElementById('drawer-event-flags');
