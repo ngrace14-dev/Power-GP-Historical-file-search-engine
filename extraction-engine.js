@@ -13,7 +13,7 @@ export class ExtractionEngine {
      * @param {String} entityContext - Active corporate entity (e.g. POMCO, RREDCO)
      * @returns {Object} Normalized financial record matching Phase 3 schema
      */
-    static extractFields(rawData = {}, documentType = 'Unknown Document', entityContext = 'UNKNOWN') {
+        static extractFields(rawData = {}, documentType = 'Unknown Document', entityContext = 'UNKNOWN') {
         // Prevent crashes on null payloads
         const safeData = rawData || {};
 
@@ -28,10 +28,17 @@ export class ExtractionEngine {
             transactionDate: this.#extractTransactionDate(safeData),
             amount: this.#extractAmount(safeData),
             description: this.#extractDescription(safeData),
-            referenceNumber: this.#extractReferenceNumber(safeData)
+            referenceNumber: this.#extractReferenceNumber(safeData),
+            _extractionFlags: []
         };
 
+        // Phase 2.5 Mapping Error Flagging
+        if (record.amount === null) record._extractionFlags.push('INVALID_AMOUNT');
+        if (record.transactionDate === null) record._extractionFlags.push('MISSING_TRANSACTION_DATE');
+        if (record.invoiceNumber === 'ERR_DATE_IN_DOC_FIELD') record._extractionFlags.push('ERR_DATE_IN_DOC_FIELD');
+
         // Fallback: If Vendor is still the generic HTML default, try to salvage it from Description or Reference
+
         if (record.vendor === 'MASTER GL RECORD' || record.vendor === '000') {
             if (record.description && record.description !== 'Unspecified Transaction') {
                 record.vendor = `(Desc) ${record.description.substring(0, 30)}`;
@@ -66,20 +73,25 @@ export class ExtractionEngine {
         return String(val).trim();
     }
 
-    static #extractInvoiceNumber(data) {
-        const val = String(
-            data['Originating Document Number'] ||
-            data.doc_number || 
-            data.invoiceNumber || 
-            data['Invoice Number'] || 
-            data['Doc Number'] || 
-            data['Document Number'] ||
-            data['Original Control Number'] ||
-            '-'
-        ).trim();
-        
-        return (val === '' || val === 'undefined' || val === 'null') ? '-' : val;
-    }
+        static #extractInvoiceNumber(data) {
+            // Power GP Remediation: Reference and Journal Entry are the primary anchor keys
+            let val = data['Reference'] || 
+                      data['Journal Entry'] ||
+                      data['Originating Document Number'] ||
+                      data.doc_number || 
+                      data.invoiceNumber;
+
+            // Remediation: Date objects must NEVER populate document fields
+            if (val instanceof Date) {
+                console.error('[ExtractionEngine] Critical Mapping Error: Date object detected in Document Number field.');
+                return 'ERR_DATE_IN_DOC_FIELD';
+            }
+
+            val = String(val || '-').trim();
+            return (val === '' || val === 'undefined' || val === 'null') ? '-' : val;
+        }
+
+
 
     static #extractVoucherNumber(data) {
         const val = String(
@@ -120,29 +132,64 @@ export class ExtractionEngine {
         return (val === '' || val === 'undefined' || val === 'null') ? '-' : val;
     }
 
-    static #extractTransactionDate(data) {
-        const rawDate = data['TRX Date'] || data.doc_date || data.transactionDate || data['Date'] || data['Posting Date'];
-        if (!rawDate) return new Date().toISOString().split('T')[0];
+        static #extractTransactionDate(data) {
+            // Power GP Layout: TRX Date is Column 3
+            const rawDate = data['TRX Date'] || data.doc_date || data.transactionDate;
+            if (!rawDate) return null; 
         
-        const parsed = new Date(rawDate);
-        if (isNaN(parsed.getTime())) return new Date().toISOString().split('T')[0];
-        return parsed.toISOString().split('T')[0];
-    }
-
-    static #extractAmount(data) {
-        // Dynamics GP usually splits amounts into Debits and Credits in raw ledgers
-        if (data['Debit Amount'] !== undefined || data['Credit Amount'] !== undefined) {
-            const debit = parseFloat(data['Debit Amount']) || 0;
-            const credit = parseFloat(data['Credit Amount']) || 0;
-            // Assuming standard GL perspective: Debits are positive, Credits are negative
-            return parseFloat((debit - credit).toFixed(2));
+            const parsed = new Date(rawDate);
+            if (isNaN(parsed.getTime())) return null; 
+            return parsed.toISOString().split('T')[0];
         }
 
-        const rawAmt = data.doc_amount !== undefined ? data.doc_amount : (data.amount || data['Amount'] || data['Net Amount'] || 0);
-        const parsed = parseFloat(rawAmt);
+
+
+        static #extractAmount(data) {
+            // Power GP Signed Amount Reconstruction (Phase 2.5)
+            const dStr = String(data['Debit Amount'] || '0');
+            const cStr = String(data['Credit Amount'] || '0');
         
-        return isNaN(parsed) ? 0.0 : parseFloat(parsed.toFixed(2));
+            const debit = this.#parseForensicCurrency(dStr);
+            const credit = this.#parseForensicCurrency(cStr);
+
+            if (debit > 0) return debit;
+            if (credit > 0) return -credit;
+        
+            // If both are zero or undefined
+            if (debit === 0 && credit === 0) return null;
+
+            // Fallback for net amount fields if they exist but debits/credits don't
+            const rawAmt = data.doc_amount !== undefined ? data.doc_amount : (data.amount || data['Amount'] || 0);
+            return this.#parseForensicCurrency(rawAmt);
+        }
+
+
+    /**
+     * Robust currency parsing for forensic accounting
+     * Handles: $1,234.56, (1,234.56), -1234.56, whitespace
+     */
+    static #parseForensicCurrency(val) {
+        if (val === null || val === undefined) return 0;
+        if (typeof val === 'number') return val;
+
+        let str = String(val).trim();
+        if (!str || str === '-') return 0;
+
+        // Check for parentheses (negative)
+        const isParenthetical = str.startsWith('(') && str.endsWith(')');
+        
+        // Remove currency symbols, commas, and parentheses
+        let clean = str.replace(/[$,\(\)]/g, '');
+        
+        let num = parseFloat(clean);
+        if (isNaN(num)) {
+            console.error(`[ExtractionEngine] Critical: Failed to parse currency string: "${str}"`);
+            return NaN; // Remediation: Do not silently return 0
+        }
+
+        return isParenthetical ? -Math.abs(num) : num;
     }
+
 
     static #extractDescription(data) {
         const val = data.description || 

@@ -1015,28 +1015,32 @@
                   const MAX_RECORDS_PER_FILE = totalFiles < 3 ? 15000 : 5000;
                   const recordsToProcess = Math.min(MAX_RECORDS_PER_FILE, raw2D.length);
 
-                  for (let r = 1; r < recordsToProcess; r++) {
+                                    for (let r = 1; r < recordsToProcess; r++) {
                     const row = raw2D[r];
                     if (!row || row.length === 0) continue;
 
-                    const docAmt = parseFloat(row[7]) || 0;
-                    const curAmt = parseFloat(row[8]) || 0;
-            
+                    // POWER GP LAYOUT REMEDIATION (Phase 2.5)
                     const rawRecord = {
-                      row_id: `LH_ROW_${rowId++}`,
-                      vendor_id: String(row[0] || entityMatch.name),
-                      vendor_name: String(row[2] || 'MASTER GL RECORD'),
-                      voucher: String(row[1] || 'JE-CLK'),
-                      doc_number: String(row[3] || 'INV-CLK'),
-                      type: docType,
-                      doc_date: row[4] ? (row[4] instanceof Date ? row[4].toLocaleDateString() : String(row[4])) : new Date().toLocaleDateString(),
-                      doc_amount: docAmt,
-                      current_period: curAmt,
-                      _cross_foot_valid: true
+                        'Department': row[0],
+                        'Journal Entry': row[1],
+                        'Originating Master Name': row[2],
+                        'TRX Date': row[3],
+                        'Account Number': row[4],
+                        'Account Description': row[5],
+                        'Debit Amount': row[6],
+                        'Credit Amount': row[7],
+                        'Reference': row[8],
+                        'Description': row[9],
+                        'Originating TRX Source': row[10],
+                        'User Who Posted': row[11],
+                        row_id: `LH_ROW_${rowId++}`,
+                        _cross_foot_valid: true
                     };
 
                     const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
+                    normalizedRecord.row_id = rawRecord.row_id; // Preserve ID
                     normalizedRecord.type = docType;
+
 
                     const scores = ConfidenceEngine.calculateScores({
                         sourceType: "NATIVE_EXPORT",
