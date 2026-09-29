@@ -1403,7 +1403,7 @@
       }
     };
 
-    window.downloadExcel = async () => {
+        window.downloadExcel = async () => {
       if (extractedData.length === 0) return;
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Lighthouse Audit');
@@ -1452,11 +1452,6 @@
       a.download = `Digitized_Lighthouse_Schedule_${Date.now()}.xlsx`;
       a.click();
     };
-
-    lucide.createIcons();
-  </script>
-</body>
-</html>
 
     lucide.createIcons();
   </script>
