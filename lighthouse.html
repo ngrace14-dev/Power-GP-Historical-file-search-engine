@@ -114,17 +114,54 @@
         </button>
       </div>
       
-      <!-- View 1: Cloud Storage Pull -->
-      <div id="view-cloud" class="flex flex-col items-center justify-center p-10 rounded-2xl border border-dashed border-cyan-500/30 bg-slate-950/50">
-        <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-3">
-          <i class="ph ph-cloud-arrow-down text-2xl text-cyan-400"></i>
-        </div>
-        <h2 class="font-bold text-base text-white mb-1">Analyze Master Corporate Ledgers</h2>
-        <p class="text-xs text-slate-400 text-center max-w-md mb-5">Pull the 17 corporate entity Excel ledgers directly from Cloud Storage (<code class="font-mono text-cyan-400">RREDCO Power GP</code>) to execute cross-footing and tie-outs.</p>
-        <button id="btn-cloud-pull" onclick="pullCloudLedgers()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition shadow-lg shadow-cyan-500/20 flex items-center gap-2">
-          <i class="ph ph-lightning text-base"></i> PULL & DIGITIZE 17 ENTITY LEDGERS
+          <!-- Upload & Cloud Pull Panel -->
+    <section id="upload-section" class="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 transition-all shadow-xl">
+      <div class="flex gap-6 mb-6 border-b border-slate-800 px-2 overflow-x-auto">
+        <button onclick="switchTab('cloud')" id="tab-cloud" class="text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
+          <i class="ph ph-cloud-arrow-down text-base"></i> Pull Power GP Cloud Ledgers
+        </button>
+        <button onclick="switchTab('pdf')" id="tab-pdf" class="text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
+          <i class="ph ph-file-pdf text-base"></i> PDF Schedule Upload
+        </button>
+        <button onclick="switchTab('text')" id="tab-text" class="text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
+          <i class="ph ph-text-t text-base"></i> Raw Text Ingestion
         </button>
       </div>
+      
+      <!-- View 1: Cloud Storage Pull & Catalog -->
+      <div id="view-cloud" class="flex flex-col p-2 min-h-[300px]">
+        <div id="catalog-loading" class="flex flex-col items-center justify-center py-12">
+            <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-3">
+              <i class="ph ph-cloud-arrow-down text-2xl text-cyan-400"></i>
+            </div>
+            <h2 class="font-bold text-base text-white mb-1">Connecting to corporate cloud...</h2>
+            <p class="text-xs text-slate-400">Fetching entity ledger catalog from RREDCO Power GP Storage.</p>
+        </div>
+
+        <div id="catalog-view" class="hidden animate-in fade-in duration-500">
+            <div class="flex items-center justify-between mb-4 bg-slate-950/40 p-4 rounded-xl border border-slate-800">
+                <div>
+                    <h2 class="font-bold text-base text-white">Entity Ledger Catalog</h2>
+                    <p class="text-[11px] text-slate-500 mt-0.5">Select corporate entities to ingest into the workstation.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="selectAllEntities(true)" class="px-3 py-1.5 text-[10px] font-bold text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition border border-cyan-500/20">SELECT ALL</button>
+                    <button onclick="selectAllEntities(false)" class="px-3 py-1.5 text-[10px] font-bold text-slate-500 hover:bg-slate-500/10 rounded-lg transition border border-slate-700">CLEAR</button>
+                </div>
+            </div>
+
+            <div id="entity-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <!-- Dynamically populated -->
+            </div>
+
+            <div class="mt-6 pt-6 border-t border-slate-800 flex justify-center">
+                <button id="btn-execute-selective" onclick="pullSelectedLedgers()" class="w-full sm:w-auto px-10 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-sm transition shadow-xl shadow-cyan-500/20 flex items-center justify-center gap-2 group">
+                    <i class="ph ph-lightning text-lg group-hover:animate-pulse"></i> INGEST SELECTED CORPORATE LEDGERS
+                </button>
+            </div>
+        </div>
+      </div>
+
 
       <!-- View 2: PDF Upload -->
       <label id="view-pdf" class="hidden flex-col items-center justify-center p-12 rounded-2xl cursor-pointer transition-all border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-800/40 group">
@@ -628,177 +665,238 @@
       document.getElementById('modal-relationship-inspector').classList.add('hidden');
     };
 
-        window.pullCloudLedgers = async () => {
-          const t_start = performance.now();
-          console.group('Lighthouse Diagnostics: Cloud Ledger Pull');
-      
-          document.getElementById('upload-section').classList.add('hidden');
-          document.getElementById('progress-section').classList.remove('hidden');
-          document.getElementById('results-section').classList.add('hidden');
+            let cloudCatalog = [];
 
-          extractedData = [];
-          window.logSys('Connecting to Firebase Storage bucket: RREDCO Power GP...');
-          window.updateProgress(5, 'FETCHING CLOUD FILES...');
+    window.switchTab = (tab) => {
+      const tabCloud = document.getElementById('tab-cloud');
+      const tabPdf = document.getElementById('tab-pdf');
+      const tabText = document.getElementById('tab-text');
+      const viewCloud = document.getElementById('view-cloud');
+      const viewPdf = document.getElementById('view-pdf');
+      const viewText = document.getElementById('view-text');
 
-          try {
+      tabCloud.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+      tabPdf.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+      tabText.className = "text-slate-500 hover:text-slate-300 font-bold pb-3 border-b-2 border-transparent transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+
+      viewCloud.classList.add('hidden'); viewCloud.classList.remove('flex');
+      viewPdf.classList.add('hidden'); viewPdf.classList.remove('flex');
+      viewText.classList.add('hidden'); viewText.classList.remove('flex');
+
+      if (tab === 'cloud') {
+        tabCloud.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewCloud.classList.remove('hidden'); viewCloud.classList.add('flex');
+        fetchCloudCatalog();
+      } else if (tab === 'pdf') {
+        tabPdf.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewPdf.classList.remove('hidden'); viewPdf.classList.add('flex');
+      } else {
+        tabText.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+        viewText.classList.remove('hidden'); viewText.classList.add('flex');
+      }
+    };
+
+    async function fetchCloudCatalog() {
+        if (cloudCatalog.length > 0) return; // Only fetch once
+        
+        document.getElementById('catalog-loading').classList.remove('hidden');
+        document.getElementById('catalog-loading').classList.add('flex');
+        document.getElementById('catalog-view').classList.add('hidden');
+
+        try {
             const folderRef = ref(storage, 'RREDCO Power GP');
             const result = await listAll(folderRef);
-            const xlsxFiles = result.items.filter(item => item.name.endsWith('.xlsx'));
+            cloudCatalog = result.items.filter(item => item.name.endsWith('.xlsx'));
+            renderCatalog();
+        } catch (err) {
+            window.logSys(`Catalog Error: ${err.message}`, 'error');
+        }
+    }
 
-            window.logSys(`Found ${xlsxFiles.length} entity ledger files in Cloud Storage.`);
+    function renderCatalog() {
+        const grid = document.getElementById('entity-grid');
+        document.getElementById('catalog-loading').classList.add('hidden');
+        document.getElementById('catalog-loading').classList.remove('flex');
+        document.getElementById('catalog-view').classList.remove('hidden');
 
-            let rowId = 1;
-            const totalFiles = xlsxFiles.length;
-            let totalParseTime = 0;
+        grid.innerHTML = cloudCatalog.map((file, idx) => {
+            const entityMatch = window.COMPANY_ENTITIES.find(e => file.name.includes(e.short)) || { name: file.name.split(' ')[0], short: "UNK" };
+            return `
+                <label class="group flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-cyan-500/40 hover:bg-slate-800/40 cursor-pointer transition-all">
+                    <input type="checkbox" name="entity-select" value="${idx}" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-slate-950">
+                    <div class="flex-1 overflow-hidden">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-bold text-cyan-400 px-1 rounded bg-cyan-500/10">${entityMatch.short}</span>
+                            <span class="text-xs font-bold text-white truncate">${entityMatch.name}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 truncate mt-0.5">${file.name}</div>
+                    </div>
+                </label>
+            `;
+        }).join('');
+    }
 
-            for (let idx = 0; idx < totalFiles; idx++) {
-              const fileRef = xlsxFiles[idx];
-              const fileProgressStart = 5 + (idx / totalFiles) * 75;
+    window.selectAllEntities = (check) => {
+        const checks = document.querySelectorAll('input[name="entity-select"]');
+        checks.forEach(c => c.checked = check);
+    };
+
+    window.pullSelectedLedgers = async () => {
+        const selectedIndices = Array.from(document.querySelectorAll('input[name="entity-select"]:checked')).map(c => parseInt(c.value));
+        if (selectedIndices.length === 0) return alert("Select at least one corporate entity ledger to begin.");
+
+        const filesToProcess = selectedIndices.map(idx => cloudCatalog[idx]);
+        await executeCloudIngestion(filesToProcess);
+    };
+
+    async function executeCloudIngestion(xlsxFiles) {
+      const t_start = performance.now();
+      console.group('Lighthouse Diagnostics: Selective Ingestion');
+      
+      document.getElementById('upload-section').classList.add('hidden');
+      document.getElementById('progress-section').classList.remove('hidden');
+      document.getElementById('results-section').classList.add('hidden');
+
+      extractedData = [];
+      window.logSys(`Initiating selective ingestion for ${xlsxFiles.length} entities...`);
+      window.updateProgress(5, 'INITIALIZING WORKSTATION...');
+
+      try {
+        let rowId = 1;
+        const totalFiles = xlsxFiles.length;
+        let totalParseTime = 0;
+
+        for (let idx = 0; idx < totalFiles; idx++) {
+          const fileRef = xlsxFiles[idx];
+          const fileProgressStart = 5 + (idx / totalFiles) * 75;
           
-              window.updateProgress(fileProgressStart, `DOWNLOADING ${fileRef.name} (${idx + 1}/${totalFiles})`);
+          window.updateProgress(fileProgressStart, `DOWNLOADING ${fileRef.name} (${idx + 1}/${totalFiles})`);
 
-              const classification = ClassificationEngine.classifyDocument('', fileRef.name);
-              const docType = classification.documentType === 'Unknown Document' ? 'General Ledger Export' : classification.documentType;
+          const classification = ClassificationEngine.classifyDocument('', fileRef.name);
+          const docType = classification.documentType === 'Unknown Document' ? 'General Ledger Export' : classification.documentType;
 
-              const url = await getDownloadURL(fileRef);
-              const response = await fetch(url);
-              const arrayBuffer = await response.arrayBuffer();
+          const url = await getDownloadURL(fileRef);
+          const response = await fetch(url);
+          const arrayBuffer = await response.arrayBuffer();
           
-              window.updateProgress(fileProgressStart + (2 / totalFiles * 75), `DIGITIZING ${fileRef.name}...`);
-              await new Promise(resolve => setTimeout(resolve, 0));
+          window.updateProgress(fileProgressStart + (2 / totalFiles * 75), `DIGITIZING ${fileRef.name}...`);
+          await new Promise(resolve => setTimeout(resolve, 10));
 
-              const t_parse_start = performance.now();
-              const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellNF: false, cellText: false });
-              const sheet = workbook.Sheets[workbook.SheetNames[0]];
-              const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
-              const t_parse_end = performance.now();
-              totalParseTime += (t_parse_end - t_parse_start);
+          const t_parse_start = performance.now();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellNF: false, cellText: false });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+          const t_parse_end = performance.now();
+          totalParseTime += (t_parse_end - t_parse_start);
 
-              const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0], short: "UNKNOWN" };
-              const batchRecords = [];
+          const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0], short: "UNKNOWN" };
+          const batchRecords = [];
 
-              const MAX_RECORDS_PER_FILE = 5000;
-              const recordsToProcess = Math.min(MAX_RECORDS_PER_FILE, raw2D.length);
+          // Selective load allows us to increase the per-file limit as fewer files are in memory
+          const MAX_RECORDS_PER_FILE = totalFiles < 3 ? 15000 : 5000;
+          const recordsToProcess = Math.min(MAX_RECORDS_PER_FILE, raw2D.length);
 
-              for (let r = 1; r < recordsToProcess; r++) {
-                const row = raw2D[r];
-                if (!row || row.length === 0) continue;
+          for (let r = 1; r < recordsToProcess; r++) {
+            const row = raw2D[r];
+            if (!row || row.length === 0) continue;
 
-                const docAmt = parseFloat(row[7]) || 0;
-                const curAmt = parseFloat(row[8]) || 0;
+            const docAmt = parseFloat(row[7]) || 0;
+            const curAmt = parseFloat(row[8]) || 0;
             
-                const rawRecord = {
-                  row_id: `LH_ROW_${rowId++}`,
-                  vendor_id: String(row[0] || entityMatch.name),
-                  vendor_name: String(row[2] || 'MASTER GL RECORD'),
-                  voucher: String(row[1] || 'JE-CLK'),
-                  doc_number: String(row[3] || 'INV-CLK'),
-                  type: docType,
-                  doc_date: row[4] ? (row[4] instanceof Date ? row[4].toLocaleDateString() : String(row[4])) : new Date().toLocaleDateString(),
-                  doc_amount: docAmt,
-                  current_period: curAmt,
-                  _cross_foot_valid: true
-                };
+            const rawRecord = {
+              row_id: `LH_ROW_${rowId++}`,
+              vendor_id: String(row[0] || entityMatch.name),
+              vendor_name: String(row[2] || 'MASTER GL RECORD'),
+              voucher: String(row[1] || 'JE-CLK'),
+              doc_number: String(row[3] || 'INV-CLK'),
+              type: docType,
+              doc_date: row[4] ? (row[4] instanceof Date ? row[4].toLocaleDateString() : String(row[4])) : new Date().toLocaleDateString(),
+              doc_amount: docAmt,
+              current_period: curAmt,
+              _cross_foot_valid: true
+            };
 
-                const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
-                normalizedRecord.type = docType;
+            const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
+            normalizedRecord.type = docType;
 
-                const scores = ConfidenceEngine.calculateScores({
-                    sourceType: "NATIVE_EXPORT",
-                    parsedRecord: normalizedRecord
-                });
+            const scores = ConfidenceEngine.calculateScores({
+                sourceType: "NATIVE_EXPORT",
+                parsedRecord: normalizedRecord
+            });
 
-                const stampedRecord = ProvenanceEngine.stampRecord({
-                  sourceFile: fileRef.name,
-                  sourceSystem: "Firebase_Storage",
-                  sourceType: "NATIVE_EXPORT", 
-                  entityContext: entityMatch.short || "UNKNOWN", 
-                  processedBy: "Lighthouse Engine v3 (Memory Optimized)",
-                  ocrConfidence: scores.ocrConfidence,
-                  parsingConfidence: scores.parsingConfidence,
-                  extractedData: normalizedRecord
-                });
+            const stampedRecord = ProvenanceEngine.stampRecord({
+              sourceFile: fileRef.name,
+              sourceSystem: "Firebase_Storage",
+              sourceType: "NATIVE_EXPORT", 
+              entityContext: entityMatch.short || "UNKNOWN", 
+              processedBy: "Lighthouse Engine v3 (Selective Load)",
+              ocrConfidence: scores.ocrConfidence,
+              parsingConfidence: scores.parsingConfidence,
+              extractedData: normalizedRecord
+            });
 
-                batchRecords.push({
-                    _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
-                    _provenance: stampedRecord._provenance,
-                    data: stampedRecord.data,
-                    _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
-                });
-              }
-
-              const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
-              batchRecords.forEach(b => {
-                  b._validation = validation;
-                  if (validation.tieOutStatus === 'FAIL') b._evidenceState.hasVariance = true;
-              });
-
-              extractedData = [...extractedData, ...batchRecords];
-              await new Promise(resolve => setTimeout(resolve, 10));
-            }
-
-            console.log(`XLSX Parse Phase Complete: ${totalParseTime.toFixed(2)}ms`);
-            console.log(`Total Records Extracted: ${extractedData.length}`);
-
-            window.updateProgress(85, 'EXECUTING FORENSIC PIPELINE...');
-        
-            const t_pipeline_start = performance.now();
-            await new Promise(resolve => setTimeout(resolve, 0));
-            extractedData = await RelationshipEngine.buildRelationships(extractedData);
-        
-            await new Promise(resolve => setTimeout(resolve, 0));
-            extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
-        
-            await new Promise(resolve => setTimeout(resolve, 0));
-            extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
-        
-            await new Promise(resolve => setTimeout(resolve, 0));
-            extractedData = RiskEngine.evaluateDataset(extractedData).records;
-        
-            await new Promise(resolve => setTimeout(resolve, 0));
-            extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
-            const t_pipeline_end = performance.now();
-        
-            console.log(`Forensic Pipeline Duration: ${(t_pipeline_end - t_pipeline_start).toFixed(2)}ms`);
-
-            const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
-            renderContradictionPanel(contradictionFlags);
-
-            window.updateProgress(95, 'BUILDING EVIDENCE GRAPH...');
-            const t_graph_start = performance.now();
-            await new Promise(resolve => setTimeout(resolve, 0));
-            activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
-            const t_graph_end = performance.now();
-        
-            console.log(`Evidence Graph Construction: ${(t_graph_end - t_graph_start).toFixed(2)}ms`);
-            console.log(`Graph Nodes: ${activeEvidenceGraph.nodes.size}`);
-            console.log(`Graph Edges: ${activeEvidenceGraph.edges.length}`);
-
-            const coc = ChainOfCustody.getLedger();
-            console.log(`ChainOfCustody Event Count: ${coc.length}`);
-        
-            if (activeCase) {
-                console.log(`Investigation Timeline Events: ${activeCase.timeline ? activeCase.timeline.length : 0}`);
-                console.log(`Evidence Packages: ${activeCase.evidencePackages ? activeCase.evidencePackages.length : 0}`);
-                console.log(`Findings: ${activeCase.findings ? activeCase.findings.length : 0}`);
-            }
-
-            const estimatedMemory = (JSON.stringify(extractedData).length + JSON.stringify(activeEvidenceGraph).length) / (1024 * 1024);
-            console.log(`Estimated Dataset Memory Footprint: ${estimatedMemory.toFixed(2)} MB`);
-
-            window.updateProgress(100, 'CLOUD DIGITIZATION COMPLETE');
-            window.renderResults(extractedData);
-
-            const t_end = performance.now();
-            console.log(`Total Ingestion Duration: ${(t_end - t_start).toFixed(2)}ms`);
-            console.groupEnd();
-
-          } catch (err) {
-            window.logSys(`Optimization Failure: ${err.message}`, 'error');
-            window.updateProgress(0, 'PULL ABORTED');
-            console.groupEnd();
+            batchRecords.push({
+                _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
+                _provenance: stampedRecord._provenance,
+                data: stampedRecord.data,
+                _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
+            });
           }
-        };
+
+          const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
+          batchRecords.forEach(b => {
+              b._validation = validation;
+              if (validation.tieOutStatus === 'FAIL') b._evidenceState.hasVariance = true;
+          });
+
+          extractedData = [...extractedData, ...batchRecords];
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+
+        console.log(`XLSX Parse Phase Complete: ${totalParseTime.toFixed(2)}ms`);
+
+        window.updateProgress(85, 'EXECUTING FORENSIC PIPELINE...');
+        
+        await new Promise(resolve => setTimeout(resolve, 50));
+        extractedData = await RelationshipEngine.buildRelationships(extractedData);
+        
+        await new Promise(resolve => setTimeout(resolve, 10));
+        extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
+        
+        await new Promise(resolve => setTimeout(resolve, 10));
+        extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
+        
+        await new Promise(resolve => setTimeout(resolve, 10));
+        extractedData = RiskEngine.evaluateDataset(extractedData).records;
+        
+        await new Promise(resolve => setTimeout(resolve, 10));
+        extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
+        
+        const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
+        renderContradictionPanel(contradictionFlags);
+
+        window.updateProgress(95, 'BUILDING EVIDENCE GRAPH...');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
+
+        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_SELECTIVE", {
+            fileCount: totalFiles,
+            recordCount: extractedData.length,
+            entities: xlsxFiles.map(f => f.name)
+        }, currentUserEmail);
+
+        window.updateProgress(100, 'INGESTION COMPLETE');
+        window.renderResults(extractedData);
+
+        console.groupEnd();
+
+      } catch (err) {
+        window.logSys(`Ingestion Failure: ${err.message}`, 'error');
+        window.updateProgress(0, 'PULL ABORTED');
+        console.groupEnd();
+      }
+    }
+
 
 
 
