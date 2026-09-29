@@ -48,13 +48,120 @@ export class GeminiService {
             if (data.analysis) return data.analysis;
         }
 
-        // Governed client-side fallback reasoning generator
+                // Governed client-side fallback reasoning generator
         return this.generateClientSideReasoning(userQuery, dataset, triEvidence);
+    }
+
+    /**
+     * Phase 3.0: Specific endpoint for AI Analyst interpretation
+     */
+    async queryAnalyst(prompt, eventData) {
+        // Attempt remote call to specialized analyst endpoint
+        const response = await fetch('https://rredco-database-default-rtdb.firebaseio.com/ai_analyst_stubs.json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, eventData })
+        }).catch(() => null);
+
+        if (response && response.ok) {
+            const data = await response.json();
+            if (data.analysis) return data.analysis;
+        }
+
+        // Fallback governed interpretation
+        return this.generateClientSideAnalystReasoning(eventData);
+    }
+
+    /**
+     * Phase 3.0 Fallback Analyst Generator
+     */
+    generateClientSideAnalystReasoning(eventData) {
+        const isUnbalanced = Math.abs(eventData.metrics.netEconomicImpact) > 0.01;
+        const isCompound = eventData.eventIntent === 'COMPOUND_ENTRY';
+        
+        let interpretation = "";
+        let recommendations = [];
+        let hypotheses = [];
+        let warnings = [];
+
+        if (isCompound && isUnbalanced) {
+            interpretation = "This event appears consistent with an unbalanced journal entry or a partial data extraction. In intercompany environments, this often reflects a 'Due To' or 'Due From' relationship where only one side of the transaction is captured in the current scope.";
+            recommendations = [
+                "Search matching Journal Entry across other corporate entities.",
+                "Review Due To / Due From accounts in the General Ledger.",
+                "Inspect source GLTRX posting for offset account details."
+            ];
+            hypotheses = [
+                { explanation: "Intercompany Allocation (Fragmented)", confidence: "High" },
+                { explanation: "Filtered Extraction Scope", confidence: "Medium" },
+                { explanation: "Incomplete Ingestion", confidence: "Medium" },
+                { explanation: "Accounting Error / Missing Counterparty", confidence: "Low" }
+            ];
+                } else if (eventData.eventIntent === 'SETTLEMENT_PACKAGE') {
+            interpretation = "This event appears consistent with a standard settlement cycle (Accounts Payable payment). The chain shows a liability being satisfied by a settlement instrument like a computer check or electronic transfer.";
+            recommendations = [
+                "Review matching bank statement activity.",
+                "Verify check or EFT reference numbers against bank exports.",
+                "Ensure the corresponding liability invoice was properly relieved."
+            ];
+            hypotheses = [
+                { explanation: "Standard Settlement Cycle (Computer Check)", confidence: "High" },
+                { explanation: "Manual Payment Entry", confidence: "Medium" }
+            ];
+        } else if (eventData.eventIntent === 'CONTROLLER_ADJUSTMENT') {
+            interpretation = "This event appears consistent with a manual accounting intervention, such as a 'Back Out' entry or a reclassification. These are typically used to correct prior period errors or redirect expenses between departments/entities.";
+            recommendations = [
+                "Review the original entry being reversed or adjusted.",
+                "Verify manual authorization for the reclassification.",
+                "Check for matching 'Back Out' chains in adjacent periods."
+            ];
+            hypotheses = [
+                { explanation: "Correction of Prior Error", confidence: "High" },
+                { explanation: "Reclassification of Expenses", confidence: "Medium" },
+                { explanation: "Manual Ledger Maintenance", confidence: "Medium" }
+            ];
+        } else if (eventData.eventIntent === 'RECON_PACKAGE') {
+            interpretation = "This event is consistent with a month-end reconciliation entry (e.g., ONQ Hilton Recon). It often aggregates multiple activity streams into a single clearing or suspense account.";
+            recommendations = [
+                "Review detailed reconciliation workpapers for the $${Math.abs(eventData.metrics.netEconomicImpact).toLocaleString()} balance.",
+                "Verify clearing account matches against source subledger reports.",
+                "Inspect 'ONQ' or 'Hilton' specific source feeds if available."
+            ];
+            hypotheses = [
+                { explanation: "Month-End Reconciliation Entry", confidence: "High" },
+                { explanation: "Subledger-to-GL Sync Point", confidence: "Medium" }
+            ];
+        } else {
+
+            interpretation = `This event is classified as ${eventData.eventIntent.replace('_', ' ')} and appears consistent with standard ${eventData.eventIntent.toLowerCase()} activity for ${eventData.anchor.vendorName}.`;
+            recommendations = [
+                "Review adjacent ledger segments for related activity.",
+                "Verify document references against physical source records."
+            ];
+            hypotheses = [
+                { explanation: "Standard Ledger Activity", confidence: "High" }
+            ];
+        }
+
+        // Contradiction Detection (Phase 3.0 Rule 4)
+        if (eventData.status === 'BALANCED' && isUnbalanced) {
+            warnings.push(`Internal Consistency Warning: Status indicates BALANCED while event metrics indicate an imbalance of $${Math.abs(eventData.metrics.netEconomicImpact).toLocaleString()}.`);
+        }
+
+        return {
+            interpretation,
+            auditorGuidance: "Auditors should verify the existence of the counterparty entry in the consolidated ledger before concluding a posting error exists. Cross-entity boundary leaks are common in this environment.",
+            confidence: "High",
+            hypotheses,
+            warnings,
+            recommendations
+        };
     }
 
     /**
      * Phase 6: Generates a formal, evidence-derived Accounting Audit Memorandum
      */
+
     async generateAuditMemo(dataset = [], title = "Forensic Evidence Memorandum") {
         if (!dataset || dataset.length === 0) {
             throw new Error("Governance Violation: Cannot generate an audit memorandum from an empty dataset.");
