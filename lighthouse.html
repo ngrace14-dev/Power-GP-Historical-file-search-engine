@@ -621,8 +621,10 @@
     
     // NEW MODULAR ENGINES
     import { RelationshipEngine } from './src/engines/relationship/relationship-engine.js';
-    import { AEREEngine } from './src/engines/aere/aere-engine.js';
+        import { AEREEngine } from './src/engines/aere/aere-engine.js';
     import { AiAnalystEngine } from './src/engines/aere/ai-analyst-engine.js';
+    import { HypothesisCorroborationEngine } from './src/engines/aere/hypothesis-corroboration-engine.js';
+
 
 
 
@@ -1683,54 +1685,72 @@
     };
 
         window.triggerAiAnalyst = async (event) => {
-        const container = document.getElementById('ai-analyst-container');
-        const interpretation = document.getElementById('ai-interpretation');
-        const confidence = document.getElementById('ai-confidence-badge');
-        const rec = document.getElementById('ai-recommendation');
-        const evidenceList = document.getElementById('ai-evidence-list');
-        const mostLikely = document.getElementById('ai-most-likely');
-        const alternative = document.getElementById('ai-alternative');
-        const altContainer = document.getElementById('ai-alt-container');
-        const warnings = document.getElementById('ai-warnings');
+            const container = document.getElementById('ai-analyst-container');
+            const interpretation = document.getElementById('ai-interpretation');
+            const confidence = document.getElementById('ai-confidence-badge');
+            const rec = document.getElementById('ai-recommendation');
+            const evidenceList = document.getElementById('ai-evidence-list');
+            const mostLikely = document.getElementById('ai-most-likely');
+            const alternative = document.getElementById('ai-alternative');
+            const altContainer = document.getElementById('ai-alt-container');
+            const warnings = document.getElementById('ai-warnings');
 
-        container.classList.remove('hidden');
-        interpretation.textContent = "Analyzing event context with Level 5 AI Reasoning...";
-        confidence.textContent = "...";
-        rec.textContent = "Processing...";
-        evidenceList.innerHTML = '';
-        mostLikely.textContent = '...';
-        alternative.textContent = '...';
-        altContainer.classList.add('hidden');
-        warnings.innerHTML = '';
-        warnings.classList.add('hidden');
+            container.classList.remove('hidden');
+            interpretation.textContent = "Analyzing event context with Level 5 AI Reasoning...";
+            confidence.textContent = "...";
+            rec.textContent = "Processing...";
+            evidenceList.innerHTML = '';
+            mostLikely.textContent = '...';
+            alternative.textContent = '...';
+            altContainer.classList.add('hidden');
+            warnings.innerHTML = '';
+            warnings.classList.add('hidden');
 
-        try {
-            const analysis = await AiAnalystEngine.analyzeEvent(event);
+            try {
+                const analysis = await AiAnalystEngine.analyzeEvent(event);
             
-            interpretation.textContent = analysis.interpretation;
-            confidence.textContent = analysis.confidence + ' Confidence';
+                // Phase 4.0: Deterministic Corroboration of AI Hypotheses
+                const corrob = HypothesisCorroborationEngine.corroborate(event, analysis);
             
-            // Confidence Color Logic
-            confidence.className = 'px-2 py-0.5 rounded text-[9px] font-bold border uppercase whitespace-nowrap ' + 
-                (analysis.confidence === 'High' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 
-                (analysis.confidence === 'Medium' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 
-                'bg-rose-500/20 text-rose-300 border-rose-500/30'));
-
-            rec.innerHTML = `<i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-purple-400"></i> ${analysis.recommendations[0] || 'Review manual entries.'}`;
+                interpretation.textContent = analysis.interpretation;
+                confidence.textContent = analysis.confidence + ' Confidence';
             
-            // Render Evidence Chain
-            evidenceList.innerHTML = (analysis.evidenceUsed || []).map(e => `
-                <span class="px-1.5 py-0.5 rounded bg-slate-900 border border-purple-500/20 text-[8px] font-mono text-purple-400/80">${e}</span>
-            `).join('');
+                // Confidence Color Logic
+                confidence.className = 'px-2 py-0.5 rounded text-[9px] font-bold border uppercase whitespace-nowrap ' + 
+                    (analysis.confidence === 'High' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 
+                    (analysis.confidence === 'Medium' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 
+                    'bg-rose-500/20 text-rose-300 border-rose-500/30'));
 
-            // Render Explanations
-            mostLikely.textContent = analysis.mostLikely?.explanation || 'N/A';
-            if (analysis.alternative && analysis.alternative.explanation) {
-                altContainer.classList.remove('hidden');
-                alternative.textContent = analysis.alternative.explanation;
-            }
+                rec.innerHTML = `<i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-purple-400"></i> ${analysis.recommendations[0] || 'Review manual entries.'}`;
+            
+                // Render Evidence Chain
+                evidenceList.innerHTML = (analysis.evidenceUsed || []).map(e => `
+                    <span class="px-1.5 py-0.5 rounded bg-slate-900 border border-purple-500/20 text-[8px] font-mono text-purple-400/80">${e}</span>
+                `).join('');
 
-            if (analysis.warnings && analysis.warnings.length > 0) {
+                // Render Explanations with Corroboration (Phase 4.0)
+                const renderExplanation = (exp, cor) => {
+                    if (!exp) return '';
+                    const corStatus = cor?.status || 'NOT EVALUATED';
+                    const corColor = corStatus === 'SUPPORTED' ? 'text-emerald-400' : (corStatus === 'PARTIALLY SUPPORTED' ? 'text-amber-400' : 'text-rose-400');
+                
+                    return `
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-[10px] text-purple-100/90 italic leading-snug">${exp.explanation}</span>
+                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded border border-current ${corColor} bg-current/10 uppercase ml-2 whitespace-nowrap">${corStatus}</span>
+                        </div>
+                        ${cor?.supporting?.length > 0 ? `<div class="text-[8px] text-slate-500 font-mono mt-1">Verified: ${cor.supporting.join(', ')}</div>` : ''}
+                    `;
+                };
+
+                mostLikely.innerHTML = renderExplanation(analysis.mostLikely, corrob?.mostLikely);
+                if (analysis.alternative && analysis.alternative.explanation) {
+                    altContainer.classList.remove('hidden');
+                    alternative.innerHTML = renderExplanation(analysis.alternative, corrob?.alternative);
+                }
+
+                if (analysis.warnings && analysis.warnings.length > 0) {
+
                 warnings.classList.remove('hidden');
                 warnings.innerHTML = analysis.warnings.map(w => `
                     <div class="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg space-y-1">
