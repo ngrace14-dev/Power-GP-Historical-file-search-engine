@@ -162,12 +162,24 @@
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Complexity</div>
                           <div id="drawer-complexity" class="text-xs font-bold text-white">3 Entries</div>
                       </div>
-                      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
                           <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Confidence</div>
                           <div id="drawer-confidence" class="text-xs font-bold text-cyan-400">92%</div>
                       </div>
+                      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                          <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Anchor Quality</div>
+                          <div id="drawer-anchor-quality" class="text-xs font-bold text-white">LOW</div>
+                      </div>
+                  </div>
+                  <div id="collision-warning" class="hidden p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl">
+                      <div class="flex items-center gap-2 text-rose-400">
+                          <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                          <span class="text-[10px] font-bold uppercase tracking-wider">Possible Collision Event</span>
+                      </div>
+                      <p class="text-[9px] text-rose-300/80 mt-1">This event cluster contains potentially unrelated transactions merged under a generic document reference.</p>
                   </div>
                   <div class="flex gap-2">
+
                       <div class="flex-1 bg-slate-950/50 px-3 py-2 rounded-lg border border-slate-800 flex justify-between items-center">
                           <span class="text-[10px] text-slate-500 uppercase font-bold">Corrections</span>
                           <span id="drawer-count-corrections" class="text-xs font-mono font-bold text-amber-400">0</span>
@@ -1466,9 +1478,24 @@
         document.getElementById('drawer-status').textContent = event.finalEconomicState.status;
         document.getElementById('drawer-net-impact').textContent = `$${event.netEconomicImpact.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
         document.getElementById('drawer-complexity').textContent = `${event.finalEconomicState.determinedFrom} Entries`;
-        document.getElementById('drawer-confidence').textContent = `${Math.round(event.confidence.total * 100)}%`;
+                document.getElementById('drawer-confidence').textContent = `${Math.round(event.confidence.total * 100)}%`;
         
+        // Anchor Quality & Collision Warnings (Phase 2.6)
+        const aqEl = document.getElementById('drawer-anchor-quality');
+        aqEl.textContent = event.anchorQuality;
+        if (event.anchorQuality === 'HIGH') aqEl.className = 'text-xs font-bold text-emerald-400';
+        else if (event.anchorQuality === 'MEDIUM') aqEl.className = 'text-xs font-bold text-amber-400';
+        else aqEl.className = 'text-xs font-bold text-rose-400';
+
+        const collisionWarning = document.getElementById('collision-warning');
+        if (event.collisionRisk > 0.6 || event.anchorQuality === 'LOW') {
+            collisionWarning.classList.remove('hidden');
+        } else {
+            collisionWarning.classList.add('hidden');
+        }
+
         document.getElementById('drawer-count-corrections').textContent = event.nodes.filter(n => n.lifecycleRole === 'CORRECTION').length;
+
         document.getElementById('drawer-count-reversals').textContent = event.nodes.filter(n => n.lifecycleRole === 'REVERSAL').length;
 
         // Section 2: Economic Reality

@@ -15,13 +15,81 @@ export class AEREEngine {
     static reconstruct(records) {
         if (!records || records.length === 0) return [];
 
-        // 1. Group records by Anchor
-        const groups = this.groupByAnchor(records);
+        // 1. Initial Broad Grouping
+        const initialGroups = this.groupByAnchor(records);
         
-        // 2. Process each group into an Event
-        return Object.values(groups).map(members => {
+        // 2. Phase 2.6: Refined Partitioning (Collision Prevention)
+        const refinedGroups = [];
+        Object.values(initialGroups).forEach(members => {
+            const partitions = this.partitionGroup(members);
+            refinedGroups.push(...partitions);
+        });
+
+        // 3. Process each group into an Event
+        return refinedGroups.map(members => {
             return this.buildEvent(members);
         });
+    }
+
+    /**
+     * Phase 2.6: Partitions a broad group into distinct events if collisions are detected
+     */
+    static partitionGroup(members) {
+        const doc = this.normalizeDoc((members[0].data || members[0]).invoiceNumber || (members[0].data || members[0]).doc_number || 'UNKNOWN');
+        const quality = this.calculateAnchorQuality(doc);
+
+        // Scenario 1: Stable High-Quality Anchor -> Keep together
+        if (quality === 'HIGH') return [members];
+
+        // Scenario 2: Generic Anchor -> Partition by Voucher first
+        const voucherGroups = {};
+        members.forEach(node => {
+            const v = (node.data || node).voucherNumber || (node.data || node).voucher || 'NO_VCH';
+            if (!voucherGroups[v]) voucherGroups[v] = [];
+            voucherGroups[v].push(node);
+        });
+
+        // Scenario 3: Temporal Windowing (90 Day Gap)
+        const finalPartitions = [];
+        Object.values(voucherGroups).forEach(vNodes => {
+            const sorted = [...vNodes].sort((a, b) => {
+                const da = new Date((a.data || a).transactionDate || (a.data || a).doc_date);
+                const db = new Date((b.data || b).transactionDate || (b.data || b).doc_date);
+                return da - db;
+            });
+
+            let currentPartition = [sorted[0]];
+            for (let i = 1; i < sorted.length; i++) {
+                const prevDate = new Date((sorted[i-1].data || sorted[i-1]).transactionDate || (sorted[i-1].data || sorted[i-1]).doc_date);
+                const currDate = new Date((sorted[i].data || sorted[i]).transactionDate || (sorted[i].data || sorted[i]).doc_date);
+                
+                const diffDays = (currDate - prevDate) / (1000 * 60 * 60 * 24);
+                
+                if (diffDays > 90) {
+                    finalPartitions.push(currentPartition);
+                    currentPartition = [sorted[i]];
+                } else {
+                    currentPartition.push(sorted[i]);
+                }
+            }
+            finalPartitions.push(currentPartition);
+        });
+
+        return finalPartitions;
+    }
+
+    /**
+     * Phase 2.6: Scoring Anchor Uniqueness
+     */
+    static calculateAnchorQuality(doc) {
+        const blacklist = ['RECON', 'RECONCILIATION', 'PAYMENT', 'VOID', 'INTEREST', 'BALANCE', 'ADJUSTMENT', 'MONTH END', 'YEAR END', '-', 'UNKNOWN'];
+        if (blacklist.includes(doc) || doc.length < 4) return 'LOW';
+        
+        const hasNumbers = /\d/.test(doc);
+        const hasLetters = /[A-Z]/.test(doc);
+        if (hasNumbers && hasLetters && doc.length > 6) return 'HIGH';
+        
+        return 'MEDIUM';
     }
 
     /**
@@ -108,6 +176,9 @@ export class AEREEngine {
             nodes: classifiedNodes
         });
 
+        const anchorQuality = this.calculateAnchorQuality(this.normalizeDoc(anchor.docNumber));
+        const collisionRisk = anchorQuality === 'LOW' ? 0.8 : (anchorQuality === 'MEDIUM' ? 0.3 : 0.05);
+
         // Variance Separation (Example logic for Phase 1)
         const varianceContribution = this.calculateVarianceContribution(classifiedNodes, net);
 
@@ -122,6 +193,8 @@ export class AEREEngine {
             grossActivity: gross,
             netEconomicImpact: net,
             eventNarrative: narrative,
+            anchorQuality: anchorQuality,
+            collisionRisk: collisionRisk,
             varianceAnalysis: varianceContribution,
             confidence: confidence,
             nodes: classifiedNodes,

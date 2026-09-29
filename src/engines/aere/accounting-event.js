@@ -30,6 +30,10 @@ export class AccountingEvent {
         // Human-readable narrative for Findings and Memorandums
         this.eventNarrative = data.eventNarrative || '';
 
+        // Anchor Quality Scoring (Phase 2.6)
+        this.anchorQuality = data.anchorQuality || 'LOW'; // HIGH, MEDIUM, LOW
+        this.collisionRisk = data.collisionRisk || 0;     // 0.0 to 1.0
+
         // Variance Separation: Distinct from Ledger-wide contradictions
         this.varianceAnalysis = {
             contributesToLedgerVariance: data.varianceAnalysis?.contributesToLedgerVariance || false,
@@ -64,6 +68,8 @@ export class AccountingEvent {
             grossActivity: this.grossActivity,
             netEconomicImpact: this.netEconomicImpact,
             eventNarrative: this.eventNarrative,
+            anchorQuality: this.anchorQuality,
+            collisionRisk: this.collisionRisk,
             varianceAnalysis: this.varianceAnalysis,
             confidence: this.confidence,
             nodes: this.nodes,
