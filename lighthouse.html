@@ -518,14 +518,9 @@
       viewText.classList.add('hidden'); viewText.classList.remove('flex');
 
             if (tab === 'cloud') {
-        tabCloud.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
-        viewCloud.classList.remove('hidden'); viewCloud.classList.add('flex');
-        
-        // Auto-pull catalog when tab is switched to
-        if (cloudCatalog.length === 0) {
-            window.fetchCloudCatalog();
-        }
-      } else if (tab === 'pdf') {
+              tabCloud.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
+              viewCloud.classList.remove('hidden'); viewCloud.classList.add('flex');
+            } else if (tab === 'pdf') {
         tabPdf.className = "text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap";
         viewPdf.classList.remove('hidden'); viewPdf.classList.add('flex');
       } else {
