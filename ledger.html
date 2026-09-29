@@ -722,15 +722,21 @@
       updateCounters();
     }
 
-    function updateCounters() {
-      document.getElementById('stat-matches').textContent = window.appState.filteredRecords.length.toLocaleString();
-      document.getElementById('export-count').textContent = window.appState.filteredRecords.length.toLocaleString();
+        function updateCounters() {
+      const statMatches = document.getElementById('stat-matches');
+      if (statMatches) statMatches.textContent = window.appState.filteredRecords.length.toLocaleString();
+      
+      const exportCount = document.getElementById('export-count');
+      if (exportCount) exportCount.textContent = window.appState.filteredRecords.length.toLocaleString();
       
       const start = window.appState.filteredRecords.length === 0 ? 0 : ((window.appState.currentPage - 1) * window.appState.pageSize) + 1;
       const end = Math.min(window.appState.currentPage * window.appState.pageSize, window.appState.filteredRecords.length);
       
-      document.getElementById('pagination-info').textContent = `Showing ${start} to ${end} of ${window.appState.filteredRecords.length} records`;
-      document.getElementById('pagination-current-page').textContent = window.appState.currentPage;
+      const paginationInfo = document.getElementById('pagination-info');
+      if (paginationInfo) paginationInfo.textContent = `Showing ${start} to ${end} of ${window.appState.filteredRecords.length} records`;
+      
+      const paginationCurrent = document.getElementById('pagination-current-page');
+      if (paginationCurrent) paginationCurrent.textContent = window.appState.currentPage;
     }
 
     function renderTable() {
