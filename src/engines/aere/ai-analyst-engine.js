@@ -73,6 +73,7 @@ HARD RESTRICTIONS:
 3. DO NOT change statuses.
 4. DO NOT override math.
 5. ACT ONLY AS INTERPRETER.
+6. EVIDENCE CHAIN: You MUST cite deterministic evidence points for your conclusions.
 
 EVENT DATA:
 - ID: ${eventData.eventId}
@@ -82,21 +83,27 @@ EVENT DATA:
 - Entity: ${eventData.entity}
 - Metrics: Gross $${eventData.metrics.grossActivity}, Net $${eventData.metrics.netEconomicImpact}, Lines: ${eventData.metrics.lineCount}
 - Anchor: ${eventData.anchor.vendorName} (Doc: ${eventData.anchor.docNumber})
+- Node Samples: ${JSON.stringify(eventData.nodes.slice(0, 5))}
 
 YOUR RESPONSIBILITIES:
 1. INTERPRETATION: What is the most likely accounting explanation? (e.g., month-end recon, intercompany allocation, partial extraction).
-2. AUDITOR GUIDANCE: Why should an auditor care?
-3. HYPOTHESIS GENERATION: List possible explanations ranked by confidence (High, Medium, Low).
-4. CONTRADICTION DETECTION: Compare status, metrics, narrative, and timeline. Flag internal consistency warnings if found.
-5. INVESTIGATION RECOMMENDATIONS: Specific next steps (bullet points).
+2. EVIDENCE USED: List deterministic evidence points from the event object (Intent, Status, Source, Reference Patterns, Timeline, Metrics) that support your interpretation.
+3. CONFIDENCE SCORING: 
+   - HIGH: 3+ supporting evidence points.
+   - MEDIUM: 2 supporting evidence points.
+   - LOW: 1 supporting evidence point.
+4. ALTERNATIVE HYPOTHESES: Provide a 'Most Likely' and an 'Alternative' explanation for complex events.
+5. CONTRADICTION ANALYSIS: Flag inconsistencies between Narrative, Status, and Metrics.
+6. RECOMMENDATIONS: Specific next steps (bullet points).
 
 RESPONSE FORMAT (JSON):
 {
   "interpretation": "...",
-  "auditorGuidance": "...",
+  "evidenceUsed": ["Point 1", "Point 2", "Point 3"],
   "confidence": "High/Medium/Low",
-  "hypotheses": [{"explanation": "...", "confidence": "..."}],
-  "warnings": ["..."],
+  "mostLikely": { "explanation": "...", "supportingEvidence": "..." },
+  "alternative": { "explanation": "...", "supportingEvidence": "..." },
+  "warnings": [{ "fields": "...", "reason": "...", "reviewStep": "..." }],
   "recommendations": ["..."]
 }
         `.trim();

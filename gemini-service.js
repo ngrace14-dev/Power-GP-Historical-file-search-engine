@@ -72,103 +72,110 @@ export class GeminiService {
         return this.generateClientSideAnalystReasoning(eventData);
     }
 
-    /**
+        /**
      * Phase 3.0 Fallback Analyst Generator
      */
     generateClientSideAnalystReasoning(eventData) {
         const isUnbalanced = Math.abs(eventData.metrics.netEconomicImpact) > 0.01;
         const isCompound = eventData.eventIntent === 'COMPOUND_ENTRY';
+        const hasReconRef = (eventData.anchor.docNumber || '').toUpperCase().includes('RECON');
         
         let interpretation = "";
         let recommendations = [];
-        let hypotheses = [];
+        let mostLikely = { explanation: "", supportingEvidence: "" };
+        let alternative = { explanation: "", supportingEvidence: "" };
+        let evidenceUsed = [];
         let warnings = [];
 
+        // Build Evidence Chain (Phase 3.2 Rule)
+        if (eventData.eventIntent) evidenceUsed.push(`Intent Classification: ${eventData.eventIntent}`);
+        if (eventData.status) evidenceUsed.push(`Status: ${eventData.status}`);
+        if (eventData.metrics.lineCount) evidenceUsed.push(`Line Count: ${eventData.metrics.lineCount}`);
+        if (isUnbalanced) evidenceUsed.push(`Metric Characteristic: Unbalanced Net Impact ($${eventData.metrics.netEconomicImpact.toFixed(2)})`);
+        if (hasReconRef) evidenceUsed.push(`Reference Pattern: 'RECON' detected in document anchor`);
+
         if (isCompound && isUnbalanced) {
-            interpretation = "This event appears consistent with an unbalanced journal entry or a partial data extraction. In intercompany environments, this often reflects a 'Due To' or 'Due From' relationship where only one side of the transaction is captured in the current scope.";
+            interpretation = "This event appears consistent with a fragmented journal entry, likely representing a partial extraction of a larger intercompany transaction.";
+            mostLikely = { 
+                explanation: "Intercompany Allocation (Fragmented)", 
+                supportingEvidence: "Compound entry intent with unbalanced net impact in a multi-entity environment suggests counterparty lines exist outside this extraction scope." 
+            };
+            alternative = { 
+                explanation: "Filtered Extraction Scope", 
+                supportingEvidence: "The extraction parameters may have excluded the offset accounts (Cash, AP, or Intercompany Clearing)." 
+            };
             recommendations = [
                 "Search matching Journal Entry across other corporate entities.",
                 "Review Due To / Due From accounts in the General Ledger.",
                 "Inspect source GLTRX posting for offset account details."
             ];
-            hypotheses = [
-                { explanation: "Intercompany Allocation (Fragmented)", confidence: "High" },
-                { explanation: "Filtered Extraction Scope", confidence: "Medium" },
-                { explanation: "Incomplete Ingestion", confidence: "Medium" },
-                { explanation: "Accounting Error / Missing Counterparty", confidence: "Low" }
-            ];
-                } else if (eventData.eventIntent === 'SETTLEMENT_PACKAGE') {
-            interpretation = "This event appears consistent with a standard settlement cycle (Accounts Payable payment). The chain shows a liability being satisfied by a settlement instrument like a computer check or electronic transfer.";
+        } else if (eventData.eventIntent === 'SETTLEMENT_PACKAGE') {
+            interpretation = "Standard settlement activity. The lifecycle characteristics show a liability being satisfied by a computer-generated check or electronic payment.";
+            mostLikely = { 
+                explanation: "Standard Settlement Cycle", 
+                supportingEvidence: "Intent matches settlement patterns with balanced net impact." 
+            };
             recommendations = [
                 "Review matching bank statement activity.",
-                "Verify check or EFT reference numbers against bank exports.",
-                "Ensure the corresponding liability invoice was properly relieved."
-            ];
-            hypotheses = [
-                { explanation: "Standard Settlement Cycle (Computer Check)", confidence: "High" },
-                { explanation: "Manual Payment Entry", confidence: "Medium" }
+                "Verify check or EFT reference numbers against bank exports."
             ];
         } else if (eventData.eventIntent === 'CONTROLLER_ADJUSTMENT') {
-            interpretation = "This event appears consistent with a manual accounting intervention, such as a 'Back Out' entry or a reclassification. These are typically used to correct prior period errors or redirect expenses between departments/entities.";
+            interpretation = "Manual controller intervention detected. Reference patterns and 'Back Out' narrative indicate a correction of prior period activity.";
+            mostLikely = { 
+                explanation: "Correction of Prior Error", 
+                supportingEvidence: "Controller adjustment classification combined with net impact reversal characteristics." 
+            };
+            alternative = { 
+                explanation: "Reclassification of Expenses", 
+                supportingEvidence: "Entry may be moving costs between departments rather than correcting an error." 
+            };
             recommendations = [
-                "Review the original entry being reversed or adjusted.",
-                "Verify manual authorization for the reclassification.",
-                "Check for matching 'Back Out' chains in adjacent periods."
+                "Review the original entry being reversed.",
+                "Verify manual authorization for the reclassification."
             ];
-            hypotheses = [
-                { explanation: "Correction of Prior Error", confidence: "High" },
-                { explanation: "Reclassification of Expenses", confidence: "Medium" },
-                { explanation: "Manual Ledger Maintenance", confidence: "Medium" }
-            ];
-        } else if (eventData.eventIntent === 'RECON_PACKAGE') {
-            interpretation = "This event is consistent with a month-end reconciliation entry (e.g., ONQ Hilton Recon). It often aggregates multiple activity streams into a single clearing or suspense account.";
+        } else if (eventData.eventIntent === 'CAPITALIZATION_EVENT') {
+            interpretation = "Asset treatment transition. Expenditure identified for conversion from operational repair expense to a long-term capital asset.";
+            mostLikely = { 
+                explanation: "Fixed Asset Capitalization", 
+                supportingEvidence: "Capitalization event intent detected in elevator repair context." 
+            };
             recommendations = [
-                "Review detailed reconciliation workpapers for the $${Math.abs(eventData.metrics.netEconomicImpact).toLocaleString()} balance.",
-                "Verify clearing account matches against source subledger reports.",
-                "Inspect 'ONQ' or 'Hilton' specific source feeds if available."
-            ];
-            hypotheses = [
-                { explanation: "Month-End Reconciliation Entry", confidence: "High" },
-                { explanation: "Subledger-to-GL Sync Point", confidence: "Medium" }
-            ];
-                } else if (eventData.eventIntent === 'CAPITALIZATION_EVENT') {
-            interpretation = "This event appears consistent with a transition from an operational expense to a capital asset (Fixed Asset / CIP). This represents the conversion of repair or construction costs into a balance sheet asset subject to depreciation.";
-            recommendations = [
-                "Verify the item meets the corporate capitalization threshold.",
-                "Ensure the asset is recorded in the Fixed Asset Register.",
-                "Review for related labor or material costs that should also be capitalized."
-            ];
-            hypotheses = [
-                { explanation: "Fixed Asset Capitalization", confidence: "High" },
-                { explanation: "CIP (Construction in Progress) Reclassification", confidence: "Medium" }
+                "Verify item meets corporate capitalization threshold.",
+                "Ensure asset is recorded in Fixed Asset Register."
             ];
         } else {
-
-
-            interpretation = `This event is classified as ${eventData.eventIntent.replace('_', ' ')} and appears consistent with standard ${eventData.eventIntent.toLowerCase()} activity for ${eventData.anchor.vendorName}.`;
+            interpretation = `Standard ${eventData.eventIntent.toLowerCase()} activity for ${eventData.anchor.vendorName}.`;
+            mostLikely = { explanation: "Standard Ledger Activity", supportingEvidence: "Matches expected vendor lifecycle patterns." };
             recommendations = [
-                "Review adjacent ledger segments for related activity.",
                 "Verify document references against physical source records."
             ];
-            hypotheses = [
-                { explanation: "Standard Ledger Activity", confidence: "High" }
-            ];
         }
 
-        // Contradiction Detection (Phase 3.0 Rule 4)
+        // Contradiction Analysis (Phase 3.2)
         if (eventData.status === 'BALANCED' && isUnbalanced) {
-            warnings.push(`Internal Consistency Warning: Status indicates BALANCED while event metrics indicate an imbalance of $${Math.abs(eventData.metrics.netEconomicImpact).toLocaleString()}.`);
+            warnings.push({
+                fields: "Status vs Metrics",
+                reason: `Deterministic status is 'BALANCED' but net economic impact is $${eventData.metrics.netEconomicImpact.toFixed(2)}.`,
+                reviewStep: "Verify manual balance overrides in source GL."
+            });
         }
+
+        // Confidence Calculation (Phase 3.2 Rules)
+        let confidence = "Low";
+        if (evidenceUsed.length >= 3) confidence = "High";
+        else if (evidenceUsed.length >= 2) confidence = "Medium";
 
         return {
             interpretation,
-            auditorGuidance: "Auditors should verify the existence of the counterparty entry in the consolidated ledger before concluding a posting error exists. Cross-entity boundary leaks are common in this environment.",
-            confidence: "High",
-            hypotheses,
+            evidenceUsed,
+            confidence,
+            mostLikely,
+            alternative,
             warnings,
             recommendations
         };
     }
+
 
     /**
      * Phase 6: Generates a formal, evidence-derived Accounting Audit Memorandum
