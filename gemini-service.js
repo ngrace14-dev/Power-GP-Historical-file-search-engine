@@ -131,7 +131,19 @@ export class GeminiService {
                 { explanation: "Month-End Reconciliation Entry", confidence: "High" },
                 { explanation: "Subledger-to-GL Sync Point", confidence: "Medium" }
             ];
+                } else if (eventData.eventIntent === 'CAPITALIZATION_EVENT') {
+            interpretation = "This event appears consistent with a transition from an operational expense to a capital asset (Fixed Asset / CIP). This represents the conversion of repair or construction costs into a balance sheet asset subject to depreciation.";
+            recommendations = [
+                "Verify the item meets the corporate capitalization threshold.",
+                "Ensure the asset is recorded in the Fixed Asset Register.",
+                "Review for related labor or material costs that should also be capitalized."
+            ];
+            hypotheses = [
+                { explanation: "Fixed Asset Capitalization", confidence: "High" },
+                { explanation: "CIP (Construction in Progress) Reclassification", confidence: "Medium" }
+            ];
         } else {
+
 
             interpretation = `This event is classified as ${eventData.eventIntent.replace('_', ' ')} and appears consistent with standard ${eventData.eventIntent.toLowerCase()} activity for ${eventData.anchor.vendorName}.`;
             recommendations = [
