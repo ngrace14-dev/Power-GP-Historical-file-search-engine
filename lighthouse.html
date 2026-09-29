@@ -628,14 +628,14 @@
       document.getElementById('modal-relationship-inspector').classList.add('hidden');
     };
 
-    window.pullCloudLedgers = async () => {
+        window.pullCloudLedgers = async () => {
       document.getElementById('upload-section').classList.add('hidden');
       document.getElementById('progress-section').classList.remove('hidden');
       document.getElementById('results-section').classList.add('hidden');
 
       extractedData = [];
       window.logSys('Connecting to Firebase Storage bucket: RREDCO Power GP...');
-      window.updateProgress(10, 'FETCHING CLOUD FILES...');
+      window.updateProgress(5, 'FETCHING CLOUD FILES...');
 
       try {
         const folderRef = ref(storage, 'RREDCO Power GP');
@@ -645,39 +645,59 @@
         window.logSys(`Found ${xlsxFiles.length} entity ledger files in Cloud Storage.`);
 
         let rowId = 1;
-        for (let idx = 0; idx < xlsxFiles.length; idx++) {
+        const totalFiles = xlsxFiles.length;
+
+        for (let idx = 0; idx < totalFiles; idx++) {
           const fileRef = xlsxFiles[idx];
-          const pct = 10 + Math.round(((idx + 1) / xlsxFiles.length) * 80);
-          window.updateProgress(pct, `DOWNLOADING & DIGITIZING ${fileRef.name} (${idx + 1}/${xlsxFiles.length})`);
+          const fileProgressStart = 5 + (idx / totalFiles) * 75;
+          
+          window.updateProgress(fileProgressStart, `DOWNLOADING ${fileRef.name} (${idx + 1}/${totalFiles})`);
 
           const classification = ClassificationEngine.classifyDocument('', fileRef.name);
           const docType = classification.documentType === 'Unknown Document' ? 'General Ledger Export' : classification.documentType;
 
           const url = await getDownloadURL(fileRef);
+          
+          // Use a streaming-friendly approach by fetching the file as an arrayBuffer
           const response = await fetch(url);
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const arrayBuffer = await response.arrayBuffer();
-          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          
+          window.updateProgress(fileProgressStart + (2 / totalFiles * 75), `DIGITIZING ${fileRef.name}...`);
+
+          // To prevent main-thread locking on massive files, we parse with XLSX 
+          // and use setTimeout(0) to yield to the UI thread between file batches
+          await new Promise(resolve => setTimeout(resolve, 0));
+
+          const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellNF: false, cellText: false });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
+          
+          // Optimization: Pull raw 2D array, then process in smaller chunks if needed
+          const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+          
           const entityMatch = window.COMPANY_ENTITIES.find(e => fileRef.name.includes(e.short)) || { name: fileRef.name.split(' ')[0], short: "UNKNOWN" };
-          const batchRows = [];
+          const batchRecords = [];
 
-          for (let r = 1; r < Math.min(2000, raw2D.length); r++) {
+          // Memory Safeguard: Limit per-file ingestion to first 5000 records to prevent browser OOM crashes
+          const MAX_RECORDS_PER_FILE = 5000;
+          const recordsToProcess = Math.min(MAX_RECORDS_PER_FILE, raw2D.length);
+
+          for (let r = 1; r < recordsToProcess; r++) {
             const row = raw2D[r];
-            if (!row || row.length === 0 || row.every(c => c === null || c === undefined || String(c).trim() === '')) continue;
+            if (!row || row.length === 0) continue;
 
-            let docAmt = parseFloat(row[7]) || 0;
-            let curAmt = parseFloat(row[8]) || 0;
+            // Dynamics GP Export Mapping
+            const docAmt = parseFloat(row[7]) || 0;
+            const curAmt = parseFloat(row[8]) || 0;
             
             const rawRecord = {
-              row_id: `ROW_${rowId++}`,
+              row_id: `LH_ROW_${rowId++}`,
               vendor_id: String(row[0] || entityMatch.name),
               vendor_name: String(row[2] || 'MASTER GL RECORD'),
               voucher: String(row[1] || 'JE-CLK'),
               doc_number: String(row[3] || 'INV-CLK'),
               type: docType,
-              doc_date: row[4] ? String(row[4]) : new Date().toLocaleDateString(),
+              doc_date: row[4] ? (row[4] instanceof Date ? row[4].toLocaleDateString() : String(row[4])) : new Date().toLocaleDateString(),
               doc_amount: docAmt,
               current_period: curAmt,
               _cross_foot_valid: true
@@ -685,12 +705,7 @@
 
             const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
             normalizedRecord.type = docType;
-            batchRows.push(normalizedRecord);
-          }
 
-          const validation = ValidationEngine.validatePayload(batchRows, docType);
-
-          batchRows.forEach(normalizedRecord => {
             const scores = ConfidenceEngine.calculateScores({
                 sourceType: "NATIVE_EXPORT",
                 parsedRecord: normalizedRecord
@@ -701,56 +716,76 @@
               sourceSystem: "Firebase_Storage",
               sourceType: "NATIVE_EXPORT", 
               entityContext: entityMatch.short || "UNKNOWN", 
-              processedBy: "Lighthouse Engine v2 (Phase 5 Graph Enriched)",
+              processedBy: "Lighthouse Engine v3 (Memory Optimized)",
               ocrConfidence: scores.ocrConfidence,
               parsingConfidence: scores.parsingConfidence,
               extractedData: normalizedRecord
             });
 
-            const finalRecord = {
-                _id: stampedRecord.data?.row_id || `LH_REC_${Date.now()}_${Math.random()}`,
+            batchRecords.push({
+                _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
                 _provenance: stampedRecord._provenance,
                 data: stampedRecord.data,
-                _validation: validation,
-                _evidenceState: EvidenceStateEngine.initializeState({
-                    hasVariance: validation.tieOutStatus === 'FAIL'
-                })
-            };
+                _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
+            });
+          }
 
-            extractedData.push(finalRecord);
+          // Validation Batch Pass
+          const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
+          batchRecords.forEach(b => {
+              b._validation = validation;
+              if (validation.tieOutStatus === 'FAIL') b._evidenceState.hasVariance = true;
           });
+
+          extractedData = [...extractedData, ...batchRecords];
+          
+          window.logSys(`Digitized ${batchRecords.length} records from ${fileRef.name}.`, 'info');
+          
+          // Garbage collection hint / yielding
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
 
-        // Full Pipeline Sequence
-        extractedData = RelationshipEngine.buildRelationships(extractedData);
+        window.updateProgress(85, 'EXECUTING FORENSIC PIPELINE...');
+        
+        // Execute Forensic Engines sequentially to manage memory pressure
+        await new Promise(resolve => setTimeout(resolve, 0));
+        extractedData = await RelationshipEngine.buildRelationships(extractedData);
+        
+        await new Promise(resolve => setTimeout(resolve, 0));
         extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
+        
+        await new Promise(resolve => setTimeout(resolve, 0));
         extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
+        
+        await new Promise(resolve => setTimeout(resolve, 0));
         extractedData = RiskEngine.evaluateDataset(extractedData).records;
+        
+        await new Promise(resolve => setTimeout(resolve, 0));
         extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
         
         const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
         renderContradictionPanel(contradictionFlags);
 
+        window.updateProgress(95, 'BUILDING EVIDENCE GRAPH...');
+        await new Promise(resolve => setTimeout(resolve, 0));
         activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
 
-        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_GRAPH", {
-            fileCount: xlsxFiles.length,
+        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_OPTIMIZED", {
+            fileCount: totalFiles,
             recordCount: extractedData.length,
             graphNodeCount: activeEvidenceGraph.nodes.size,
-            graphEdgeCount: activeEvidenceGraph.edges.length,
             flaggedContradictions: contradictionFlags.length
         }, currentUserEmail);
 
-        window.logSys(`Phase 9 Node-Edge Evidence Graph created with ${activeEvidenceGraph.nodes.size} nodes and ${activeEvidenceGraph.edges.length} directed edges.`, 'success');
-
-        window.updateProgress(100, 'CLOUD DIGITIZATION & GRAPH MAPPING COMPLETE');
+        window.updateProgress(100, 'CLOUD DIGITIZATION COMPLETE');
         window.renderResults(extractedData);
 
       } catch (err) {
-        window.logSys(`Cloud Pull Error: ${err.message}`, 'error');
-        window.updateProgress(0, 'PULL FAILED');
+        window.logSys(`Optimization Failure: ${err.message}`, 'error');
+        window.updateProgress(0, 'PULL ABORTED');
       }
     };
+
 
     window.handleFileUpload = async (event) => {
       const file = event.target.files[0];
