@@ -1,79 +1,87 @@
 import { RelationshipIndexer } from './indexing/relationship-indexer.js';
-import { RelationshipConfig } from './config/relationship-config.js';
-import { RelationshipTypes, InvestigativePriority } from './relationship-types.js';
-import { RelationshipAudit } from './governance/relationship-audit.js';
-
-// Detectors
+import { RelationshipTypes } from './relationship-types.js';
 import { ReversalDetector } from './detectors/reversal-detector.js';
 import { SettlementDetector } from './detectors/settlement-detector.js';
-import { CorrectionDetector } from './detectors/correction-detector.js';
-import { AdjustmentDetector } from './detectors/adjustment-detector.js';
-import { TransferDetector } from './detectors/transfer-detector.js';
-import { CorroborationDetector } from './detectors/corroboration-detector.js';
-import { ContradictionDetector } from './detectors/contradiction-detector.js';
 import { ClassificationDetector } from './detectors/classification-detector.js';
+import { RelationshipAudit } from './governance/relationship-audit.js';
 
 /**
- * Relationship Engine (Coordinator) - Governance v6.0
+ * Forensic Relationship Engine (Coordinator) - Governance v6.0
+ * Orchestrates pure detector modules and aggregates forensic lifecycle edges.
  */
 export class RelationshipEngine {
     
     /**
-     * Orchestrates the forensic relationship detection pipeline
-     * @param {Array<Object>} records - The full digitized dataset
+     * Executes the relationship detection pipeline.
+     * @param {Array<Object>} records - Standardized Lighthouse records
      * @returns {Promise<Array<Object>>} Enriched records
      */
     static async buildRelationships(records = []) {
         if (!Array.isArray(records) || records.length === 0) return records;
 
-        // Initialize forensic structure
+        // Reset state
         records.forEach(rec => {
-            rec._relationships = {
-                forensicEdges: [],
-                anomalyEdges: [],
-                classificationEdges: [],
-                hasLinks: false,
-                allEdges: []
-            };
+            rec._relationships = { forensicEdges: [], anomalyEdges: [], classificationEdges: [], hasLinks: false };
         });
 
         await RelationshipAudit.log('STARTED', { count: records.length });
 
         try {
+            // 1. Build O(1) Index Matrix
             const indexes = RelationshipIndexer.build(records);
 
+            // 2. Define Pipeline
             const detectors = [
                 ReversalDetector,
                 SettlementDetector,
-                CorrectionDetector,
-                AdjustmentDetector,
-                TransferDetector,
-                CorroborationDetector,
-                ContradictionDetector,
                 ClassificationDetector
             ];
 
+            // 3. Orchestrate Stateless Passes
             for (const Detector of detectors) {
                 try {
-                    const result = await Detector.detect(records, indexes, RelationshipConfig);
-                    this.#processDetectorResult(records, result);
+                    const result = await Detector.detect(records, indexes, { reversalWindowDays: 60 });
+                    this.#mapEdgesToRecords(records, result.edges);
                     await RelationshipAudit.log('DETECTED', { detector: result.detector, edgeCount: result.edges.length });
                 } catch (err) {
                     await RelationshipAudit.log('ERROR', { source: Detector.name, message: err.message });
-                    console.error(`[RelationshipEngine] ${Detector.name} Failure:`, err);
                 }
             }
 
-            this.#finalize(records);
+            // 4. Post-Process Metadata
+            this.#finalizeMetadata(records);
             await RelationshipAudit.log('COMPLETED', { count: records.length });
 
-        } catch (fatalErr) {
-            await RelationshipAudit.log('ERROR', { source: 'RelationshipEngine_Core', message: fatalErr.message });
-            console.error('[RelationshipEngine] Core Failure:', fatalErr);
+        } catch (fatal) {
+            console.error("[RelationshipEngine] Fatal Core Exception:", fatal);
         }
 
         return records;
     }
+
+    static #mapEdgesToRecords(records, edges) {
+        edges.forEach(edge => {
+            const source = records.find(r => r._id === edge.sourceNode);
+            if (!source) return;
+
+            if (edge.investigativePriority === 'HIGH') source._relationships.forensicEdges.push(edge);
+            else if (edge.investigativePriority === 'MEDIUM') source._relationships.anomalyEdges.push(edge);
+            else source._relationships.classificationEdges.push(edge);
+        });
+    }
+
+    static #finalizeMetadata(records) {
+        records.forEach(rec => {
+            const rel = rec._relationships;
+            rel.hasLinks = (rel.forensicEdges.length + rel.anomalyEdges.length + rel.classificationEdges.length) > 0;
+            
+            // Backward compatibility for legacy UI
+            rel.tier1Edges = rel.forensicEdges;
+            rel.tier2Edges = rel.anomalyEdges;
+            rel.tier3Edges = rel.classificationEdges;
+        });
+    }
+}
 
     static #processDetectorResult(records, result) {
         result.edges.forEach(edge => {
