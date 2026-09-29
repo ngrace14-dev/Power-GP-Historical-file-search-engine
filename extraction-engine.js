@@ -155,13 +155,14 @@ export class ExtractionEngine {
             if (debit > 0) return debit;
             if (credit > 0) return -credit;
         
-            // If both are zero or undefined
-            if (debit === 0 && credit === 0) return null;
+            // Phase 2.8: Return 0 instead of null to prevent NaN in aggregations
+            if (debit === 0 && credit === 0) return 0;
 
             // Fallback for net amount fields if they exist but debits/credits don't
             const rawAmt = data.doc_amount !== undefined ? data.doc_amount : (data.amount || data['Amount'] || 0);
             return this.#parseForensicCurrency(rawAmt);
         }
+
 
 
     /**

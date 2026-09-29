@@ -186,7 +186,14 @@ export class AEREEngine {
         });
 
         const anchorQuality = this.calculateAnchorQuality(this.normalizeDoc(anchor.docNumber));
-        const collisionRisk = anchorQuality === 'LOW' ? 0.8 : (anchorQuality === 'MEDIUM' ? 0.3 : 0.05);
+        let collisionRisk = anchorQuality === 'LOW' ? 0.8 : (anchorQuality === 'MEDIUM' ? 0.3 : 0.05);
+
+        // Phase 2.8: Intent-Aware Risk Tuning
+        if (intent === 'ACCRUAL_CYCLE' || intent === 'PAYROLL_PACKAGE') {
+            collisionRisk = Math.min(collisionRisk, 0.2); // Lower risk for expected reversals
+        } else if (intent === 'CONTROLLER_ADJUSTMENT' || intent === 'CAPITALIZATION_EVENT') {
+            collisionRisk = Math.max(collisionRisk, 0.7); // Elevate risk for manual interventions
+        }
 
         // Variance Separation (Example logic for Phase 1)
         const varianceContribution = this.calculateVarianceContribution(classifiedNodes, net);
@@ -218,15 +225,45 @@ export class AEREEngine {
      * Phase 2.7: Detects if a cluster is a single Compound Entry vs a Lifecycle
      */
     static determineIntent(nodes) {
-        const uniqueVouchers = new Set(nodes.map(n => (n.data || n).voucherNumber || (n.data || n).voucher));
+        const uniqueVouchers = new Set(nodes.map(n => (n.data || n).voucherNumber || (node.data || node).voucher));
         const uniqueDates = new Set(nodes.map(n => (n.data || n).transactionDate || (n.data || n).doc_date));
-        
+        const sources = new Set(nodes.map(n => (n.data || n)['Originating TRX Source'] || ''));
+        const refs = nodes.map(n => String((n.data || n).Reference || (n.data || n).referenceNumber || '').toUpperCase());
+        const descriptions = nodes.map(n => String((n.data || n).Description || (n.data || n).description || '').toUpperCase());
+
+        // 1. SETTLEMENT_PACKAGE (Payments/Checks)
+        if (sources.has('PMCHK') || sources.has('PMPAY') || refs.some(r => r.includes('COMPUTER CHECKS') || r.includes('PAYMENT ENTRY'))) {
+            return 'SETTLEMENT_PACKAGE';
+        }
+
+        // 2. PAYROLL_PACKAGE (CMTRX / Payroll Refs)
+        if (sources.has('CMTRX') || refs.some(r => r.includes('PAYROLL') || r.includes('PAY PERIOD')) || descriptions.some(d => d.includes('PAYROLL'))) {
+            return 'PAYROLL_PACKAGE';
+        }
+
+        // 3. ACCRUAL_CYCLE (GLTRX/GLREV Pattern)
+        if ((sources.has('GLTRX') && sources.has('GLREV')) || descriptions.some(d => d.includes('ACCRUE'))) {
+            return 'ACCRUAL_CYCLE';
+        }
+
+        // 4. CAPITALIZATION_EVENT (Fixed Asset Focus)
+        if (descriptions.some(d => d.includes('CAPITALIZE') || d.includes('FIXED ASSET') || d.includes('CIP '))) {
+            return 'CAPITALIZATION_EVENT';
+        }
+
+        // 5. CONTROLLER_ADJUSTMENT (Manual Correction Keywords)
+        if (descriptions.some(d => d.includes('BACK OUT') || d.includes('RCL ') || d.includes('RECLASS') || d.includes('DUPLICATE'))) {
+            return 'CONTROLLER_ADJUSTMENT';
+        }
+
+        // 6. COMPOUND_ENTRY (Standard Balanced Entry)
         if (uniqueVouchers.size === 1 && uniqueDates.size === 1) {
             return 'COMPOUND_ENTRY';
         }
 
+        // 7. RECON_PACKAGE (Generic broad clusters)
         const doc = this.normalizeDoc((nodes[0].data || nodes[0]).invoiceNumber || 'UNKNOWN');
-        if (['RECON', 'RECONCILIATION', 'MONTH END'].includes(doc)) return 'RECON_PACKAGE';
+        if (['RECON', 'RECONCILIATION', 'MONTH END', 'BALANCE'].includes(doc)) return 'RECON_PACKAGE';
 
         return 'INVOICE_LIFECYCLE';
     }
@@ -283,6 +320,26 @@ export class AEREEngine {
         if (intent === 'COMPOUND_ENTRY') {
             const balanceNote = status === 'BALANCED' ? 'The entry is balanced.' : `The entry is UNBALANCED by $${Math.abs(finalAmount).toLocaleString()}.`;
             return `${count}-Line Journal Entry recorded on ${(nodes[0].data || nodes[0]).transactionDate || 'unknown date'}. ${balanceNote}`;
+        }
+
+        if (intent === 'ACCRUAL_CYCLE') {
+            return `Accrual cycle identified: An accrual was recorded and subsequently reversed. Net economic impact is zero.`;
+        }
+
+        if (intent === 'PAYROLL_PACKAGE') {
+            return `Payroll processing package containing ${count} individual distributions.`;
+        }
+
+        if (intent === 'SETTLEMENT_PACKAGE') {
+            return `Accounts payable settlement activity: Liability satisfaction via check or electronic transfer.`;
+        }
+
+        if (intent === 'CONTROLLER_ADJUSTMENT') {
+            return `Manual accounting intervention detected. Entry description identifies this as a reclassification, back-out, or manual adjustment.`;
+        }
+
+        if (intent === 'CAPITALIZATION_EVENT') {
+            return `Asset treatment transition: Expenditure identified for capitalization as Fixed Asset or CIP.`;
         }
 
         const startAmount = parseFloat((nodes[0].data || nodes[0]).amount || 0).toLocaleString();

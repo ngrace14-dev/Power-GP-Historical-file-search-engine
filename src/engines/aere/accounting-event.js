@@ -34,8 +34,10 @@ export class AccountingEvent {
         this.anchorQuality = data.anchorQuality || 'LOW'; // HIGH, MEDIUM, LOW
         this.collisionRisk = data.collisionRisk || 0;     // 0.0 to 1.0
 
-        // Intent-Based Classification (Phase 2.7)
-        this.eventIntent = data.eventIntent || 'INVOICE_LIFECYCLE'; // COMPOUND_ENTRY, INVOICE_LIFECYCLE, RECON_PACKAGE
+        // Intent-Based Classification (Phase 2.7/2.8)
+        this.eventIntent = data.eventIntent || 'INVOICE_LIFECYCLE'; 
+        // TAXONOMY: COMPOUND_ENTRY, INVOICE_LIFECYCLE, RECON_PACKAGE, ACCRUAL_CYCLE, PAYROLL_PACKAGE, SETTLEMENT_PACKAGE, CONTROLLER_ADJUSTMENT, CAPITALIZATION_EVENT
+        
         this.lineCount = data.lineCount || 0;
 
         // Variance Separation: Distinct from Ledger-wide contradictions
