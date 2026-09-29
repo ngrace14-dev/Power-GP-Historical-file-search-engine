@@ -17,7 +17,7 @@ export class ExtractionEngine {
         // Prevent crashes on null payloads
         const safeData = rawData || {};
 
-        const record = {
+                const record = {
             entity: entityContext,
             vendor: this.#extractVendor(safeData),
             customer: this.#extractCustomer(safeData),
@@ -29,8 +29,11 @@ export class ExtractionEngine {
             amount: this.#extractAmount(safeData),
             description: this.#extractDescription(safeData),
             referenceNumber: this.#extractReferenceNumber(safeData),
+            paymentNumber: this.#extractPaymentNumber(safeData), // Phase 4.1I Promotion
+            batchId: this.#extractBatchId(safeData),           // Phase 4.1I Promotion
             _extractionFlags: []
         };
+
 
         // Phase 2.5 Mapping Error Flagging
         if (record.amount === null) record._extractionFlags.push('INVALID_AMOUNT');
@@ -202,7 +205,7 @@ export class ExtractionEngine {
         return String(val).trim();
     }
 
-    static #extractReferenceNumber(data) {
+        static #extractReferenceNumber(data) {
         const val = String(
             data['Reference'] ||
             data.referenceNumber || 
@@ -213,4 +216,24 @@ export class ExtractionEngine {
         
         return (val === '' || val === 'undefined' || val === 'null') ? '-' : val;
     }
+
+    static #extractPaymentNumber(data) {
+        const val = String(
+            data['Originating Document Number'] ||
+            data['Check Number'] ||
+            data.payment_number ||
+            '-'
+        ).trim();
+        return (val === '' || val === 'undefined' || val === 'null') ? '-' : val;
+    }
+
+    static #extractBatchId(data) {
+        const val = String(
+            data['Originating TRX Source'] ||
+            data.batch_id ||
+            '-'
+        ).trim();
+        return (val === '' || val === 'undefined' || val === 'null') ? '-' : val;
+    }
 }
+

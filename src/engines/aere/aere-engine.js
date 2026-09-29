@@ -109,6 +109,8 @@ export class AEREEngine {
 
     /**
      * Groups records by Entity, Vendor, and Normalized Document Number
+     * Refined in Phase 4.1I: PROCESS anchors use Voucher as secondary grouping key
+     * to prevent early-stage batch collisions.
      */
     static groupByAnchor(records) {
         const groups = {};
@@ -119,9 +121,18 @@ export class AEREEngine {
             
             const entity = prov.entityContext || 'UNK';
             const vendor = r.vendor_id || r.vendor || 'UNK';
-            const doc = this.normalizeDoc(r.invoiceNumber || r.doc_number || 'UNKNOWN');
+            const rawDoc = r.invoiceNumber || r.doc_number || 'UNKNOWN';
+            const doc = this.normalizeDoc(rawDoc);
             
-            const key = `${entity}|${vendor}|${doc}`;
+            const anchorType = this.classifyAnchor(rawDoc);
+            
+            // Phase 4.1I Fix: Immediate partitioning for PROCESS and CATEGORY
+            let key = `${entity}|${vendor}|${doc}`;
+            if (anchorType === 'PROCESS' || anchorType === 'CATEGORY') {
+                const voucher = r.voucherNumber || r.voucher || 'NO_VCH';
+                key += `|VCH:${voucher}`;
+            }
+
             if (!groups[key]) groups[key] = [];
             groups[key].push(record);
         });
@@ -411,8 +422,9 @@ export class AEREEngine {
     static extractEventFlags(nodes, intent = 'INVOICE_LIFECYCLE') {
         const flags = [];
         
-        // Phase 4.1G Fix: Suppress Churn diagnostics for COMPOUND_ENTRY
-        if (intent !== 'COMPOUND_ENTRY' && nodes.length > 8) {
+        // Phase 4.1I Fix: Suppress Churn diagnostics for COMPOUND_ENTRY and SETTLEMENT_PACKAGE
+        const skipChurn = ['COMPOUND_ENTRY', 'SETTLEMENT_PACKAGE', 'PAYROLL_PACKAGE', 'EXPENSE_SERIES'];
+        if (!skipChurn.includes(intent) && nodes.length > 8) {
             flags.push({
                 category: 'CONTRADICTION',
                 severity: 'HIGH',
