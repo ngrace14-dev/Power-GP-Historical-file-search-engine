@@ -160,9 +160,21 @@
         </button>
       </div>
       
-      <!-- View 1: Cloud Storage Pull & Catalog -->
+            <!-- View 1: Cloud Storage Pull & Catalog -->
       <div id="view-cloud" class="flex flex-col p-2 min-h-[300px]">
-        <div id="catalog-loading" class="flex flex-col items-center justify-center py-12">
+        <!-- Initial State: Connection Prompt -->
+        <div id="catalog-initial" class="flex flex-col items-center justify-center py-12">
+            <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-4">
+              <i class="ph ph-cloud-arrow-down text-2xl text-cyan-400"></i>
+            </div>
+            <h2 class="font-bold text-base text-white mb-1">Connect to Corporate Cloud</h2>
+            <p class="text-xs text-slate-400 text-center max-w-md mb-6">Load available RREDCO Power GP ledgers from Firebase Storage for forensic investigation.</p>
+            <button onclick="window.fetchCloudCatalog()" class="px-8 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-500/30 text-cyan-400 font-bold text-sm transition shadow-lg flex items-center gap-2">
+                <i class="ph ph-plugs-connected text-lg"></i> CONNECT TO STORAGE BUCKET
+            </button>
+        </div>
+
+        <div id="catalog-loading" class="hidden flex-col items-center justify-center py-12">
             <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-3">
               <i class="ph ph-cloud-arrow-down text-2xl text-cyan-400"></i>
             </div>
@@ -171,6 +183,7 @@
         </div>
 
         <div id="catalog-view" class="hidden animate-in fade-in duration-500">
+
             <div class="flex items-center justify-between mb-4 bg-slate-950/40 p-4 rounded-xl border border-slate-800">
                 <div>
                     <h2 class="font-bold text-base text-white">Entity Ledger Catalog</h2>
