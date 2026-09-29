@@ -1,10 +1,16 @@
 import { RelationshipIndexer } from './indexing/relationship-indexer.js';
 import { RelationshipConfig } from './config/relationship-config.js';
 import { RelationshipTypes, InvestigativePriority } from './relationship-types.js';
+import { RelationshipAudit } from './governance/relationship-audit.js';
 
 // Detectors
 import { ReversalDetector } from './detectors/reversal-detector.js';
 import { SettlementDetector } from './detectors/settlement-detector.js';
+import { CorrectionDetector } from './detectors/correction-detector.js';
+import { AdjustmentDetector } from './detectors/adjustment-detector.js';
+import { TransferDetector } from './detectors/transfer-detector.js';
+import { CorroborationDetector } from './detectors/corroboration-detector.js';
+import { ContradictionDetector } from './detectors/contradiction-detector.js';
 import { ClassificationDetector } from './detectors/classification-detector.js';
 
 /**
@@ -13,12 +19,14 @@ import { ClassificationDetector } from './detectors/classification-detector.js';
 export class RelationshipEngine {
     
     /**
-     * Orchestrates the relationship detection pipeline
+     * Orchestrates the forensic relationship detection pipeline
+     * @param {Array<Object>} records - The full digitized dataset
+     * @returns {Promise<Array<Object>>} Enriched records
      */
     static async buildRelationships(records = []) {
         if (!Array.isArray(records) || records.length === 0) return records;
 
-        // Initialize relationship structure on records
+        // Initialize forensic structure
         records.forEach(rec => {
             rec._relationships = {
                 forensicEdges: [],
@@ -29,36 +37,39 @@ export class RelationshipEngine {
             };
         });
 
-        this.#emit('relationship:started', { count: records.length });
+        await RelationshipAudit.log('STARTED', { count: records.length });
 
         try {
-            // 1. Build O(1) Index Matrix
             const indexes = RelationshipIndexer.build(records);
 
-            // 2. Load Detector Pipeline
             const detectors = [
                 ReversalDetector,
                 SettlementDetector,
+                CorrectionDetector,
+                AdjustmentDetector,
+                TransferDetector,
+                CorroborationDetector,
+                ContradictionDetector,
                 ClassificationDetector
             ];
 
-            // 3. Execute Detection Pass
             for (const Detector of detectors) {
                 try {
                     const result = await Detector.detect(records, indexes, RelationshipConfig);
                     this.#processDetectorResult(records, result);
-                    this.#emit('relationship:detected', { detector: result.detector, edgeCount: result.edges.length });
+                    await RelationshipAudit.log('DETECTED', { detector: result.detector, edgeCount: result.edges.length });
                 } catch (err) {
-                    this.#handleError(Detector.name, err);
+                    await RelationshipAudit.log('ERROR', { source: Detector.name, message: err.message });
+                    console.error(`[RelationshipEngine] ${Detector.name} Failure:`, err);
                 }
             }
 
-            // 4. Finalize Edges & Metadata
             this.#finalize(records);
-            this.#emit('relationship:completed', { count: records.length });
+            await RelationshipAudit.log('COMPLETED', { count: records.length });
 
         } catch (fatalErr) {
-            this.#handleError('RelationshipEngine_Core', fatalErr);
+            await RelationshipAudit.log('ERROR', { source: 'RelationshipEngine_Core', message: fatalErr.message });
+            console.error('[RelationshipEngine] Core Failure:', fatalErr);
         }
 
         return records;
