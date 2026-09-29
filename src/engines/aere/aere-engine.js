@@ -53,7 +53,7 @@ export class AEREEngine {
 
     /**
      * Phase 2.6: Partitions a broad group into distinct events if collisions are detected
-     * Refined in Phase 4.1F to support IDENTITY/PROCESS/CATEGORY logic
+     * Refined in Phase 4.1K to prioritize Payment Identity splitting for PROCESS
      */
     static partitionGroup(members) {
         const doc = (members[0].data || members[0]).invoiceNumber || (members[0].data || members[0]).doc_number || 'UNKNOWN';
@@ -63,21 +63,35 @@ export class AEREEngine {
         // IDENTITY with HIGH quality -> Keep as a single lifecycle
         if (anchorType === 'IDENTITY' && quality === 'HIGH') return [members];
 
-        // PROCESS anchors -> Always partition by Voucher (Batch Separation)
+        // PROCESS anchors -> Always partition by Payment ID first, then Voucher
         if (anchorType === 'PROCESS') {
-            return this.splitByVoucher(members);
+            return this.splitByIdentity(members);
         }
 
-        // CATEGORY anchors -> 
-        // 1. For "EXPENSE_SERIES" we could keep them together, 
-        // 2. But for Forensic accuracy we split by Voucher.
-        // We will split by Voucher to prevent AI "Lifecycle" hallucinations.
+        // CATEGORY anchors -> Always partition by Voucher
         if (anchorType === 'CATEGORY') {
             return this.splitByVoucher(members);
         }
 
         // Default: Partition by Voucher for safety
         return this.splitByVoucher(members);
+    }
+
+    /**
+     * Helper to split a group by the best available identity (Payment > Voucher)
+     */
+    static splitByIdentity(members) {
+        const groups = {};
+        members.forEach(node => {
+            const r = node.data || node;
+            const pay = r.paymentNumber || '-';
+            const vch = r.voucherNumber || r.voucher || 'NO_VCH';
+            const id = (pay !== '-' && pay !== 'undefined' && pay !== 'null') ? `PAY:${pay}` : `VCH:${vch}`;
+            
+            if (!groups[id]) groups[id] = [];
+            groups[id].push(node);
+        });
+        return Object.values(groups);
     }
 
     /**
@@ -109,8 +123,8 @@ export class AEREEngine {
 
     /**
      * Groups records by Entity, Vendor, and Normalized Document Number
-     * Refined in Phase 4.1I: PROCESS anchors use Voucher as secondary grouping key
-     * to prevent early-stage batch collisions.
+     * Refined in Phase 4.1K: Prioritizes Payment Identity over Voucher for PROCESS anchors
+     * to prevent batch voucher collisions in settlement runs.
      */
     static groupByAnchor(records) {
         const groups = {};
@@ -126,11 +140,20 @@ export class AEREEngine {
             
             const anchorType = this.classifyAnchor(rawDoc);
             
-            // Phase 4.1I Fix: Immediate partitioning for PROCESS and CATEGORY
             let key = `${entity}|${vendor}|${doc}`;
-            if (anchorType === 'PROCESS' || anchorType === 'CATEGORY') {
-                const voucher = r.voucherNumber || r.voucher || 'NO_VCH';
-                key += `|VCH:${voucher}`;
+            
+            // Phase 4.1K: Identity Hierarchy for Grouping
+            if (anchorType === 'PROCESS') {
+                const pay = r.paymentNumber || '-';
+                if (pay !== '-' && pay !== 'undefined' && pay !== 'null') {
+                    key += `|PAY:${pay}`;
+                } else {
+                    const vch = r.voucherNumber || r.voucher || 'NO_VCH';
+                    key += `|VCH:${vch}`;
+                }
+            } else if (anchorType === 'CATEGORY') {
+                const vch = r.voucherNumber || r.voucher || 'NO_VCH';
+                key += `|VCH:${vch}`;
             }
 
             if (!groups[key]) groups[key] = [];
