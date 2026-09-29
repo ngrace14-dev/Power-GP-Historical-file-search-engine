@@ -124,7 +124,7 @@
 
   <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
 
-    <!-- Active Investigation Case Panel -->
+        <!-- Active Investigation Case Panel -->
     <section id="case-section" class="hidden bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-5 shadow-xl">
       <div class="flex justify-between items-center">
         <div>
@@ -146,7 +146,7 @@
       </div>
     </section>
 
-        <!-- Upload & Cloud Pull Panel -->
+    <!-- Upload & Cloud Pull Panel -->
     <section id="upload-section" class="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800 transition-all shadow-xl">
       <div class="flex gap-6 mb-6 border-b border-slate-800 px-2 overflow-x-auto">
         <button onclick="switchTab('cloud')" id="tab-cloud" class="text-cyan-400 font-bold pb-3 border-b-2 border-cyan-400 transition-colors text-xs sm:text-sm flex items-center gap-2 whitespace-nowrap">
@@ -193,6 +193,7 @@
             </div>
         </div>
       </div>
+
 
 
 
@@ -1013,17 +1014,21 @@
         extractedData = RiskEngine.evaluateDataset(extractedData).records;
         extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
 
-        activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
+
+        // activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
 
         await ChainOfCustody.recordEvent("INGEST_PDF_SCHEDULE_GRAPH", {
             filename: file.name,
             recordCount: extractedData.length,
-            graphNodeCount: activeEvidenceGraph.nodes.size,
-            graphEdgeCount: activeEvidenceGraph.edges.length,
+
+
+            graphNodeCount: 0, //activeEvidenceGraph.nodes.size,
+            graphEdgeCount: 0, //activeEvidenceGraph.edges.length,
             entity: userSelectedEntity.toUpperCase()
         }, currentUserEmail);
 
         window.updateProgress(100, 'EXTRACTION & GRAPH MAPPING COMPLETE');
+        activeEvidenceGraph = null;
         window.renderResults(extractedData);
 
       } catch (err) {
@@ -1092,12 +1097,15 @@
             extractedData = RiskEngine.evaluateDataset(extractedData).records;
             extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
 
-            activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
+
+            // activeEvidenceGraph = EvidenceGraph.buildGraphFromDataset(extractedData);
 
             await ChainOfCustody.recordEvent("INGEST_TEXT_BUFFER_GRAPH", {
                 recordCount: extractedData.length,
-                graphNodeCount: activeEvidenceGraph.nodes.size,
-                graphEdgeCount: activeEvidenceGraph.edges.length,
+
+
+                graphNodeCount: 0, //activeEvidenceGraph.nodes.size,
+                graphEdgeCount: 0, //activeEvidenceGraph.edges.length,
                 entity: userSelectedEntity.toUpperCase()
             }, currentUserEmail);
         } else {
@@ -1105,6 +1113,7 @@
         }
 
         window.updateProgress(100, 'COMPLETE');
+        activeEvidenceGraph = null;
         window.renderResults(extractedData);
       }, 300);
     };
@@ -1201,17 +1210,27 @@
       lucide.createIcons();
     }
 
+        const MAX_VISIBLE_ROWS = 250;
+
     window.renderResults = (data) => {
+      console.time("Render Results");
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
-      document.getElementById('results-meta').innerText = `${data.length} records extracted, validated, and graph mapped (${activeEvidenceGraph ? activeEvidenceGraph.nodes.size : 0} Nodes / ${activeEvidenceGraph ? activeEvidenceGraph.edges.length : 0} Edges).`;
+      
+      const visibleData = data.slice(0, MAX_VISIBLE_ROWS);
+      const totalCount = data.length;
+
+      document.getElementById('results-meta').innerHTML = `
+        Showing ${visibleData.length.toLocaleString()} of ${totalCount.toLocaleString()} records 
+        <span class="text-slate-500">| Graph Analysis: Deferred</span>
+      `;
 
       const tbody = document.getElementById('table-body');
-      tbody.innerHTML = data.map(record => {
+      tbody.innerHTML = visibleData.map(record => {
         const r = record.data || record; 
         const prov = record._provenance || {};
         const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
-        const rel = record._relationships || { hasLinks: false, evidenceCount: 0, corroboratingCount: 0 };
+        const rel = record._relationships || { hasLinks: false, forensicEdges: [], anomalyEdges: [], classificationEdges: [] };
         const mat = AIGovernanceEngine.classifyMateriality(r.amount || r.doc_amount, val.variance);
         const corr = record._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
         const risk = record._risk || { riskScore: 0, riskClass: 'LOW', badgeColor: '' };
@@ -1220,7 +1239,7 @@
         const recId = record._id || r.row_id;
 
         let actionCell = `<button onclick="attachToCaseUI('${recId}')" class="px-2 py-1 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 rounded border border-indigo-500/40 text-[10px] transition font-bold" title="Attach to Active Case">Attach</button>`;
-        if (activeCase && activeCase.evidenceLog.some(log => log.recordId === recId)) {
+        if (activeCase && activeCase.evidenceLog && activeCase.evidenceLog.some(log => log.recordId === recId)) {
           actionCell = `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-bold">Attached</span>`;
         }
 
@@ -1228,8 +1247,8 @@
         if (rel.hasLinks) {
           linkDisplay = `
             <button onclick="viewGraphLinks('${recId}')" class="flex items-center gap-1 cursor-pointer">
-              ${rel.evidenceCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">${rel.evidenceCount} Evid</span>` : ''}
-              ${rel.corroboratingCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">${rel.corroboratingCount} Corrob</span>` : ''}
+              ${rel.forensicEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">${rel.forensicEdges.length} Evid</span>` : ''}
+              ${rel.anomalyEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">${rel.anomalyEdges.length} Corrob</span>` : ''}
             </button>
           `;
         }
@@ -1272,10 +1291,85 @@
         </tr>
       `}).join('');
 
-      document.getElementById('btn-download').disabled = false;
-      document.getElementById('btn-pass').disabled = false;
+      if (totalCount > MAX_VISIBLE_ROWS) {
+          const loadMoreRow = document.createElement('tr');
+          loadMoreRow.id = 'load-more-row';
+          loadMoreRow.innerHTML = `
+            <td colspan="14" class="p-6 text-center bg-slate-900/50">
+              <button onclick="window.renderAllResults()" class="px-6 py-2 rounded-lg bg-slate-800 border border-slate-700 text-cyan-400 font-bold text-xs hover:bg-slate-700 transition">
+                LOAD ALL ${totalCount.toLocaleString()} RECORDS (MAY CAUSE BROWSER LAG)
+              </button>
+            </td>
+          `;
+          tbody.appendChild(loadMoreRow);
+      }
+
+      console.timeEnd("Render Results");
       lucide.createIcons();
     };
+
+    window.renderAllResults = () => {
+        const loadMore = document.getElementById('load-more-row');
+        if (loadMore) loadMore.remove();
+        window.renderResultsBatch(extractedData);
+    };
+
+    window.renderResultsBatch = (data) => {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = data.map(record => {
+            const r = record.data || record; 
+            const prov = record._provenance || {};
+            const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
+            const rel = record._relationships || { hasLinks: false, forensicEdges: [], anomalyEdges: [], classificationEdges: [] };
+            const mat = AIGovernanceEngine.classifyMateriality(r.amount || r.doc_amount, val.variance);
+            const corr = record._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
+            const risk = record._risk || { riskScore: 0, riskClass: 'LOW', badgeColor: '' };
+            const auth = record._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
+            const contra = record._contradictions || { hasContradictions: false, count: 0 };
+            const recId = record._id || r.row_id;
+
+            let actionCell = `<button onclick="attachToCaseUI('${recId}')" class="px-2 py-1 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 rounded border border-indigo-500/40 text-[10px] transition font-bold" title="Attach to Active Case">Attach</button>`;
+            if (activeCase && activeCase.evidenceLog && activeCase.evidenceLog.some(log => log.recordId === recId)) {
+                actionCell = `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-bold">Attached</span>`;
+            }
+
+            let linkDisplay = `<span class="text-slate-500 text-[10px]">Unlinked</span>`;
+            if (rel.hasLinks) {
+                linkDisplay = `<button onclick="viewGraphLinks('${recId}')" class="flex items-center gap-1 cursor-pointer">
+                    ${rel.forensicEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">${rel.forensicEdges.length} Evid</span>` : ''}
+                    ${rel.anomalyEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">${rel.anomalyEdges.length} Corrob</span>` : ''}
+                </button>`;
+            }
+
+            let matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400">Immaterial</span>`;
+            if (mat.level === 'CRITICAL') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">Critical</span>`;
+            else if (mat.level === 'SIGNIFICANT') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">Significant</span>`;
+
+            const riskBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${risk.badgeColor}">${risk.riskScore}/100 (${risk.riskClass})</span>`;
+            const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/60 text-purple-300 border border-purple-500/30">${auth.primaryCitation}</span>`;
+            const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span>`;
+            const contraBadge = contra.hasContradictions ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">${contra.count} Contradiction${contra.count > 1 ? 's' : ''}</span>` : `<span class="text-slate-500 text-[10px]">Clear</span>`;
+
+            return `<tr class="hover:bg-slate-800/50 transition">
+                <td class="p-3 pl-4 text-center">${actionCell}</td>
+                <td class="p-3 font-mono"><span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext || 'ENTITY'} | ${r.accountNumber || r.vendor_id}</span>${r.vendor || r.vendor_name}</td>
+                <td class="p-3 text-slate-400 font-mono">${r.voucherNumber || r.voucher}</td>
+                <td class="p-3 text-slate-200 font-bold font-mono">${r.invoiceNumber || r.doc_number}</td>
+                <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300 font-mono">${r.type}</span></td>
+                <td class="p-3 text-slate-300 font-mono">${r.transactionDate || r.doc_date}</td>
+                <td class="p-3 text-right font-bold font-mono ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
+                <td class="p-3">${linkDisplay}</td>
+                <td class="p-3 text-center">${corrobBadge}</td>
+                <td class="p-3 text-center">${contraBadge}</td>
+                <td class="p-3 text-center">${matBadge}</td>
+                <td class="p-3 text-center">${riskBadge}</td>
+                <td class="p-3 text-center">${authBadge}</td>
+                <td class="p-3 text-center">${val.tieOutStatus === 'PASS' ? `<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">PASS</span>` : `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold">FAIL ($${val.variance})</span>`}</td>
+            </tr>`;
+        }).join('');
+        lucide.createIcons();
+    };
+
 
     window.stageAuditData = async () => {
       if (extractedData.length === 0) return;
@@ -1362,3 +1456,9 @@
   </script>
 </body>
 </html>
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>
+
