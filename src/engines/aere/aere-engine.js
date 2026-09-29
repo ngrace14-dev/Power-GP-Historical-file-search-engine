@@ -189,7 +189,10 @@ export class AEREEngine {
             ? (Math.abs(net) < 0.01 ? 'BALANCED' : 'UNBALANCED')
             : this.determineStatus(classifiedNodes, net);
 
-        const finalAmount = status === 'VOIDED' ? 0 : (classifiedNodes[classifiedNodes.length - 1].amount || net);
+        // Phase 4.1G Fix: Ensure finalAmount for COMPOUND_ENTRY is the net imbalance
+        const finalAmount = (intent === 'COMPOUND_ENTRY')
+            ? net
+            : (status === 'VOIDED' ? 0 : (classifiedNodes[classifiedNodes.length - 1].amount || net));
 
         // Generate Narrative
         const narrative = this.generateNarrative(anchor, classifiedNodes, finalAmount, status, intent);
@@ -231,7 +234,7 @@ export class AEREEngine {
             varianceAnalysis: varianceContribution,
             confidence: confidence,
             nodes: classifiedNodes,
-            eventFlags: this.extractEventFlags(classifiedNodes),
+            eventFlags: this.extractEventFlags(classifiedNodes, intent),
             ledgerFlags: this.extractLedgerFlags(classifiedNodes)
         });
     }
@@ -405,16 +408,27 @@ export class AEREEngine {
     /**
      * Extracts only findings specific to this event lifecycle
      */
-    static extractEventFlags(nodes) {
+    static extractEventFlags(nodes, intent = 'INVOICE_LIFECYCLE') {
         const flags = [];
-        // Example: Detect duplicate final states or excessive churn
-        if (nodes.length > 8) {
+        
+        // Phase 4.1G Fix: Suppress Churn diagnostics for COMPOUND_ENTRY
+        if (intent !== 'COMPOUND_ENTRY' && nodes.length > 8) {
             flags.push({
                 category: 'CONTRADICTION',
                 severity: 'HIGH',
                 description: 'Excessive Transaction Churn: Anchor Document underwent 8+ revisions.'
             });
         }
+
+        // Add Account-Line diagnostics for COMPOUND_ENTRY
+        if (intent === 'COMPOUND_ENTRY' && nodes.length > 50) {
+            flags.push({
+                category: 'COMPLEXITY',
+                severity: 'MEDIUM',
+                description: 'High-Density Journal Entry: 50+ individual account distributions detected.'
+            });
+        }
+
         return flags;
     }
 
