@@ -20,8 +20,10 @@ import { CorrectionPathEngine } from './correction-path-engine.js';
 import { AccountingDebtEngine } from './accounting-debt-engine.js';
 import { ForensicNarrativeEngine } from './forensic-narrative-engine.js';
 import { ChiefForensicReasoner } from './chief-forensic-reasoner.js';
+import { RoleIntelligenceEngine } from './role-intelligence-engine.js';
 
 export class InvestigationEngine {
+
 
 
 
@@ -84,8 +86,18 @@ export class InvestigationEngine {
                     if (!records || records.length === 0) return null;
                     const synthesis = await ForensicNarrativeEngine.synthesize(records);
                     const reasoning = await ChiefForensicReasoner.reason(synthesis);
-                    return { synthesis, reasoning };
+            
+                    // Auto-generate role briefs
+                    const briefs = {
+                        controller: await RoleIntelligenceEngine.generateBrief(RoleIntelligenceEngine.ROLES.CONTROLLER, synthesis, reasoning),
+                        auditor: await RoleIntelligenceEngine.generateBrief(RoleIntelligenceEngine.ROLES.AUDITOR, synthesis, reasoning),
+                        m_and_a: await RoleIntelligenceEngine.generateBrief(RoleIntelligenceEngine.ROLES.M_AND_A, synthesis, reasoning),
+                        executive: await RoleIntelligenceEngine.generateBrief(RoleIntelligenceEngine.ROLES.EXECUTIVE, synthesis, reasoning)
+                    };
+
+                    return { synthesis, reasoning, briefs };
                 }
+
 
 
         /**

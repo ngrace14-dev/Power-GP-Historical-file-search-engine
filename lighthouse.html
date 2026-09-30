@@ -622,7 +622,9 @@
         import { MemoWriter } from './memo-writer.js';
         import { ForensicNarrativeEngine } from './forensic-narrative-engine.js';
         import { ChiefForensicReasoner } from './chief-forensic-reasoner.js';
+        import { RoleIntelligenceEngine } from './role-intelligence-engine.js';
         import { ChainOfCustody } from './chain-of-custody.js';
+
 
 
         import { InvestigationEngine } from './investigation-engine.js';
@@ -849,12 +851,57 @@
       lucide.createIcons();
 
             try {
-        const result = await InvestigationEngine.runNarrativeSynthesis(extractedData);
-        const { synthesis, reasoning } = result;
+              const result = await InvestigationEngine.runNarrativeSynthesis(extractedData);
+              const { synthesis, reasoning, briefs } = result;
         
-        let html = `
-          <div class="space-y-6">
-            <!-- Reasoning Layer (PRO 3) -->
+              let html = `
+                <div class="space-y-6">
+                  <!-- Intelligence Agents (Role-Based) -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-cyan-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
+                      <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="user-cog" class="w-4 h-4 text-cyan-400"></i>
+                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Controller Brief</span>
+                      </div>
+                      <p class="text-[10px] text-slate-500">"What did I inherit?"</p>
+                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-cyan-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
+                        ${briefs.controller.replace(/\n/g, '<br/>')}
+                      </div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-emerald-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
+                      <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-400"></i>
+                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Audit Brief</span>
+                      </div>
+                      <p class="text-[10px] text-slate-500">"What deserves attention?"</p>
+                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-emerald-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
+                        ${briefs.auditor.replace(/\n/g, '<br/>')}
+                      </div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-amber-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
+                      <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="briefcase" class="w-4 h-4 text-amber-400"></i>
+                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">M&A Brief</span>
+                      </div>
+                      <p class="text-[10px] text-slate-500">"What is hidden?"</p>
+                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-amber-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
+                        ${briefs.m_and_a.replace(/\n/g, '<br/>')}
+                      </div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-purple-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
+                      <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="presentation" class="w-4 h-4 text-purple-400"></i>
+                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Executive Brief</span>
+                      </div>
+                      <p class="text-[10px] text-slate-500">"What matters?"</p>
+                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-purple-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
+                        ${briefs.executive.replace(/\n/g, '<br/>')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Reasoning Layer (PRO 3) -->
+
             <div class="bg-purple-950/20 border border-purple-500/30 rounded-2xl p-6 shadow-lg">
               <div class="flex items-center gap-2 mb-4">
                 <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center">
