@@ -116,10 +116,14 @@
                     <button onclick="runDecisionAnalysis()" class="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="git-branch" class="w-3.5 h-3.5"></i> Decision Consistency
           </button>
-          <button onclick="runPathAnalysis()" class="px-4 py-1.5 bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+                    <button onclick="runPathAnalysis()" class="px-4 py-1.5 bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="route" class="w-3.5 h-3.5"></i> Correction Paths
           </button>
+          <button onclick="runDebtAnalysis()" class="px-4 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="line-chart" class="w-3.5 h-3.5"></i> Accounting Debt
+          </button>
           <button onclick="runBehaviorAnalysis()" class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+
 
 
 
@@ -661,7 +665,66 @@
     </div>
   </div>
 
+    <!-- Accounting Debt Analysis Modal -->
+  <div id="modal-debt-analysis" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden font-sans">
+      <div class="px-5 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center border border-amber-500/40">
+            <i data-lucide="line-chart" class="w-5 h-5 text-amber-400"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold uppercase tracking-wider">Accounting Debt Analysis Engine</h3>
+            <p class="text-[10px] text-amber-300 font-medium">Phase 5.8 Operational Burden Engine</p>
+          </div>
+        </div>
+        <button onclick="closeDebtModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      
+      <div class="p-8 overflow-y-auto space-y-8 bg-slate-50 flex-1">
+        <!-- Core Score -->
+        <div class="flex flex-col items-center justify-center space-y-2 py-6 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Accounting Debt Score</p>
+            <div id="debt-score" class="text-6xl font-black text-slate-900">--</div>
+            <div id="debt-classification" class="px-4 py-1 rounded-full text-xs font-black border tracking-widest">--</div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Top Sources -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Top Debt Contributors</h4>
+                <div id="debt-sources-container" class="space-y-3">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Observed Facts -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Observed Debt Facts</h4>
+                <ul id="debt-facts-list" class="space-y-2 text-xs text-slate-700">
+                    <!-- Dynamically populated -->
+                </ul>
+            </div>
+        </div>
+
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div class="flex gap-3">
+            <i data-lucide="layers" class="w-5 h-5 text-amber-600 flex-shrink-0"></i>
+            <div class="text-[11px] text-amber-900 leading-relaxed">
+              <strong>Forensic Rule:</strong> Accounting Debt measures the cumulative operational effort required to resolve ledger events. High scores indicate an environment where work is frequently carried forward through time, increasing the risk of forensic drift and reconciliation variance.
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="px-6 py-4 border-t border-slate-200 bg-white flex justify-end">
+        <button onclick="closeDebtModal()" class="px-6 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition shadow-md">Close Analysis</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Connected Evidence Graph Inspector Modal -->
+
 
 
 
@@ -1068,7 +1131,55 @@
         document.getElementById('inv-count').textContent = inv.evidenceLog.length;
     }
 
+        window.runDebtAnalysis = () => {
+            const analysis = InvestigationEngine.runAccountingDebtAnalysis(window.appState.records);
+            renderDebtModal(analysis);
+        };
+
+        window.renderDebtModal = (analysis) => {
+            if (!analysis) return;
+
+            const scoreEl = document.getElementById('debt-score');
+            scoreEl.textContent = analysis.debtScore;
+        
+            const classEl = document.getElementById('debt-classification');
+            classEl.textContent = analysis.classification;
+            const colorClass = analysis.classification === 'LOW' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 
+                              (analysis.classification === 'MODERATE' ? 'text-blue-600 bg-blue-50 border-blue-200' : 
+                              (analysis.classification === 'HIGH' ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-rose-600 bg-rose-50 border-rose-200'));
+            classEl.className = `px-4 py-1 rounded-full text-xs font-black border tracking-widest ${colorClass}`;
+
+            const sourcesList = document.getElementById('debt-sources-container');
+            sourcesList.innerHTML = analysis.topSources.map(s => `
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="font-bold text-slate-700">${s.name}</span>
+                        <span class="text-slate-400 font-mono">${s.debtContribution} debt units</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                        <div class="bg-amber-500 h-full" style="width: ${Math.min(100, (s.debtContribution / analysis.metrics.totalChains) * 50)}%"></div>
+                    </div>
+                </div>
+            `).join('');
+
+            const factsList = document.getElementById('debt-facts-list');
+            factsList.innerHTML = analysis.observedFacts.map(f => `
+                <li class="flex items-start gap-2">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-amber-500 mt-0.5"></i>
+                    <span>${f}</span>
+                </li>
+            `).join('');
+
+            document.getElementById('modal-debt-analysis').classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        window.closeDebtModal = () => {
+            document.getElementById('modal-debt-analysis').classList.add('hidden');
+        };
+
         window.runPathAnalysis = () => {
+
             const analysis = InvestigationEngine.runCorrectionPathAnalysis(window.appState.records);
             renderPathModal(analysis);
         };

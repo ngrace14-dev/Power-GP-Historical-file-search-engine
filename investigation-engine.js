@@ -17,8 +17,10 @@ import { ControlEnvironmentEngine } from './control-environment-engine.js';
 import { EnvironmentFingerprintEngine } from './environment-fingerprint-engine.js';
 import { DecisionConsistencyEngine } from './decision-consistency-engine.js';
 import { CorrectionPathEngine } from './correction-path-engine.js';
+import { AccountingDebtEngine } from './accounting-debt-engine.js';
 
 export class InvestigationEngine {
+
 
 
 
@@ -72,7 +74,18 @@ export class InvestigationEngine {
     }
 
         /**
+         * Performs an accounting debt analysis.
+         */
+        static runAccountingDebtAnalysis(allDatasetRecords = []) {
+            if (!allDatasetRecords || allDatasetRecords.length === 0) {
+                return null;
+            }
+            return AccountingDebtEngine.analyzeDebt(allDatasetRecords);
+        }
+
+        /**
          * Performs a correction path analysis.
+
          */
         static runCorrectionPathAnalysis(allDatasetRecords = []) {
             if (!allDatasetRecords || allDatasetRecords.length === 0) {
