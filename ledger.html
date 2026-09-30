@@ -107,10 +107,14 @@
                     <button onclick="runPopulationAnalysis()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="pie-chart" class="w-3.5 h-3.5"></i> Population Analysis
           </button>
-          <button onclick="runControlAnalysis()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+                    <button onclick="runControlAnalysis()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Control Analysis
           </button>
+          <button onclick="runFingerprintAnalysis()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="fingerprint" class="w-3.5 h-3.5"></i> Environment Fingerprint
+          </button>
           <button onclick="runBehaviorAnalysis()" class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+
 
 
             <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i> Analyze Patterns
@@ -435,7 +439,88 @@
     </div>
   </div>
 
+    <!-- Environment Fingerprint Modal -->
+  <div id="modal-fingerprint-analysis" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden font-sans">
+      <div class="px-5 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-slate-500/20 flex items-center justify-center border border-slate-500/40">
+            <i data-lucide="fingerprint" class="w-5 h-5 text-slate-400"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold uppercase tracking-wider">Environment Fingerprint Engine</h3>
+            <p class="text-[10px] text-slate-400 font-medium">Phase 5.5 Comprehensive Characterization Engine</p>
+          </div>
+        </div>
+        <button onclick="closeFingerprintModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      
+      <div class="p-8 overflow-y-auto space-y-8 bg-slate-50 flex-1">
+        <!-- Classification Badges -->
+        <div class="flex flex-wrap gap-2" id="fingerprint-classifications">
+            <!-- Dynamically populated -->
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Summary & Scores -->
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Operational Characterization</h4>
+                    <p id="fingerprint-summary" class="text-sm text-slate-700 leading-relaxed font-medium italic"></p>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Environment Scores</h4>
+                    <div id="fingerprint-scores-list" class="space-y-3">
+                        <!-- Score bars dynamically populated -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Behavior Segments -->
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Behavioral Segmentation</h4>
+                    <div class="space-y-6">
+                        <div>
+                            <span class="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Dominant Behaviors</span>
+                            <div id="segment-dominant" class="mt-2 flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black text-rose-600 uppercase tracking-tighter">Rare Behaviors</span>
+                            <div id="segment-rare" class="mt-2 flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black text-blue-600 uppercase tracking-tighter">Persistent Behaviors</span>
+                            <div id="segment-persistent" class="mt-2 flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black text-amber-600 uppercase tracking-tighter">Emerging Behaviors</span>
+                            <div id="segment-emerging" class="mt-2 flex flex-wrap gap-1.5"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 bg-slate-900 border border-slate-800 rounded-xl">
+          <div class="flex gap-3">
+            <i data-lucide="info" class="w-5 h-5 text-slate-400 flex-shrink-0"></i>
+            <div class="text-[11px] text-slate-400 leading-relaxed">
+              <strong>Forensic Governance Notice:</strong> The Accounting Environment Fingerprint characterizes the "how" of the ledger operation. It is a high-level metadata abstraction based on aggregate behavior and does not replace transaction-level evidence.
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="px-6 py-4 border-t border-slate-200 bg-white flex justify-end">
+        <button onclick="closeFingerprintModal()" class="px-6 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition shadow-md">Close Fingerprint</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Connected Evidence Graph Inspector Modal -->
+
 
 
 
@@ -839,7 +924,73 @@
         document.getElementById('inv-count').textContent = inv.evidenceLog.length;
     }
 
+        window.runFingerprintAnalysis = () => {
+            const analysis = InvestigationEngine.runEnvironmentFingerprint(window.appState.records);
+            renderFingerprintModal(analysis);
+        };
+
+        window.renderFingerprintModal = (analysis) => {
+            if (!analysis) return;
+
+            // Classifications
+            const classesDiv = document.getElementById('fingerprint-classifications');
+            classesDiv.innerHTML = analysis.fingerprintClassifications.map(c => `
+                <span class="px-3 py-1 rounded-full bg-slate-800 text-white text-[10px] font-bold tracking-wide border border-slate-700 shadow-sm">${c.toUpperCase()}</span>
+            `).join('');
+
+            // Summary
+            document.getElementById('fingerprint-summary').textContent = analysis.environmentSummary;
+
+            // Scores List
+            const scoresList = document.getElementById('fingerprint-scores-list');
+            const metricKeys = [
+                { label: 'Process Consistency', key: 'processConsistency' },
+                { label: 'Manual Intervention', key: 'manualIntervention' },
+                { label: 'Intercompany Dependency', key: 'intercompanyDependency' },
+                { label: 'Settlement Stability', key: 'settlementStability' },
+                { label: 'Persistence Risk', key: 'persistenceRisk' },
+                { label: 'Behavior Variability', key: 'behaviorVariability' }
+            ];
+
+            scoresList.innerHTML = metricKeys.map(m => {
+                const val = analysis.scores[m.key];
+                const barColor = val > 75 ? 'bg-rose-500' : (val > 50 ? 'bg-amber-500' : 'bg-emerald-500');
+                return `
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] font-bold text-slate-600">
+                            <span>${m.label}</span>
+                            <span>${val}/100</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div class="${barColor} h-full" style="width: ${val}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Behavior Segments
+            const renderSegment = (id, items) => {
+                const container = document.getElementById(id);
+                container.innerHTML = items.length > 0 ? items.map(item => `
+                    <span class="px-2 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-medium text-slate-700">${item}</span>
+                `).join('') : '<span class="text-[10px] text-slate-400 italic">None identified</span>';
+            };
+
+            renderSegment('segment-dominant', analysis.behaviorSegments.dominant);
+            renderSegment('segment-rare', analysis.behaviorSegments.rare);
+            renderSegment('segment-persistent', analysis.behaviorSegments.persistent);
+            renderSegment('segment-emerging', analysis.behaviorSegments.emerging);
+
+            document.getElementById('modal-fingerprint-analysis').classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        window.closeFingerprintModal = () => {
+            document.getElementById('modal-fingerprint-analysis').classList.add('hidden');
+        };
+
         window.runControlAnalysis = () => {
+
             const analysis = InvestigationEngine.runControlEnvironmentAnalysis(window.appState.records);
             renderControlModal(analysis);
         };
