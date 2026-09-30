@@ -1264,103 +1264,110 @@
                     });
 
                     const stampedRecord = ProvenanceEngine.stampRecord({
-                      sourceFile: fileRef.name,
-                      sourceSystem: "Firebase_Storage",
-                      sourceType: "NATIVE_EXPORT", 
-                      entityContext: entityMatch.short || "UNKNOWN", 
-                      processedBy: "Lighthouse Engine v3 (Selective Load)",
-                      ocrConfidence: scores.ocrConfidence,
-                      parsingConfidence: scores.parsingConfidence,
-                      extractedData: normalizedRecord
+                              sourceFile: fileRef.name,
+                              sourceSystem: "Firebase_Storage",
+                              sourceType: "NATIVE_EXPORT", 
+                              entityContext: entityMatch.short || "UNKNOWN", 
+                              processedBy: "Lighthouse Engine v3 (Selective Load)",
+                              ocrConfidence: scores.ocrConfidence,
+                              parsingConfidence: scores.parsingConfidence,
+                              extractedData: normalizedRecord
+                            });
+
+                            batchRecords.push({
+                                _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
+                                _provenance: stampedRecord._provenance,
+                                data: stampedRecord.data,
+                                _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
+                            });
+                          }
+
+                          const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
+                          batchRecords.forEach(b => {
+                              b._validation = validation;
+                              if (validation.tieOutStatus === 'FAIL') b._evidenceState.hasVariance = true;
+                          });
+
+                          extractedData = [...extractedData, ...batchRecords];
+                          await new Promise(resolve => setTimeout(resolve, 20));
+                        }
+
+                        console.log(`XLSX Parse Phase Complete: ${totalParseTime.toFixed(2)}ms`);
+
+                        window.updateForensicLoader('Relationships Built', 80, 'Executing Forensic Relationship Pipeline...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        extractedData = await RelationshipEngine.buildRelationships(extractedData);
+        
+                        window.updateForensicLoader('Analysis Ongoing', 85, 'Running Corroboration & Risk Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                        extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
+        
+                        window.updateForensicLoader('Analysis Ongoing', 90, 'Running Materiality & Authority Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                        extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
+                        extractedData = RiskEngine.evaluateDataset(extractedData).records;
+                        extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
+        
+                        const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
+                        renderContradictionPanel(contradictionFlags);
+
+                        // Move Evidence Graph to On-Demand
+                        activeEvidenceGraph = null;
+
+                        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_SELECTIVE", {
+                            fileCount: totalFiles,
+                            recordCount: extractedData.length,
+                            entities: xlsxFiles.map(f => f.name)
+                        }, currentUserEmail);
+
+                        window.updateForensicLoader('Analysis Complete', 100, 'Finalizing results...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+        
+                        // Final yielding before rendering results
+                        await new Promise(resolve => setTimeout(resolve, 100));
+        
+                        window.renderResults(extractedData);
+                        window.hideForensicLoader();
+
+                        console.groupEnd();
+
+                      } catch (err) {
+                        window.logSys(`Ingestion Failure: ${err.message}`, 'error');
+                        window.hideForensicLoader();
+                        console.groupEnd();
+                      }
+                    }
+
+    const selectAllEntities = (val) => {
+        const checks = document.querySelectorAll('input[name="entity-select"]');
+        checks.forEach(c => c.checked = val);
+    };
+
+                    // Expose selective functions to window for onclick handlers
+                    exportToWindow({
+                        fetchCloudCatalog,
+                        pullSelectedLedgers,
+                        updateForensicLoader,
+                        hideForensicLoader,
+                        setRenderMode,
+                        renderResults,
+                        openForensicDrawer,
+                        closeInvestigationDrawer,
+                        triggerAiAnalyst,
+                        generateAuditMemoUI,
+                        generateForensicNarrativeUI,
+                        askAiAssistant,
+                        startInvestigationUI,
+                        attachToCaseUI,
+                        saveAndCloseCaseUI,
+                        resetState,
+                        switchTab,
+                        viewGraphLinks,
+                        closeMemoModal,
+                        closeAiModal,
+                        closeGraphModal,
+                        selectAllEntities
                     });
 
-                    batchRecords.push({
-                        _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
-                        _provenance: stampedRecord._provenance,
-                        data: stampedRecord.data,
-                        _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
-                    });
-                  }
-
-                  const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
-                  batchRecords.forEach(b => {
-                      b._validation = validation;
-                      if (validation.tieOutStatus === 'FAIL') b._evidenceState.hasVariance = true;
-                  });
-
-                  extractedData = [...extractedData, ...batchRecords];
-                  await new Promise(resolve => setTimeout(resolve, 20));
-                }
-
-                console.log(`XLSX Parse Phase Complete: ${totalParseTime.toFixed(2)}ms`);
-
-                window.updateForensicLoader('Relationships Built', 80, 'Executing Forensic Relationship Pipeline...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-                await new Promise(resolve => setTimeout(resolve, 50));
-                extractedData = await RelationshipEngine.buildRelationships(extractedData);
-        
-                window.updateForensicLoader('Analysis Ongoing', 85, 'Running Corroboration & Risk Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-                await new Promise(resolve => setTimeout(resolve, 10));
-                extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
-        
-                window.updateForensicLoader('Analysis Ongoing', 90, 'Running Materiality & Authority Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-                await new Promise(resolve => setTimeout(resolve, 10));
-                extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
-                extractedData = RiskEngine.evaluateDataset(extractedData).records;
-                extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
-        
-                const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
-                renderContradictionPanel(contradictionFlags);
-
-                // Move Evidence Graph to On-Demand
-                activeEvidenceGraph = null;
-
-                await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_SELECTIVE", {
-                    fileCount: totalFiles,
-                    recordCount: extractedData.length,
-                    entities: xlsxFiles.map(f => f.name)
-                }, currentUserEmail);
-
-                window.updateForensicLoader('Analysis Complete', 100, 'Finalizing results...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-        
-                // Final yielding before rendering results
-                await new Promise(resolve => setTimeout(resolve, 100));
-        
-                                window.renderResults(extractedData);
-                window.hideForensicLoader();
-
-                console.groupEnd();
-
-              } catch (err) {
-                window.logSys(`Ingestion Failure: ${err.message}`, 'error');
-                window.hideForensicLoader();
-                console.groupEnd();
-              }
-            }
-
-            // Expose selective functions to window for onclick handlers
-            exportToWindow({
-                fetchCloudCatalog,
-                pullSelectedLedgers,
-                updateForensicLoader,
-                hideForensicLoader,
-                setRenderMode,
-                renderResults,
-                openForensicDrawer,
-                closeInvestigationDrawer,
-                triggerAiAnalyst,
-                generateAuditMemoUI,
-                generateForensicNarrativeUI,
-                askAiAssistant,
-                startInvestigationUI,
-                attachToCaseUI,
-                saveAndCloseCaseUI,
-                resetState,
-                switchTab,
-                viewGraphLinks,
-                closeMemoModal,
-                closeAiModal,
-                closeGraphModal
-            });
 
 
 
