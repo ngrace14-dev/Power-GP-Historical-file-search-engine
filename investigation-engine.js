@@ -11,8 +11,10 @@
 import { AIGovernanceEngine } from './ai-governance.js';
 import { ChainOfCustody } from './chain-of-custody.js';
 import { BehaviorPatternEngine } from './behavior-pattern-engine.js';
+import { BehaviorBaselineEngine } from './behavior-baseline-engine.js';
 
 export class InvestigationEngine {
+
 
 
     static CASE_STATES = [
@@ -62,7 +64,7 @@ export class InvestigationEngine {
     /**
      * Performs a behavior pattern analysis on the case evidence.
      */
-    static runBehaviorAnalysis(caseObj, allDatasetRecords = []) {
+        static runBehaviorAnalysis(caseObj, allDatasetRecords = []) {
         if (!caseObj.evidenceLog || caseObj.evidenceLog.length === 0) {
             return null;
         }
@@ -73,16 +75,25 @@ export class InvestigationEngine {
         });
 
         const analysis = BehaviorPatternEngine.analyzePattern(hydratedRecords);
+        
+        // Phase 5.2 Baseline Integration
+        const globalBaseline = BehaviorBaselineEngine.generateGlobalBaseline(allDatasetRecords);
+        const baselineComparison = BehaviorBaselineEngine.evaluateAgainstBaseline(hydratedRecords, globalBaseline);
+        
+        analysis.baselineComparison = baselineComparison;
+        
         caseObj._behaviorAnalysis = analysis;
         caseObj.updatedAt = new Date().toISOString();
 
         ChainOfCustody.recordEvent("BEHAVIOR_ANALYSIS_PERFORMED", {
             caseId: caseObj.caseId,
-            pattern: analysis.behaviorPattern
+            pattern: analysis.behaviorPattern,
+            baselineCategories: baselineComparison.length
         }, caseObj.authorEmail);
 
         return analysis;
     }
+
 
     /**
      * Attaches evidence to an investigation with mandatory Governance rationale

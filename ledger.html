@@ -268,7 +268,19 @@
           </div>
         </div>
 
+        <!-- Behavior Baseline Comparison (Phase 5.2) -->
+        <div class="space-y-4">
+          <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i>
+            Behavior Baseline Comparison
+          </h4>
+          <div id="baseline-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <!-- Dynamically populated baseline cards -->
+          </div>
+        </div>
+
         <!-- Competing Explanations -->
+
         <div class="space-y-4">
           <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
             <i data-lucide="layers" class="w-4 h-4 text-cyan-600"></i>
@@ -724,10 +736,45 @@
         `).join('');
 
                 // Populate Pattern
-        document.getElementById('behavior-pattern-title').textContent = analysis.behaviorPattern;
-        document.getElementById('behavior-stamp').textContent = `STAMP: ${analysis.timestamp} | CLASSIFICATION: CONFIDENTIAL`;
+                document.getElementById('behavior-pattern-title').textContent = analysis.behaviorPattern;
+                document.getElementById('behavior-stamp').textContent = `STAMP: ${analysis.timestamp} | CLASSIFICATION: CONFIDENTIAL`;
 
-        // Populate Explanations
+                // Populate Baselines (Phase 5.2)
+                const baselineContainer = document.getElementById('baseline-container');
+                if (analysis.baselineComparison && analysis.baselineComparison.length > 0) {
+                    baselineContainer.innerHTML = analysis.baselineComparison.map(base => {
+                        const classColor = base.classification === 'COMMON' || base.classification === 'PERSISTENT' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' :
+                                          (base.classification === 'RARE' ? 'text-rose-600 bg-rose-50 border-rose-200' : 'text-amber-600 bg-amber-50 border-amber-200');
+                
+                        return `
+                            <div class="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] font-bold text-slate-500 uppercase">${base.category}</span>
+                                    <span class="px-2 py-0.5 rounded text-[9px] font-black border ${classColor}">${base.classification}</span>
+                                </div>
+                                <div class="flex items-end gap-1.5">
+                                    <span class="text-xl font-bold text-slate-900">${base.commonalityScore}%</span>
+                                    <span class="text-[10px] text-slate-400 font-medium mb-1">Commonality Score</span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[10px]">
+                                    <div class="flex flex-col">
+                                        <span class="text-slate-400">Observed Freq</span>
+                                        <span class="font-bold text-slate-700">${base.observedFrequency} items</span>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-slate-400">Total Pop.</span>
+                                        <span class="font-bold text-slate-700">${base.populationSize} items</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    baselineContainer.innerHTML = `<div class="col-span-full py-6 text-center text-slate-400 text-xs italic">No comparable baseline categories identified in this subset.</div>`;
+                }
+
+                // Populate Explanations
+
 
         const container = document.getElementById('explanations-container');
         container.innerHTML = analysis.explanations.map(exp => {
