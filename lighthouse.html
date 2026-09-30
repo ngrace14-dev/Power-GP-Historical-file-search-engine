@@ -790,10 +790,49 @@
       terminal.scrollTop = terminal.scrollHeight;
     };
 
-    window.updateProgress = (pct, msg) => {
+        window.updateProgress = (pct, msg) => {
       document.getElementById('progress-pct').innerText = `${Math.round(pct)}%`;
       document.getElementById('progress-bar').style.width = `${pct}%`;
       if (msg) document.getElementById('progress-text').innerText = msg;
+    };
+
+    window.downloadExcel = async () => {
+        if (!extractedData || extractedData.length === 0) return;
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Evidence');
+        sheet.addRow(['ID', 'Entity', 'Vendor', 'Voucher', 'Type', 'Date', 'Amount', 'Confidence']);
+        extractedData.forEach(row => {
+            const r = row.data || row;
+            sheet.addRow([
+                row._id || r.row_id,
+                row._provenance?.entityContext || r.entity,
+                r.vendor || r.vendor_name,
+                r.voucher || r.voucherNumber,
+                r.type || r.documentType,
+                r.doc_date || r.transactionDate,
+                r.amount || r.doc_amount,
+                row._provenance?.parsingConfidence || 1
+            ]);
+        });
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'Lighthouse_Export.xlsx';
+        link.click();
+    };
+
+    window.stageAuditData = async () => {
+        if (!extractedData || extractedData.length === 0) return alert('No data to stage.');
+        try {
+            const db = await openAuditDB();
+            const tx = db.transaction('staging', 'readwrite');
+            const store = tx.objectStore('staging');
+            store.put({ id: 'latest_export', data: extractedData, timestamp: Date.now() });
+            tx.oncomplete = () => alert('Data staged to Ledger Terminal successfully.');
+        } catch (e) {
+            alert('Failed to stage data: ' + e.message);
+        }
     };
 
         window.resetState = () => {
@@ -1359,13 +1398,15 @@
                         startInvestigationUI: window.startInvestigationUI,
                         attachToCaseUI: window.attachToCaseUI,
                         saveAndCloseCaseUI: window.saveAndCloseCaseUI,
-                        resetState: window.resetState,
+                                                resetState: window.resetState,
                         switchTab: window.switchTab,
                         viewGraphLinks: window.viewGraphLinks,
                         closeMemoModal: window.closeMemoModal,
                         closeAiModal: window.closeAiModal,
                         closeGraphModal: window.closeGraphModal,
-                        selectAllEntities
+                        selectAllEntities,
+                        downloadExcel: window.downloadExcel,
+                        stageAuditData: window.stageAuditData
                     });
 
 
@@ -1688,18 +1729,66 @@
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
       
-      const tbody = document.getElementById('table-body');
+            const tbody = document.getElementById('table-body');
       const thead = document.querySelector('#results-section thead tr');
 
       if (renderMode === 'EVENT') {
           reconstructedEvents = AEREEngine.reconstruct(data);
-          renderEventResults(reconstructedEvents);
+          window.renderEventResults(reconstructedEvents);
       } else {
-          renderTransactionResults(data);
+          window.renderTransactionResults(data);
       }
       
       console.timeEnd("Render Results");
       lucide.createIcons();
+    };
+
+    window.renderEventResults = (events) => {
+        const tbody = document.getElementById('table-body');
+        const thead = document.querySelector('#results-section thead tr');
+
+        thead.innerHTML = `
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Event ID</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Status</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Net Impact</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Confidence</th>
+            <th class="px-4 py-3 text-right font-bold text-slate-300">Action</th>
+        `;
+
+        tbody.innerHTML = events.map(event => `
+            <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
+                <td class="px-4 py-3 font-mono text-cyan-400">${event.eventId}</td>
+                <td class="px-4 py-3">${event.finalEconomicState.status}</td>
+                <td class="px-4 py-3">$${event.netEconomicImpact.toLocaleString()}</td>
+                <td class="px-4 py-3">${Math.round(event.confidence.total * 100)}%</td>
+                <td class="px-4 py-3 text-right">
+                    <button onclick="openForensicDrawer('${event.eventId}')" class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-2 py-1 rounded">Inspect</button>
+                </td>
+            </tr>
+        `).join('');
+    };
+
+    window.renderTransactionResults = (transactions) => {
+        const tbody = document.getElementById('table-body');
+        const thead = document.querySelector('#results-section thead tr');
+
+        thead.innerHTML = `
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Document</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Type</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Amount</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-300">Validation</th>
+        `;
+
+        tbody.innerHTML = transactions.map(txn => {
+            const data = txn.data || txn;
+            return `
+            <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
+                <td class="px-4 py-3 font-mono">${data.doc_number || data.voucher || 'UNKNOWN'}</td>
+                <td class="px-4 py-3">${data.type || 'UNKNOWN'}</td>
+                <td class="px-4 py-3">$${(data.doc_amount || data.amount || 0).toLocaleString()}</td>
+                <td class="px-4 py-3">${txn._validation ? txn._validation.tieOutStatus : 'N/A'}</td>
+            </tr>
+        `}).join('');
     };
 
         window.openForensicDrawer = (eventId) => {
