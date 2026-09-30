@@ -88,13 +88,15 @@ export class InvestigationEngine {
                     net: data.metrics.netActivity.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
                 }
             },
-            behaviorProfile: {
+                        behaviorProfile: {
                 averageLifespan: data.metrics.averageLifespan.toFixed(1) + ' days',
                 longestLifespan: data.metrics.longestLifespan + ' days',
                 reversalDensity: data.metrics.reversalDensity.toFixed(2) + '%',
                 correctionDensity: data.metrics.correctionDensity.toFixed(2) + '%'
-            }
+            },
+            representativeExample: data.representativeExample
         }));
+
 
         const notableOutliers = profiles.filter(p => 
             p.classification === 'RARE' || 

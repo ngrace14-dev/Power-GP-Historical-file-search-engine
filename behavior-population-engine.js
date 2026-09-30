@@ -42,19 +42,20 @@ export class BehaviorPopulationEngine {
             return {
                 label,
                 classification: BASELINE_CLASSIFICATIONS.RARE,
-                frequency: 0,
-                commonality: 0,
-                metrics: this.getEmptyMetrics()
+                metrics: this.getEmptyMetrics(),
+                representativeExample: null
             };
         }
 
         const metrics = this.calculateMetrics(matches, allRecords);
         const classification = this.classify(metrics, allRecords.length);
+        const representativeExample = this.findRepresentativeExample(matches);
 
         return {
             label,
             classification,
-            metrics
+            metrics,
+            representativeExample
         };
     }
 
@@ -112,6 +113,27 @@ export class BehaviorPopulationEngine {
         return {
             avg: lifespans.length > 0 ? lifespans.reduce((a, b) => a + b, 0) / lifespans.length : 0,
             max: lifespans.length > 0 ? Math.max(...lifespans) : 0
+        };
+    }
+
+    static findRepresentativeExample(matches) {
+        // Find a record that characterizes the population (e.g. highest amount or latest)
+        if (matches.length === 0) return null;
+        
+        // Sort by absolute amount descending
+        const sorted = [...matches].sort((a, b) => {
+            const amtA = Math.abs(this.getAmount(a));
+            const amtB = Math.abs(this.getAmount(b));
+            return amtB - amtA;
+        });
+
+        const best = sorted[0];
+        return {
+            journalEntry: best['Journal Entry'],
+            docNumber: best['Document Number'] || best['Invoice Number'],
+            amount: this.getAmount(best),
+            description: best['Description'] || best['Reference'],
+            entity: best._location || best['Entity']
         };
     }
 
