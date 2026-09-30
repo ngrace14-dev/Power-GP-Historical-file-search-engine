@@ -13,8 +13,10 @@ import { ChainOfCustody } from './chain-of-custody.js';
 import { BehaviorPatternEngine } from './behavior-pattern-engine.js';
 import { BehaviorBaselineEngine } from './behavior-baseline-engine.js';
 import { BehaviorPopulationEngine } from './behavior-population-engine.js';
+import { ControlEnvironmentEngine } from './control-environment-engine.js';
 
 export class InvestigationEngine {
+
 
 
 
@@ -64,7 +66,18 @@ export class InvestigationEngine {
     }
 
         /**
-     * Performs a behavior population analysis on the entire environment.
+         * Performs a control environment analysis on the dataset.
+         */
+        static runControlEnvironmentAnalysis(allDatasetRecords = []) {
+            if (!allDatasetRecords || allDatasetRecords.length === 0) {
+                return null;
+            }
+            return ControlEnvironmentEngine.analyzeControlEnvironment(allDatasetRecords);
+        }
+
+        /**
+         * Performs a behavior population analysis on the entire environment.
+
      */
     static runPopulationAnalysis(allDatasetRecords = []) {
         if (!allDatasetRecords || allDatasetRecords.length === 0) {

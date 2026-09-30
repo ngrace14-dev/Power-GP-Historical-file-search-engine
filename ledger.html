@@ -104,10 +104,14 @@
             <i data-lucide="paperclip" class="w-4 h-4"></i>
             Attached Evidence: <span id="inv-count" class="font-bold text-indigo-600 text-sm">0</span>
           </div>
-          <button onclick="runPopulationAnalysis()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+                    <button onclick="runPopulationAnalysis()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="pie-chart" class="w-3.5 h-3.5"></i> Population Analysis
           </button>
+          <button onclick="runControlAnalysis()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Control Analysis
+          </button>
           <button onclick="runBehaviorAnalysis()" class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+
 
             <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i> Analyze Patterns
           </button>
@@ -383,7 +387,56 @@
     </div>
   </div>
 
+    <!-- Control Environment Analysis Modal -->
+  <div id="modal-control-analysis" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden font-sans">
+      <div class="px-5 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center border border-purple-500/40">
+            <i data-lucide="shield-check" class="w-5 h-5 text-purple-400"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold uppercase tracking-wider">Control Environment Analysis</h3>
+            <p class="text-[10px] text-purple-300 font-medium">Phase 5.4 Environment Characterization Engine</p>
+          </div>
+        </div>
+        <button onclick="closeControlModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      
+      <div class="p-8 overflow-y-auto space-y-8 bg-slate-50 flex-1">
+        <div id="control-scores-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+            <!-- Dynamically populated scores -->
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Process Dominance</h4>
+                <div id="dominance-content" class="space-y-3"></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Persistence & Dependency Risks</h4>
+                <div id="risk-content" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <div class="flex gap-3">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0"></i>
+            <div class="text-[11px] text-amber-900 leading-relaxed">
+              <strong>Forensic Rule:</strong> This analysis measures observable accounting behavior and system management patterns. It does not rate individuals, infer intent, or conclude misconduct. High intervention density may reflect operational complexity rather than control failure.
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="px-6 py-4 border-t border-slate-200 bg-white flex justify-end">
+        <button onclick="closeControlModal()" class="px-6 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition shadow-md">Close Analysis</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Connected Evidence Graph Inspector Modal -->
+
 
 
   <div id="modal-relationship-inspector" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -786,7 +839,87 @@
         document.getElementById('inv-count').textContent = inv.evidenceLog.length;
     }
 
+        window.runControlAnalysis = () => {
+            const analysis = InvestigationEngine.runControlEnvironmentAnalysis(window.appState.records);
+            renderControlModal(analysis);
+        };
+
+        window.renderControlModal = (analysis) => {
+            if (!analysis) return;
+
+            const scoresGrid = document.getElementById('control-scores-grid');
+            const metrics = [
+                { label: 'Process Consistency', key: 'processConsistency', inverted: true },
+                { label: 'Manual Intervention', key: 'manualIntervention' },
+                { label: 'Intercompany Dependency', key: 'intercompanyDependency' },
+                { label: 'Settlement Stability', key: 'settlementStability', inverted: true },
+                { label: 'Persistence Risk', key: 'persistenceRisk' }
+            ];
+
+            scoresGrid.innerHTML = metrics.map(m => {
+                const score = analysis.scores[m.key];
+                const classification = analysis.classifications[m.key];
+                const colorClass = classification === 'LOW' ? 'text-emerald-600 bg-emerald-50' : 
+                                  (classification === 'MODERATE' ? 'text-blue-600 bg-blue-50' : 
+                                  (classification === 'HIGH' ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50'));
+            
+                return `
+                    <div class="flex flex-col gap-1 p-3 bg-white rounded-lg border border-slate-200 items-center text-center">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase leading-tight h-6 flex items-center">${m.label}</span>
+                        <div class="text-2xl font-black text-slate-900">${score}</div>
+                        <span class="px-2 py-0.5 rounded text-[8px] font-black border ${colorClass}">${classification}</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('dominance-content').innerHTML = `
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Manual Entry Density:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.intervention.density}</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Manual Actions:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.intervention.totalManual} items</span>
+                </div>
+                <div class="flex justify-between text-xs pt-2 border-t border-slate-50">
+                    <span class="text-slate-500">Unique Correction Patterns:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.consistency.uniquePatterns} types</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Average Reversal Rate:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.stability.avgReversalDensity}</span>
+                </div>
+            `;
+
+            document.getElementById('risk-content').innerHTML = `
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Intercompany Load:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.dependency.density}</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Avg Settlement Life:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.persistence.avgLifespan}</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500">Longest Open Chain:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.persistence.longestChain}</span>
+                </div>
+                <div class="flex justify-between text-xs pt-2 border-t border-slate-50">
+                    <span class="text-slate-500">Total Inter-Entity Trx:</span>
+                    <span class="font-bold text-slate-800">${analysis.details.dependency.totalIC} items</span>
+                </div>
+            `;
+
+            document.getElementById('modal-control-analysis').classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        window.closeControlModal = () => {
+            document.getElementById('modal-control-analysis').classList.add('hidden');
+        };
+
         window.runBehaviorAnalysis = () => {
+
         const inv = window.appState.activeInvestigation;
         if (!inv || inv.evidenceLog.length === 0) {
             return alert("No evidence attached to the current case for analysis.");
