@@ -666,6 +666,14 @@
     let renderMode = 'EVENT'; // 'EVENT' or 'TRANSACTION'
     let reconstructedEvents = [];
 
+    // FIX: Expose functions used in HTML onclick handlers to the window object
+    const exportToWindow = (fns) => {
+    Object.entries(fns).forEach(([name, fn]) => {
+        window[name] = fn;
+    });
+    };
+
+
 
     function openAuditDB() {
       return new Promise((resolve, reject) => {
@@ -1317,7 +1325,7 @@
                 // Final yielding before rendering results
                 await new Promise(resolve => setTimeout(resolve, 100));
         
-                window.renderResults(extractedData);
+                                window.renderResults(extractedData);
                 window.hideForensicLoader();
 
                 console.groupEnd();
@@ -1328,6 +1336,32 @@
                 console.groupEnd();
               }
             }
+
+            // Expose selective functions to window for onclick handlers
+            exportToWindow({
+                fetchCloudCatalog,
+                pullSelectedLedgers,
+                updateForensicLoader,
+                hideForensicLoader,
+                setRenderMode,
+                renderResults,
+                openForensicDrawer,
+                closeInvestigationDrawer,
+                triggerAiAnalyst,
+                generateAuditMemoUI,
+                generateForensicNarrativeUI,
+                askAiAssistant,
+                startInvestigationUI,
+                attachToCaseUI,
+                saveAndCloseCaseUI,
+                resetState,
+                switchTab,
+                viewGraphLinks,
+                closeMemoModal,
+                closeAiModal,
+                closeGraphModal
+            });
+
 
 
 
