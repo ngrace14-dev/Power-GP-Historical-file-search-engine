@@ -15,8 +15,10 @@ import { BehaviorBaselineEngine } from './behavior-baseline-engine.js';
 import { BehaviorPopulationEngine } from './behavior-population-engine.js';
 import { ControlEnvironmentEngine } from './control-environment-engine.js';
 import { EnvironmentFingerprintEngine } from './environment-fingerprint-engine.js';
+import { DecisionConsistencyEngine } from './decision-consistency-engine.js';
 
 export class InvestigationEngine {
+
 
 
 
@@ -68,7 +70,18 @@ export class InvestigationEngine {
     }
 
         /**
+         * Performs a decision consistency analysis.
+         */
+        static runDecisionConsistencyAnalysis(allDatasetRecords = []) {
+            if (!allDatasetRecords || allDatasetRecords.length === 0) {
+                return null;
+            }
+            return DecisionConsistencyEngine.analyzeDecisionConsistency(allDatasetRecords);
+        }
+
+        /**
          * Performs an environment fingerprint analysis.
+
          */
         static runEnvironmentFingerprint(allDatasetRecords = []) {
             if (!allDatasetRecords || allDatasetRecords.length === 0) {

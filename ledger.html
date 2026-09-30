@@ -110,10 +110,14 @@
                     <button onclick="runControlAnalysis()" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Control Analysis
           </button>
-          <button onclick="runFingerprintAnalysis()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+                    <button onclick="runFingerprintAnalysis()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
             <i data-lucide="fingerprint" class="w-3.5 h-3.5"></i> Environment Fingerprint
           </button>
+          <button onclick="runDecisionAnalysis()" class="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i data-lucide="git-branch" class="w-3.5 h-3.5"></i> Decision Consistency
+          </button>
           <button onclick="runBehaviorAnalysis()" class="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+
 
 
 
@@ -519,7 +523,74 @@
     </div>
   </div>
 
+    <!-- Decision Consistency Modal -->
+  <div id="modal-decision-analysis" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden font-sans">
+      <div class="px-5 py-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
+            <i data-lucide="git-branch" class="w-5 h-5 text-emerald-400"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold uppercase tracking-wider">Decision Consistency Analysis</h3>
+            <p class="text-[10px] text-emerald-300 font-medium">Phase 5.6 Accounting Decision Engine</p>
+          </div>
+        </div>
+        <button onclick="closeDecisionModal()" class="text-slate-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      
+      <div class="p-8 overflow-y-auto space-y-8 bg-slate-50 flex-1">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Mechanical Consistency</p>
+                <div id="score-mechanical" class="text-3xl font-black text-slate-900">--</div>
+                <p class="text-[9px] text-slate-500 mt-1">Tool Pattern Uniformity</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Decision Consistency</p>
+                <div id="score-decision" class="text-3xl font-black text-slate-900">--</div>
+                <p class="text-[9px] text-slate-500 mt-1">Application Uniformity</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Resolution Diversity</p>
+                <div id="score-diversity" class="text-3xl font-black text-slate-900">--</div>
+                <p class="text-[9px] text-slate-500 mt-1">Solution Breadth</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Accounting Variability</p>
+                <div id="score-variability" class="text-3xl font-black text-slate-900">--</div>
+                <p class="text-[9px] text-slate-500 mt-1">Logic Drift Index</p>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Population Decision Profiles</h4>
+            <div id="decision-profiles-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+
+        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div class="flex gap-3">
+            <i data-lucide="help-circle" class="w-5 h-5 text-emerald-600 flex-shrink-0"></i>
+            <div class="text-[11px] text-emerald-900 leading-relaxed">
+              <strong>Forensic Distinction:</strong> 
+              <em>Mechanical Consistency</em> measures if the same labels (descriptions) are used. 
+              <em>Decision Consistency</em> measures if those labels are applied to the same accounting situations (accounts/entities). 
+              High Mechanical + Low Decision = A standardized tool is being used to address a wide variety of unstandardized problems.
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="px-6 py-4 border-t border-slate-200 bg-white flex justify-end">
+        <button onclick="closeDecisionModal()" class="px-6 py-2 text-xs font-bold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition shadow-md">Close Analysis</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Connected Evidence Graph Inspector Modal -->
+
 
 
 
@@ -924,7 +995,66 @@
         document.getElementById('inv-count').textContent = inv.evidenceLog.length;
     }
 
+        window.runDecisionAnalysis = () => {
+            const analysis = InvestigationEngine.runDecisionConsistencyAnalysis(window.appState.records);
+            renderDecisionModal(analysis);
+        };
+
+        window.renderDecisionModal = (analysis) => {
+            if (!analysis) return;
+
+            document.getElementById('score-mechanical').textContent = analysis.scores.mechanicalConsistency;
+            document.getElementById('score-decision').textContent = analysis.scores.decisionConsistency;
+            document.getElementById('score-diversity').textContent = analysis.scores.resolutionDiversity;
+            document.getElementById('score-variability').textContent = analysis.scores.variabilityIndex;
+
+            const container = document.getElementById('decision-profiles-container');
+            container.innerHTML = Object.entries(analysis.profiles).map(([key, p]) => {
+                if (p.count === 0) return '';
+                return `
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <span class="text-xs font-bold text-slate-900 uppercase tracking-tighter">${key}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">${p.count} items</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-[11px]">
+                                <span class="text-slate-500">Unique Descs:</span>
+                                <span class="font-bold text-slate-800">${p.uniqueDescriptions}</span>
+                            </div>
+                            <div class="flex justify-between text-[11px]">
+                                <span class="text-slate-500">Unique Accounts:</span>
+                                <span class="font-bold text-slate-800">${p.uniqueAccounts}</span>
+                            </div>
+                            <div class="flex justify-between text-[11px]">
+                                <span class="text-slate-500">Avg Acc/Tool:</span>
+                                <span class="font-bold text-slate-800">${p.avgAccountsPerTool}</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 grid grid-cols-2 gap-2 border-t border-slate-50">
+                            <div class="text-center">
+                                <p class="text-[8px] font-bold text-slate-400 uppercase">Mechanical</p>
+                                <p class="text-sm font-black text-slate-700">${p.mechanicalScore}%</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[8px] font-bold text-slate-400 uppercase">Decision</p>
+                                <p class="text-sm font-black text-slate-700">${p.decisionScore}%</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('modal-decision-analysis').classList.remove('hidden');
+            lucide.createIcons();
+        };
+
+        window.closeDecisionModal = () => {
+            document.getElementById('modal-decision-analysis').classList.add('hidden');
+        };
+
         window.runFingerprintAnalysis = () => {
+
             const analysis = InvestigationEngine.runEnvironmentFingerprint(window.appState.records);
             renderFingerprintModal(analysis);
         };
