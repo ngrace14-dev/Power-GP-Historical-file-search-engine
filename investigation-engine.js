@@ -12,8 +12,10 @@ import { AIGovernanceEngine } from './ai-governance.js';
 import { ChainOfCustody } from './chain-of-custody.js';
 import { BehaviorPatternEngine } from './behavior-pattern-engine.js';
 import { BehaviorBaselineEngine } from './behavior-baseline-engine.js';
+import { BehaviorPopulationEngine } from './behavior-population-engine.js';
 
 export class InvestigationEngine {
+
 
 
 
@@ -61,9 +63,62 @@ export class InvestigationEngine {
                 return newCase;
     }
 
+        /**
+     * Performs a behavior population analysis on the entire environment.
+     */
+    static runPopulationAnalysis(allDatasetRecords = []) {
+        if (!allDatasetRecords || allDatasetRecords.length === 0) {
+            return null;
+        }
+
+        const populations = BehaviorPopulationEngine.analyzePopulations(allDatasetRecords);
+        
+        // Structure Output as Population Profile & Behavior Profile
+        const profiles = Object.entries(populations).map(([key, data]) => ({
+            id: key,
+            label: data.label,
+            classification: data.classification,
+            metrics: data.metrics,
+            populationProfile: {
+                frequency: data.metrics.frequency.toFixed(2) + ' per month',
+                commonality: data.metrics.commonality.toFixed(2) + '% of records',
+                entityConcentration: data.metrics.entityConcentration + ' entities',
+                activity: {
+                    gross: data.metrics.grossActivity.toLocaleString('en-US', { style: 'currency', currency: 'USD' }),
+                    net: data.metrics.netActivity.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+                }
+            },
+            behaviorProfile: {
+                averageLifespan: data.metrics.averageLifespan.toFixed(1) + ' days',
+                longestLifespan: data.metrics.longestLifespan + ' days',
+                reversalDensity: data.metrics.reversalDensity.toFixed(2) + '%',
+                correctionDensity: data.metrics.correctionDensity.toFixed(2) + '%'
+            }
+        }));
+
+        const notableOutliers = profiles.filter(p => 
+            p.classification === 'RARE' || 
+            p.metrics.reversalDensity > 20 || 
+            p.metrics.correctionDensity > 15
+        );
+
+        return {
+            timestamp: new Date().toISOString(),
+            populationCount: allDatasetRecords.length,
+            profiles,
+            notableOutliers,
+            summary: {
+                dominatingBehaviors: profiles.filter(p => p.classification === 'COMMON').map(p => p.label),
+                unusualBehaviors: profiles.filter(p => p.classification === 'RARE').map(p => p.label),
+                concentratedBehaviors: profiles.filter(p => p.metrics.entityConcentration === 1).map(p => p.label)
+            }
+        };
+    }
+
     /**
      * Performs a behavior pattern analysis on the case evidence.
      */
+
         static runBehaviorAnalysis(caseObj, allDatasetRecords = []) {
         if (!caseObj.evidenceLog || caseObj.evidenceLog.length === 0) {
             return null;
