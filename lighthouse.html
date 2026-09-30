@@ -620,8 +620,10 @@
     import { CorroborationEngine } from './corroboration-engine.js';
     import { ContradictionEngine } from './contradiction-engine.js';
         import { MemoWriter } from './memo-writer.js';
-    import { ForensicNarrativeEngine } from './forensic-narrative-engine.js';
-    import { ChainOfCustody } from './chain-of-custody.js';
+        import { ForensicNarrativeEngine } from './forensic-narrative-engine.js';
+        import { ChiefForensicReasoner } from './chief-forensic-reasoner.js';
+        import { ChainOfCustody } from './chain-of-custody.js';
+
 
         import { InvestigationEngine } from './investigation-engine.js';
     import { EvidenceGraph } from './evidence-graph.js';
@@ -846,13 +848,29 @@
       content.innerHTML = '<div class="flex items-center gap-3 text-cyan-400 font-bold justify-center py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Synthesizing Forensic Narrative...</div>';
       lucide.createIcons();
 
-      try {
-        const synthesis = await ForensicNarrativeEngine.synthesize(extractedData, { scope: "Full Ledger Review" });
+            try {
+        const result = await InvestigationEngine.runNarrativeSynthesis(extractedData);
+        const { synthesis, reasoning } = result;
         
         let html = `
           <div class="space-y-6">
+            <!-- Reasoning Layer (PRO 3) -->
+            <div class="bg-purple-950/20 border border-purple-500/30 rounded-2xl p-6 shadow-lg">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center">
+                  <i data-lucide="brain-circuit" class="w-5 h-5 text-purple-400"></i>
+                </div>
+                <h2 class="text-sm font-bold text-purple-200 uppercase tracking-widest">Chief Forensic Reasoning (PRO 3)</h2>
+              </div>
+              <div class="prose prose-invert prose-xs max-w-none text-slate-300 font-sans leading-relaxed">
+                ${reasoning.reasoningBody.replace(/\n/g, '<br/>')}
+              </div>
+            </div>
+
+            <!-- Synthesis Summary -->
             <div class="bg-cyan-950/30 border border-cyan-500/30 rounded-2xl p-6">
               <h2 class="text-xl font-bold text-cyan-400 mb-2">${synthesis.executiveSummary.headline}</h2>
+
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                 <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
                   <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">Behavioral Profile</div>
