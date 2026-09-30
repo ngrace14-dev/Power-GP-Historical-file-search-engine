@@ -18,8 +18,10 @@ import { EnvironmentFingerprintEngine } from './environment-fingerprint-engine.j
 import { DecisionConsistencyEngine } from './decision-consistency-engine.js';
 import { CorrectionPathEngine } from './correction-path-engine.js';
 import { AccountingDebtEngine } from './accounting-debt-engine.js';
+import { ForensicNarrativeEngine } from './forensic-narrative-engine.js';
 
 export class InvestigationEngine {
+
 
 
 
@@ -73,8 +75,17 @@ export class InvestigationEngine {
                 return newCase;
     }
 
+                /**
+         * Runs the full forensic narrative synthesis.
+         */
+        static async runNarrativeSynthesis(records = []) {
+            if (!records || records.length === 0) return null;
+            return await ForensicNarrativeEngine.synthesize(records);
+        }
+
         /**
          * Performs an accounting debt analysis.
+
          */
         static runAccountingDebtAnalysis(allDatasetRecords = []) {
             if (!allDatasetRecords || allDatasetRecords.length === 0) {
