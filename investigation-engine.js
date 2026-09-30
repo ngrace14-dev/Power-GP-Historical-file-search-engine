@@ -10,8 +10,10 @@
 
 import { AIGovernanceEngine } from './ai-governance.js';
 import { ChainOfCustody } from './chain-of-custody.js';
+import { BehaviorPatternEngine } from './behavior-pattern-engine.js';
 
 export class InvestigationEngine {
+
 
     static CASE_STATES = [
         'Open', 
@@ -54,11 +56,37 @@ export class InvestigationEngine {
             entityContext: entityContext.toUpperCase()
         }, authorEmail);
 
-        return newCase;
+                return newCase;
+    }
+
+    /**
+     * Performs a behavior pattern analysis on the case evidence.
+     */
+    static runBehaviorAnalysis(caseObj, allDatasetRecords = []) {
+        if (!caseObj.evidenceLog || caseObj.evidenceLog.length === 0) {
+            return null;
+        }
+
+        // Hydrate records from IDs
+        const hydratedRecords = caseObj.evidenceLog.map(log => {
+            return allDatasetRecords.find(r => r._id === log.recordId) || { data: log.snapshot };
+        });
+
+        const analysis = BehaviorPatternEngine.analyzePattern(hydratedRecords);
+        caseObj._behaviorAnalysis = analysis;
+        caseObj.updatedAt = new Date().toISOString();
+
+        ChainOfCustody.recordEvent("BEHAVIOR_ANALYSIS_PERFORMED", {
+            caseId: caseObj.caseId,
+            pattern: analysis.behaviorPattern
+        }, caseObj.authorEmail);
+
+        return analysis;
     }
 
     /**
      * Attaches evidence to an investigation with mandatory Governance rationale
+
      */
     static attachEvidence(caseObj, record, rationale, userEmail) {
         if (!caseObj || !record) {
