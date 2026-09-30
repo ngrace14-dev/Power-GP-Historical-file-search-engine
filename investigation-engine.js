@@ -16,8 +16,10 @@ import { BehaviorPopulationEngine } from './behavior-population-engine.js';
 import { ControlEnvironmentEngine } from './control-environment-engine.js';
 import { EnvironmentFingerprintEngine } from './environment-fingerprint-engine.js';
 import { DecisionConsistencyEngine } from './decision-consistency-engine.js';
+import { CorrectionPathEngine } from './correction-path-engine.js';
 
 export class InvestigationEngine {
+
 
 
 
@@ -70,7 +72,18 @@ export class InvestigationEngine {
     }
 
         /**
+         * Performs a correction path analysis.
+         */
+        static runCorrectionPathAnalysis(allDatasetRecords = []) {
+            if (!allDatasetRecords || allDatasetRecords.length === 0) {
+                return null;
+            }
+            return CorrectionPathEngine.analyzePaths(allDatasetRecords);
+        }
+
+        /**
          * Performs a decision consistency analysis.
+
          */
         static runDecisionConsistencyAnalysis(allDatasetRecords = []) {
             if (!allDatasetRecords || allDatasetRecords.length === 0) {
