@@ -103,14 +103,9 @@
         <i data-lucide="briefcase" class="w-3.5 h-3.5 text-indigo-200"></i> Start Case
       </button>
 
-            <button onclick="generateAuditMemoUI()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-emerald-400/30">
+      <button onclick="generateAuditMemoUI()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-emerald-400/30">
         <i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-200"></i> Draft Audit Memo
       </button>
-
-      <button onclick="generateForensicNarrativeUI()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-cyan-400/30">
-        <i data-lucide="book-open" class="w-3.5 h-3.5 text-cyan-200"></i> Forensic Narrative
-      </button>
-
 
       <button onclick="askAiAssistant()" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition shadow-md flex items-center gap-1.5 border border-purple-400/30">
         <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-300"></i> AI Audit Assistant
@@ -619,14 +614,8 @@
     import { AuthorityEngine } from './authority-engine.js';
     import { CorroborationEngine } from './corroboration-engine.js';
     import { ContradictionEngine } from './contradiction-engine.js';
-        import { MemoWriter } from './memo-writer.js';
-        import { ForensicNarrativeEngine } from './forensic-narrative-engine.js';
-        import { ChiefForensicReasoner } from './chief-forensic-reasoner.js';
-        import { RoleIntelligenceEngine } from './role-intelligence-engine.js';
-        import { ChainOfCustody } from './chain-of-custody.js';
-
-
-
+    import { MemoWriter } from './memo-writer.js';
+    import { ChainOfCustody } from './chain-of-custody.js';
         import { InvestigationEngine } from './investigation-engine.js';
     import { EvidenceGraph } from './evidence-graph.js';
     
@@ -665,14 +654,6 @@
     let activeEvidenceGraph = null;
     let renderMode = 'EVENT'; // 'EVENT' or 'TRANSACTION'
     let reconstructedEvents = [];
-
-    // FIX: Expose functions used in HTML onclick handlers to the window object
-    const exportToWindow = (fns) => {
-    Object.entries(fns).forEach(([name, fn]) => {
-        window[name] = fn;
-    });
-    };
-
 
 
     function openAuditDB() {
@@ -790,49 +771,10 @@
       terminal.scrollTop = terminal.scrollHeight;
     };
 
-        window.updateProgress = (pct, msg) => {
+    window.updateProgress = (pct, msg) => {
       document.getElementById('progress-pct').innerText = `${Math.round(pct)}%`;
       document.getElementById('progress-bar').style.width = `${pct}%`;
       if (msg) document.getElementById('progress-text').innerText = msg;
-    };
-
-    window.downloadExcel = async () => {
-        if (!extractedData || extractedData.length === 0) return;
-        const workbook = new ExcelJS.Workbook();
-        const sheet = workbook.addWorksheet('Evidence');
-        sheet.addRow(['ID', 'Entity', 'Vendor', 'Voucher', 'Type', 'Date', 'Amount', 'Confidence']);
-        extractedData.forEach(row => {
-            const r = row.data || row;
-            sheet.addRow([
-                row._id || r.row_id,
-                row._provenance?.entityContext || r.entity,
-                r.vendor || r.vendor_name,
-                r.voucher || r.voucherNumber,
-                r.type || r.documentType,
-                r.doc_date || r.transactionDate,
-                r.amount || r.doc_amount,
-                row._provenance?.parsingConfidence || 1
-            ]);
-        });
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'Lighthouse_Export.xlsx';
-        link.click();
-    };
-
-    window.stageAuditData = async () => {
-        if (!extractedData || extractedData.length === 0) return alert('No data to stage.');
-        try {
-            const db = await openAuditDB();
-            const tx = db.transaction('staging', 'readwrite');
-            const store = tx.objectStore('staging');
-            store.put({ id: 'latest_export', data: extractedData, timestamp: Date.now() });
-            tx.oncomplete = () => alert('Data staged to Ledger Terminal successfully.');
-        } catch (e) {
-            alert('Failed to stage data: ' + e.message);
-        }
     };
 
         window.resetState = () => {
@@ -881,144 +823,11 @@
       }
     };
 
-        window.closeMemoModal = () => {
+    window.closeMemoModal = () => {
       document.getElementById('modal-memo-result').classList.add('hidden');
     };
 
-    window.generateForensicNarrativeUI = async () => {
-      if (!extractedData || extractedData.length === 0) {
-        return alert("No data available to synthesize. Please ingest records first.");
-      }
-
-      const modal = document.getElementById('modal-ai-result');
-      const content = document.getElementById('ai-response-content');
-      
-      modal.classList.remove('hidden');
-      content.innerHTML = '<div class="flex items-center gap-3 text-cyan-400 font-bold justify-center py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i> Synthesizing Forensic Narrative...</div>';
-      lucide.createIcons();
-
-            try {
-              const result = await InvestigationEngine.runNarrativeSynthesis(extractedData);
-              const { synthesis, reasoning, briefs } = result;
-        
-              let html = `
-                <div class="space-y-6">
-                  <!-- Intelligence Agents (Role-Based) -->
-                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-cyan-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
-                      <div class="flex items-center gap-2 mb-2">
-                        <i data-lucide="user-cog" class="w-4 h-4 text-cyan-400"></i>
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Controller Brief</span>
-                      </div>
-                      <p class="text-[10px] text-slate-500">"What did I inherit?"</p>
-                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-cyan-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
-                        ${briefs.controller.replace(/\n/g, '<br/>')}
-                      </div>
-                    </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-emerald-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
-                      <div class="flex items-center gap-2 mb-2">
-                        <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-400"></i>
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Audit Brief</span>
-                      </div>
-                      <p class="text-[10px] text-slate-500">"What deserves attention?"</p>
-                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-emerald-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
-                        ${briefs.auditor.replace(/\n/g, '<br/>')}
-                      </div>
-                    </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-amber-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
-                      <div class="flex items-center gap-2 mb-2">
-                        <i data-lucide="briefcase" class="w-4 h-4 text-amber-400"></i>
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">M&A Brief</span>
-                      </div>
-                      <p class="text-[10px] text-slate-500">"What is hidden?"</p>
-                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-amber-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
-                        ${briefs.m_and_a.replace(/\n/g, '<br/>')}
-                      </div>
-                    </div>
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-purple-500/30 transition group cursor-help relative" onclick="this.querySelector('.brief-popup').classList.toggle('hidden')">
-                      <div class="flex items-center gap-2 mb-2">
-                        <i data-lucide="presentation" class="w-4 h-4 text-purple-400"></i>
-                        <span class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Executive Brief</span>
-                      </div>
-                      <p class="text-[10px] text-slate-500">"What matters?"</p>
-                      <div class="brief-popup hidden absolute top-full left-0 right-0 z-50 mt-2 p-4 bg-slate-900 border border-purple-500/40 rounded-xl shadow-2xl max-h-64 overflow-y-auto text-[11px] font-sans leading-relaxed text-slate-300">
-                        ${briefs.executive.replace(/\n/g, '<br/>')}
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Reasoning Layer (PRO 3) -->
-
-            <div class="bg-purple-950/20 border border-purple-500/30 rounded-2xl p-6 shadow-lg">
-              <div class="flex items-center gap-2 mb-4">
-                <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center">
-                  <i data-lucide="brain-circuit" class="w-5 h-5 text-purple-400"></i>
-                </div>
-                <h2 class="text-sm font-bold text-purple-200 uppercase tracking-widest">Chief Forensic Reasoning (PRO 3)</h2>
-              </div>
-              <div class="prose prose-invert prose-xs max-w-none text-slate-300 font-sans leading-relaxed">
-                ${reasoning.reasoningBody.replace(/\n/g, '<br/>')}
-              </div>
-            </div>
-
-            <!-- Synthesis Summary -->
-            <div class="bg-cyan-950/30 border border-cyan-500/30 rounded-2xl p-6">
-              <h2 class="text-xl font-bold text-cyan-400 mb-2">${synthesis.executiveSummary.headline}</h2>
-
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-                  <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">Behavioral Profile</div>
-                  <div class="text-sm font-bold text-white">${synthesis.executiveSummary.behavioralProfile}</div>
-                </div>
-                <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-                  <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">Systemic Risk</div>
-                  <div class="text-sm font-bold text-rose-400">${synthesis.executiveSummary.systemicRisk}</div>
-                </div>
-                <div class="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-                  <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">Environment Signature</div>
-                  <div class="text-sm font-bold text-cyan-400">${synthesis.executiveSummary.environmentSignature}</div>
-                </div>
-              </div>
-              <p class="mt-4 text-slate-300 italic">"${synthesis.executiveSummary.keyFinding}"</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              ${synthesis.enginePerspectives.map(p => `
-                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-2">
-                  <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-cyan-500"></div>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">${p.engine}</h3>
-                  </div>
-                  <p class="text-[11px] text-slate-400">${p.summary}</p>
-                  <ul class="space-y-1 mt-2">
-                    ${(p.findings || p.explanations || p.phenomena || p.notable || []).slice(0, 3).map(f => `
-                      <li class="text-[10px] text-slate-300 flex items-start gap-1.5">
-                        <span class="text-cyan-500 mt-0.5">•</span>
-                        <span>${f}</span>
-                      </li>
-                    `).join('')}
-                  </ul>
-                </div>
-              `).join('')}
-            </div>
-            
-            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-[10px] text-slate-500 font-mono flex justify-between items-center">
-              <span>SYNTHESIS TIMESTAMP: ${synthesis.timestamp}</span>
-              <span>RECORDS ANALYZED: ${synthesis.metadata.recordCount}</span>
-            </div>
-          </div>
-        `;
-
-        content.innerHTML = html;
-        await ChainOfCustody.recordEvent("FORENSIC_NARRATIVE_GENERATED", { recordCount: extractedData.length }, currentUserEmail);
-      } catch (err) {
-        content.innerHTML = `<div class="p-5 text-rose-400 font-bold bg-rose-950/50 border border-rose-500/30 rounded-xl">Error synthesizing narrative: ${err.message}</div>`;
-      }
-      lucide.createIcons();
-    };
-
     window.askAiAssistant = async () => {
-
       if (!extractedData || extractedData.length === 0) {
         return alert("No extracted data available to analyze. Please pull cloud ledgers or ingest a document first.");
       }
@@ -1303,113 +1112,78 @@
                     });
 
                     const stampedRecord = ProvenanceEngine.stampRecord({
-                              sourceFile: fileRef.name,
-                              sourceSystem: "Firebase_Storage",
-                              sourceType: "NATIVE_EXPORT", 
-                              entityContext: entityMatch.short || "UNKNOWN", 
-                              processedBy: "Lighthouse Engine v3 (Selective Load)",
-                              ocrConfidence: scores.ocrConfidence,
-                              parsingConfidence: scores.parsingConfidence,
-                              extractedData: normalizedRecord
-                            });
-
-                            batchRecords.push({
-                                _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
-                                _provenance: stampedRecord._provenance,
-                                data: stampedRecord.data,
-                                _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
-                            });
-                          }
-
-                          const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
-                          batchRecords.forEach(b => {
-                              b._validation = validation;
-                              if (validation.tieOutStatus === 'FAIL') b._evidenceState.hasVariance = true;
-                          });
-
-                          extractedData = [...extractedData, ...batchRecords];
-                          await new Promise(resolve => setTimeout(resolve, 20));
-                        }
-
-                        console.log(`XLSX Parse Phase Complete: ${totalParseTime.toFixed(2)}ms`);
-
-                        window.updateForensicLoader('Relationships Built', 80, 'Executing Forensic Relationship Pipeline...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-                        await new Promise(resolve => setTimeout(resolve, 50));
-                        extractedData = await RelationshipEngine.buildRelationships(extractedData);
-        
-                        window.updateForensicLoader('Analysis Ongoing', 85, 'Running Corroboration & Risk Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-                        await new Promise(resolve => setTimeout(resolve, 10));
-                        extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
-        
-                        window.updateForensicLoader('Analysis Ongoing', 90, 'Running Materiality & Authority Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-                        await new Promise(resolve => setTimeout(resolve, 10));
-                        extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
-                        extractedData = RiskEngine.evaluateDataset(extractedData).records;
-                        extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
-        
-                        const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
-                        renderContradictionPanel(contradictionFlags);
-
-                        // Move Evidence Graph to On-Demand
-                        activeEvidenceGraph = null;
-
-                        await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_SELECTIVE", {
-                            fileCount: totalFiles,
-                            recordCount: extractedData.length,
-                            entities: xlsxFiles.map(f => f.name)
-                        }, currentUserEmail);
-
-                        window.updateForensicLoader('Analysis Complete', 100, 'Finalizing results...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
-        
-                        // Final yielding before rendering results
-                        await new Promise(resolve => setTimeout(resolve, 100));
-        
-                        window.renderResults(extractedData);
-                        window.hideForensicLoader();
-
-                        console.groupEnd();
-
-                      } catch (err) {
-                        window.logSys(`Ingestion Failure: ${err.message}`, 'error');
-                        window.hideForensicLoader();
-                        console.groupEnd();
-                      }
-                    }
-
-    const selectAllEntities = (val) => {
-        const checks = document.querySelectorAll('input[name="entity-select"]');
-        checks.forEach(c => c.checked = val);
-    };
-
-                                        // Expose selective functions to window for onclick handlers
-                    exportToWindow({
-                        fetchCloudCatalog: window.fetchCloudCatalog,
-                        pullSelectedLedgers: window.pullSelectedLedgers,
-                        updateForensicLoader: window.updateForensicLoader,
-                        hideForensicLoader: window.hideForensicLoader,
-                        setRenderMode: window.setRenderMode,
-                        renderResults: window.renderResults,
-                        openForensicDrawer: window.openForensicDrawer,
-                        closeInvestigationDrawer: window.closeInvestigationDrawer,
-                        triggerAiAnalyst: window.triggerAiAnalyst,
-                        generateAuditMemoUI: window.generateAuditMemoUI,
-                        generateForensicNarrativeUI: window.generateForensicNarrativeUI,
-                        askAiAssistant: window.askAiAssistant,
-                        startInvestigationUI: window.startInvestigationUI,
-                        attachToCaseUI: window.attachToCaseUI,
-                        saveAndCloseCaseUI: window.saveAndCloseCaseUI,
-                                                resetState: window.resetState,
-                        switchTab: window.switchTab,
-                        viewGraphLinks: window.viewGraphLinks,
-                        closeMemoModal: window.closeMemoModal,
-                        closeAiModal: window.closeAiModal,
-                        closeGraphModal: window.closeGraphModal,
-                        selectAllEntities,
-                        downloadExcel: window.downloadExcel,
-                        stageAuditData: window.stageAuditData
+                      sourceFile: fileRef.name,
+                      sourceSystem: "Firebase_Storage",
+                      sourceType: "NATIVE_EXPORT", 
+                      entityContext: entityMatch.short || "UNKNOWN", 
+                      processedBy: "Lighthouse Engine v3 (Selective Load)",
+                      ocrConfidence: scores.ocrConfidence,
+                      parsingConfidence: scores.parsingConfidence,
+                      extractedData: normalizedRecord
                     });
 
+                    batchRecords.push({
+                        _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
+                        _provenance: stampedRecord._provenance,
+                        data: stampedRecord.data,
+                        _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
+                    });
+                  }
 
+                  const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
+                  batchRecords.forEach(b => {
+                      b._validation = validation;
+                      if (validation.tieOutStatus === 'FAIL') b._evidenceState.hasVariance = true;
+                  });
+
+                  extractedData = [...extractedData, ...batchRecords];
+                  await new Promise(resolve => setTimeout(resolve, 20));
+                }
+
+                console.log(`XLSX Parse Phase Complete: ${totalParseTime.toFixed(2)}ms`);
+
+                window.updateForensicLoader('Relationships Built', 80, 'Executing Forensic Relationship Pipeline...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+                await new Promise(resolve => setTimeout(resolve, 50));
+                extractedData = await RelationshipEngine.buildRelationships(extractedData);
+        
+                window.updateForensicLoader('Analysis Ongoing', 85, 'Running Corroboration & Risk Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+                await new Promise(resolve => setTimeout(resolve, 10));
+                extractedData = CorroborationEngine.evaluateDataset(extractedData).records;
+        
+                window.updateForensicLoader('Analysis Ongoing', 90, 'Running Materiality & Authority Engines...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+                await new Promise(resolve => setTimeout(resolve, 10));
+                extractedData = MaterialityEngine.evaluateDataset(extractedData).records;
+                extractedData = RiskEngine.evaluateDataset(extractedData).records;
+                extractedData = AuthorityEngine.evaluateDataset(extractedData).records;
+        
+                const contradictionFlags = ContradictionEngine.analyzeDataset(extractedData);
+                renderContradictionPanel(contradictionFlags);
+
+                // Move Evidence Graph to On-Demand
+                activeEvidenceGraph = null;
+
+                await ChainOfCustody.recordEvent("INGEST_CLOUD_LEDGERS_SELECTIVE", {
+                    fileCount: totalFiles,
+                    recordCount: extractedData.length,
+                    entities: xlsxFiles.map(f => f.name)
+                }, currentUserEmail);
+
+                window.updateForensicLoader('Analysis Complete', 100, 'Finalizing results...', { records: extractedData.length, events: ChainOfCustody.getLedger().length });
+        
+                // Final yielding before rendering results
+                await new Promise(resolve => setTimeout(resolve, 100));
+        
+                window.renderResults(extractedData);
+                window.hideForensicLoader();
+
+                console.groupEnd();
+
+              } catch (err) {
+                window.logSys(`Ingestion Failure: ${err.message}`, 'error');
+                window.hideForensicLoader();
+                console.groupEnd();
+              }
+            }
 
 
 
@@ -1729,66 +1503,18 @@
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('results-section').classList.remove('hidden');
       
-            const tbody = document.getElementById('table-body');
+      const tbody = document.getElementById('table-body');
       const thead = document.querySelector('#results-section thead tr');
 
       if (renderMode === 'EVENT') {
           reconstructedEvents = AEREEngine.reconstruct(data);
-          window.renderEventResults(reconstructedEvents);
+          renderEventResults(reconstructedEvents);
       } else {
-          window.renderTransactionResults(data);
+          renderTransactionResults(data);
       }
       
       console.timeEnd("Render Results");
       lucide.createIcons();
-    };
-
-    window.renderEventResults = (events) => {
-        const tbody = document.getElementById('table-body');
-        const thead = document.querySelector('#results-section thead tr');
-
-        thead.innerHTML = `
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Event ID</th>
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Status</th>
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Net Impact</th>
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Confidence</th>
-            <th class="px-4 py-3 text-right font-bold text-slate-300">Action</th>
-        `;
-
-        tbody.innerHTML = events.map(event => `
-            <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
-                <td class="px-4 py-3 font-mono text-cyan-400">${event.eventId}</td>
-                <td class="px-4 py-3">${event.finalEconomicState.status}</td>
-                <td class="px-4 py-3">$${event.netEconomicImpact.toLocaleString()}</td>
-                <td class="px-4 py-3">${Math.round(event.confidence.total * 100)}%</td>
-                <td class="px-4 py-3 text-right">
-                    <button onclick="openForensicDrawer('${event.eventId}')" class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-2 py-1 rounded">Inspect</button>
-                </td>
-            </tr>
-        `).join('');
-    };
-
-    window.renderTransactionResults = (transactions) => {
-        const tbody = document.getElementById('table-body');
-        const thead = document.querySelector('#results-section thead tr');
-
-        thead.innerHTML = `
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Document</th>
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Type</th>
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Amount</th>
-            <th class="px-4 py-3 text-left font-bold text-slate-300">Validation</th>
-        `;
-
-        tbody.innerHTML = transactions.map(txn => {
-            const data = txn.data || txn;
-            return `
-            <tr class="border-b border-slate-800/50 hover:bg-slate-800/20">
-                <td class="px-4 py-3 font-mono">${data.doc_number || data.voucher || 'UNKNOWN'}</td>
-                <td class="px-4 py-3">${data.type || 'UNKNOWN'}</td>
-                <td class="px-4 py-3">$${(data.doc_amount || data.amount || 0).toLocaleString()}</td>
-                <td class="px-4 py-3">${txn._validation ? txn._validation.tieOutStatus : 'N/A'}</td>
-            </tr>
-        `}).join('');
     };
 
         window.openForensicDrawer = (eventId) => {
@@ -2008,4 +1734,403 @@
                 // Render Explanations with Corroboration (Phase 4.0)
                 const renderExplanation = (exp, cor) => {
                     if (!exp) return '';
-                    const corStatus = cor?.st
+                    const corStatus = cor?.status || 'NOT EVALUATED';
+                    const corColor = corStatus === 'SUPPORTED' ? 'text-emerald-400' : (corStatus === 'PARTIALLY SUPPORTED' ? 'text-amber-400' : 'text-rose-400');
+                
+                    return `
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-[10px] text-purple-100/90 italic leading-snug">${exp.explanation}</span>
+                            <span class="text-[8px] font-bold px-1.5 py-0.5 rounded border border-current ${corColor} bg-current/10 uppercase ml-2 whitespace-nowrap">${corStatus}</span>
+                        </div>
+                        ${cor?.supporting?.length > 0 ? `<div class="text-[8px] text-slate-500 font-mono mt-1">Verified: ${cor.supporting.join(', ')}</div>` : ''}
+                    `;
+                };
+
+                mostLikely.innerHTML = renderExplanation(analysis.mostLikely, corrob?.mostLikely);
+                if (analysis.alternative && analysis.alternative.explanation) {
+                    altContainer.classList.remove('hidden');
+                    alternative.innerHTML = renderExplanation(analysis.alternative, corrob?.alternative);
+                }
+
+                if (analysis.warnings && analysis.warnings.length > 0) {
+
+                warnings.classList.remove('hidden');
+                warnings.innerHTML = analysis.warnings.map(w => `
+                    <div class="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg space-y-1">
+                        <div class="flex items-center gap-2 text-[9px] font-bold text-rose-400 uppercase">
+                            <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+                            Internal Consistency Warning: ${w.fields}
+                        </div>
+                        <p class="text-[9px] text-rose-300/80 leading-relaxed">${w.reason}</p>
+                        <div class="text-[8px] font-mono text-rose-400 mt-1">Next Step: ${w.reviewStep}</div>
+                    </div>
+                `).join('');
+            }
+
+            lucide.createIcons();
+        } catch (err) {
+            interpretation.textContent = "AI Analyst error: " + err.message;
+        }
+    };
+
+
+
+    function renderEventResults(events) {
+
+        const tbody = document.getElementById('table-body');
+        const thead = document.querySelector('#results-section thead tr');
+        
+        // Update Headers for Event View
+        thead.innerHTML = `
+            <th class="p-3 pl-4 text-center">Action</th>
+            <th class="p-3">Economic Anchor / Vendor</th>
+            <th class="p-3 text-center">Status</th>
+            <th class="p-3 text-center">Lifecycle Complexity</th>
+            <th class="p-3">Chronology Preview</th>
+            <th class="p-3 text-right">Gross Activity</th>
+            <th class="p-3 text-right">Net Economic Impact</th>
+            <th class="p-3 text-center">Recon Confidence</th>
+            <th class="p-3 text-center">Variance Impact</th>
+        `;
+
+        document.getElementById('results-meta').innerHTML = `
+            Reconstructed ${events.length.toLocaleString()} Economic Events from ${extractedData.length.toLocaleString()} Journal Lines 
+            <span class="text-cyan-500 font-bold ml-2">| Forensic Event Mode Active</span>
+        `;
+
+        tbody.innerHTML = events.map(event => {
+            const a = event.anchor;
+            const es = event.finalEconomicState;
+            const conf = event.confidence;
+            const varAn = event.varianceAnalysis;
+
+            let statusColor = 'bg-slate-800 text-slate-400';
+            if (es.status === 'CORRECTED') statusColor = 'bg-amber-500/10 text-amber-400 border border-amber-500/30';
+            if (es.status === 'VOIDED') statusColor = 'bg-rose-500/10 text-rose-400 border border-rose-500/30';
+            if (es.status === 'SETTLED') statusColor = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
+            if (es.status === 'VOLATILE') statusColor = 'bg-purple-500/10 text-purple-400 border border-purple-500/30 animate-pulse';
+
+            // Lifecycle Breadcrumb
+            const breadcrumbs = event.nodes.map(n => {
+                const role = n.lifecycleRole;
+                let char = 'O';
+                let color = 'text-slate-500';
+                if (role === 'REVERSAL') { char = 'R'; color = 'text-rose-400'; }
+                if (role === 'CORRECTION') { char = 'C'; color = 'text-amber-400'; }
+                if (role === 'RE_ENTRY') { char = 'E'; color = 'text-cyan-400'; }
+                if (role === 'FINAL_ENTRY') { char = 'F'; color = 'text-emerald-400'; }
+                return `<span class="${color} font-bold" title="${role}">${char}</span>`;
+            }).join('<span class="text-slate-700 mx-1">→</span>');
+
+            const confPct = Math.round(conf.total * 100);
+            let confColor = 'text-rose-400';
+            if (confPct > 80) confColor = 'text-emerald-400';
+            else if (confPct > 50) confColor = 'text-amber-400';
+
+            return `
+                                <tr onclick="window.openForensicDrawer('${event.eventId}')" class="hover:bg-slate-800/50 transition border-b border-slate-800/50 cursor-pointer">
+                    <td class="p-4 text-center">
+                        <button class="p-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500/50 text-slate-400 hover:text-cyan-400 transition" title="Inspect Event Lifecycle">
+                            <i data-lucide="microscope" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+
+                    <td class="p-4">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold text-white">${a.vendorName}</span>
+                            <span class="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">${a.entityContext} | REF: ${a.docNumber}</span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor}">${es.status}</span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="text-xs font-mono text-slate-300">${es.determinedFrom} Entries</span>
+                    </td>
+                    <td class="p-4">
+                        <div class="flex items-center font-mono text-[10px] bg-slate-950/50 p-2 rounded border border-slate-800/50">
+                            ${breadcrumbs}
+                        </div>
+                    </td>
+                    <td class="p-4 text-right">
+                        <span class="text-xs font-mono text-slate-500">$${event.grossActivity.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </td>
+                    <td class="p-4 text-right">
+                        <span class="text-sm font-mono font-bold ${event.netEconomicImpact < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${event.netEconomicImpact.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <div class="flex flex-col items-center">
+                            <span class="text-xs font-bold ${confColor}">${confPct}%</span>
+                            <div class="w-12 h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                                <div class="h-full bg-current ${confColor}" style="width: ${confPct}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="p-4 text-center">
+                        ${varAn.contributesToLedgerVariance 
+                            ? `<span class="text-[10px] font-bold text-rose-400">+$${varAn.contributionAmount.toLocaleString()}</span>`
+                            : `<span class="text-[10px] text-slate-600">ZERO</span>`}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderTransactionResults(data) {
+      const tbody = document.getElementById('table-body');
+      const thead = document.querySelector('#results-section thead tr');
+      
+      // Restore Original Transaction Headers
+      thead.innerHTML = `
+        <th class="p-3 pl-4 text-center">Case Action</th>
+        <th class="p-3">Entity / Vendor</th>
+        <th class="p-3">Voucher / JE</th>
+        <th class="p-3">Doc / Invoice No.</th>
+        <th class="p-3">Doc Type</th>
+        <th class="p-3">TRX Date</th>
+        <th class="p-3 text-right">Amount</th>
+        <th class="p-3">Evidence Graph Links</th>
+        <th class="p-3 text-center">Phase 4 Corroboration</th>
+        <th class="p-3 text-center">Phase 5 Contradictions</th>
+        <th class="p-3 text-center">Phase 1 Materiality</th>
+        <th class="p-3 text-center">Phase 2 Forensic Risk</th>
+        <th class="p-3 text-center">Phase 3 Authority</th>
+        <th class="p-3 text-center">Tie-Out Status</th>
+      `;
+
+      const visibleData = data.slice(0, MAX_VISIBLE_ROWS);
+      const totalCount = data.length;
+
+      document.getElementById('results-meta').innerHTML = `
+        Showing ${visibleData.length.toLocaleString()} of ${totalCount.toLocaleString()} records 
+        <span class="text-slate-500">| Raw Ledger View Active</span>
+      `;
+
+      tbody.innerHTML = visibleData.map(record => {
+        const r = record.data || record; 
+        const prov = record._provenance || {};
+        const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
+        const rel = record._relationships || { hasLinks: false, forensicEdges: [], anomalyEdges: [], classificationEdges: [] };
+        const mat = AIGovernanceEngine.classifyMateriality(r.amount || r.doc_amount, val.variance);
+        const corr = record._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
+        const risk = record._risk || { riskScore: 0, riskClass: 'LOW', badgeColor: '' };
+        const auth = record._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
+        const contra = record._contradictions || { hasContradictions: false, count: 0 };
+        const recId = record._id || r.row_id;
+
+        let actionCell = `<button onclick="attachToCaseUI('${recId}')" class="px-2 py-1 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 rounded border border-indigo-500/40 text-[10px] transition font-bold" title="Attach to Active Case">Attach</button>`;
+        if (activeCase && activeCase.evidenceLog && activeCase.evidenceLog.some(log => log.recordId === recId)) {
+          actionCell = `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-bold">Attached</span>`;
+        }
+
+        let linkDisplay = `<span class="text-slate-500 text-[10px]">Unlinked</span>`;
+        if (rel.hasLinks) {
+          linkDisplay = `
+            <button onclick="viewGraphLinks('${recId}')" class="flex items-center gap-1 cursor-pointer">
+              ${rel.forensicEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">${rel.forensicEdges.length} Evid</span>` : ''}
+              ${rel.anomalyEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">${rel.anomalyEdges.length} Corrob</span>` : ''}
+            </button>
+          `;
+        }
+
+        let matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400">Immaterial</span>`;
+        if (mat.level === 'CRITICAL') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">Critical</span>`;
+        else if (mat.level === 'SIGNIFICANT') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">Significant</span>`;
+
+        const riskBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${risk.badgeColor}" title="${(risk.riskFactors || []).map(f => f.indicator).join(', ')}">${risk.riskScore}/100 (${risk.riskClass})</span>`;
+        const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/60 text-purple-300 border border-purple-500/30" title="${auth.topic}">${auth.primaryCitation}</span>`;
+        const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span>`;
+        
+        const contraBadge = contra.hasContradictions 
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">${contra.count} Contradiction${contra.count > 1 ? 's' : ''}</span>`
+          : `<span class="text-slate-500 text-[10px]">Clear</span>`;
+
+        return `
+        <tr class="hover:bg-slate-800/50 transition">
+          <td class="p-3 pl-4 text-center">${actionCell}</td>
+          <td class="p-3 font-mono">
+            <span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext || 'ENTITY'} | ${r.accountNumber || r.vendor_id}</span>
+            ${r.vendor || r.vendor_name}
+          </td>
+          <td class="p-3 text-slate-400 font-mono">${r.voucherNumber || r.voucher}</td>
+          <td class="p-3 text-slate-200 font-bold font-mono">${r.invoiceNumber || r.doc_number}</td>
+          <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300 font-mono">${r.type}</span></td>
+          <td class="p-3 text-slate-300 font-mono">${r.transactionDate || r.doc_date}</td>
+          <td class="p-3 text-right font-bold font-mono ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
+          <td class="p-3">${linkDisplay}</td>
+          <td class="p-3 text-center">${corrobBadge}</td>
+          <td class="p-3 text-center">${contraBadge}</td>
+          <td class="p-3 text-center">${matBadge}</td>
+          <td class="p-3 text-center">${riskBadge}</td>
+          <td class="p-3 text-center">${authBadge}</td>
+          <td class="p-3 text-center">
+            ${val.tieOutStatus === 'PASS' 
+              ? `<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">PASS</span>`
+              : `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold">FAIL ($${val.variance})</span>`}
+          </td>
+        </tr>
+      `}).join('');
+
+      if (totalCount > MAX_VISIBLE_ROWS) {
+          const loadMoreRow = document.createElement('tr');
+          loadMoreRow.id = 'load-more-row';
+          loadMoreRow.innerHTML = `
+            <td colspan="14" class="p-6 text-center bg-slate-900/50">
+              <button onclick="window.renderAllResults()" class="px-6 py-2 rounded-lg bg-slate-800 border border-slate-700 text-cyan-400 font-bold text-xs hover:bg-slate-700 transition">
+                LOAD ALL ${totalCount.toLocaleString()} RECORDS (MAY CAUSE BROWSER LAG)
+              </button>
+            </td>
+          `;
+          tbody.appendChild(loadMoreRow);
+      }
+    }
+
+
+    window.renderAllResults = () => {
+        const loadMore = document.getElementById('load-more-row');
+        if (loadMore) loadMore.remove();
+        window.renderResultsBatch(extractedData);
+    };
+
+    window.renderResultsBatch = (data) => {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = data.map(record => {
+            const r = record.data || record; 
+            const prov = record._provenance || {};
+            const val = record._validation || { tieOutStatus: 'PASS', message: 'Valid' };
+            const rel = record._relationships || { hasLinks: false, forensicEdges: [], anomalyEdges: [], classificationEdges: [] };
+            const mat = AIGovernanceEngine.classifyMateriality(r.amount || r.doc_amount, val.variance);
+            const corr = record._corroboration || { corroborationLevel: 'A', sourceCount: 1 };
+            const risk = record._risk || { riskScore: 0, riskClass: 'LOW', badgeColor: '' };
+            const auth = record._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
+            const contra = record._contradictions || { hasContradictions: false, count: 0 };
+            const recId = record._id || r.row_id;
+
+            let actionCell = `<button onclick="attachToCaseUI('${recId}')" class="px-2 py-1 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 rounded border border-indigo-500/40 text-[10px] transition font-bold" title="Attach to Active Case">Attach</button>`;
+            if (activeCase && activeCase.evidenceLog && activeCase.evidenceLog.some(log => log.recordId === recId)) {
+                actionCell = `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-bold">Attached</span>`;
+            }
+
+            let linkDisplay = `<span class="text-slate-500 text-[10px]">Unlinked</span>`;
+            if (rel.hasLinks) {
+                linkDisplay = `<button onclick="viewGraphLinks('${recId}')" class="flex items-center gap-1 cursor-pointer">
+                    ${rel.forensicEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">${rel.forensicEdges.length} Evid</span>` : ''}
+                    ${rel.anomalyEdges.length > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">${rel.anomalyEdges.length} Corrob</span>` : ''}
+                </button>`;
+            }
+
+            let matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400">Immaterial</span>`;
+            if (mat.level === 'CRITICAL') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">Critical</span>`;
+            else if (mat.level === 'SIGNIFICANT') matBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">Significant</span>`;
+
+            const riskBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${risk.badgeColor}">${risk.riskScore}/100 (${risk.riskClass})</span>`;
+            const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/60 text-purple-300 border border-purple-500/30">${auth.primaryCitation}</span>`;
+            const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-cyan-300 border border-slate-700">Lvl ${corr.corroborationLevel} (${corr.sourceCount})</span>`;
+            const contraBadge = contra.hasContradictions ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">${contra.count} Contradiction${contra.count > 1 ? 's' : ''}</span>` : `<span class="text-slate-500 text-[10px]">Clear</span>`;
+
+            return `<tr class="hover:bg-slate-800/50 transition">
+                <td class="p-3 pl-4 text-center">${actionCell}</td>
+                <td class="p-3 font-mono"><span class="text-cyan-400 font-mono text-[10px] block">${prov.entityContext || 'ENTITY'} | ${r.accountNumber || r.vendor_id}</span>${r.vendor || r.vendor_name}</td>
+                <td class="p-3 text-slate-400 font-mono">${r.voucherNumber || r.voucher}</td>
+                <td class="p-3 text-slate-200 font-bold font-mono">${r.invoiceNumber || r.doc_number}</td>
+                <td class="p-3"><span class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300 font-mono">${r.type}</span></td>
+                <td class="p-3 text-slate-300 font-mono">${r.transactionDate || r.doc_date}</td>
+                <td class="p-3 text-right font-bold font-mono ${parseFloat(r.amount || r.doc_amount || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'}">$${parseFloat(r.amount || r.doc_amount || 0).toFixed(2)}</td>
+                <td class="p-3">${linkDisplay}</td>
+                <td class="p-3 text-center">${corrobBadge}</td>
+                <td class="p-3 text-center">${contraBadge}</td>
+                <td class="p-3 text-center">${matBadge}</td>
+                <td class="p-3 text-center">${riskBadge}</td>
+                <td class="p-3 text-center">${authBadge}</td>
+                <td class="p-3 text-center">${val.tieOutStatus === 'PASS' ? `<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">PASS</span>` : `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold">FAIL ($${val.variance})</span>`}</td>
+            </tr>`;
+        }).join('');
+        lucide.createIcons();
+    };
+
+
+    window.stageAuditData = async () => {
+      if (extractedData.length === 0) return;
+      try {
+        const db = await openAuditDB();
+        const tx = db.transaction('staging', 'readwrite');
+        const store = tx.objectStore('staging');
+
+        const getReq = store.get('rredco_audit_staging');
+        getReq.onsuccess = async () => {
+          const existingRecords = getReq.result || [];
+          const combinedRecords = [...existingRecords, ...extractedData];
+          store.put(combinedRecords, 'rredco_audit_staging');
+
+          await ChainOfCustody.recordEvent("STAGE_DATA_TO_TERMINAL", {
+              stagedCount: extractedData.length,
+              totalStagedInMemory: combinedRecords.length
+          }, currentUserEmail);
+        };
+
+        tx.oncomplete = () => {
+          const btn = document.getElementById('btn-pass');
+          btn.innerHTML = `<i class="ph ph-check-circle text-base"></i> STAGED TO SEARCH`;
+          btn.classList.remove('from-cyan-400', 'to-cyan-500');
+          btn.classList.add('from-emerald-400', 'to-emerald-500');
+          window.logSys(`Successfully staged ${extractedData.length} graph-enriched records to IndexedDB and recorded in Phase 7 Chain of Custody.`, 'success');
+        };
+      } catch (err) {
+        window.logSys(`Failed to save staging data: ${err.message}`, 'error');
+      }
+    };
+
+        window.downloadExcel = async () => {
+      if (extractedData.length === 0) return;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Lighthouse Audit');
+
+      sheet.columns = [
+        { header: 'Entity Context', key: 'entity_context', width: 14 },
+        { header: 'Vendor / Entity Name', key: 'vendor', width: 28 },
+        { header: 'Voucher Number', key: 'voucherNumber', width: 16 },
+        { header: 'Invoice Number', key: 'invoiceNumber', width: 18 },
+        { header: 'Doc Type', key: 'type', width: 22 },
+        { header: 'TRX Date', key: 'transactionDate', width: 14 },
+        { header: 'Amount', key: 'amount', width: 16 },
+        { header: 'Connected Links', key: 'links_count', width: 16 },
+        { header: 'Corroboration Rating', key: 'corroboration_level', width: 18 },
+        { header: 'Materiality Risk', key: 'materiality_risk', width: 16 },
+        { header: 'Forensic Risk Score', key: 'risk_score', width: 18 },
+        { header: 'Governing Authority', key: 'authority_citation', width: 18 },
+        { header: 'Tie-Out Status', key: 'tie_out_status', width: 14 },
+        { header: 'Variance', key: 'variance', width: 12 },
+        { header: 'Evidence State', key: 'evidence_state', width: 16 },
+        { header: 'Parse Score', key: 'parse_score', width: 12 }
+      ];
+
+      extractedData.forEach(record => {
+        const r = record.data || record;
+        const exportRow = { 
+            ...r, 
+            entity_context: record._provenance?.entityContext || 'ENTITY',
+            links_count: record._relationships?.evidenceCount || 0,
+            corroboration_level: `Level ${record._corroboration?.corroborationLevel || 'A'} (${record._corroboration?.corroborationStatus || 'Detected'})`,
+            materiality_risk: record._materiality?.materialityLevel || 'IMMATERIAL',
+            risk_score: record._risk?.riskScore || 0,
+            authority_citation: record._authority?.primaryCitation || 'ASC 205',
+            tie_out_status: record._validation?.tieOutStatus || 'PASS',
+            variance: record._validation?.variance || 0,
+            evidence_state: record._evidenceState?.status || 'Accepted',
+            parse_score: record._provenance?.confidenceMetrics?.parsingConfidence || 100
+        };
+        sheet.addRow(exportRow);
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Digitized_Lighthouse_Schedule_${Date.now()}.xlsx`;
+      a.click();
+    };
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>
