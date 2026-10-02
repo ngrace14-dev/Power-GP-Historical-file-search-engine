@@ -952,39 +952,57 @@
           const entityMatch = window.COMPANY_ENTITIES.find(e => fileName.toUpperCase().includes(e.short)) || { short: fileName.split('.')[0].toUpperCase() };
           const entityCode = entityMatch.short || 'UNKNOWN';
 
-          if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+            // Yield before fetching
+            await new Promise(resolve => setTimeout(resolve, 0));
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
+            
+            // Yield before parsing workbook
+            await new Promise(resolve => setTimeout(resolve, 0));
             const workbook = XLSX.read(arrayBuffer, { type: 'array' });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            // Yield before converting to json
+            await new Promise(resolve => setTimeout(resolve, 0));
             const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
-            jsonRows.forEach((row, idx) => {
-              const rec = {
-                _id: `CLOUD_${entityCode}_${idx}_${Date.now()}`,
-                _location: entityCode,
-                _sourceFile: fileName,
-                _trustLevel: 5,
-                _state: 'Accepted',
+            // Process rows in chunks so we don't block the UI thread during parsing
+            const CHUNK_SIZE = 1500;
+            for (let i = 0; i < jsonRows.length; i += CHUNK_SIZE) {
+                const chunkEnd = Math.min(i + CHUNK_SIZE, jsonRows.length);
+                for (let j = i; j < chunkEnd; j++) {
+                    const row = jsonRows[j];
+                    const rec = {
+                        _id: `CLOUD_${entityCode}_${j}_${Date.now()}`,
+                        _location: entityCode,
+                        _sourceFile: fileName,
+                        _trustLevel: 5,
+                        _state: 'Accepted',
+                        
+                        'Department': row['Department'] || row['Dept'] || 'General',
+                        'Journal Entry': String(row['Journal Entry'] || row['JRNENTRY'] || row['Voucher'] || row[1] || '-'),
+                        'Invoice Number': String(row['Invoice Number'] || row['DOCNUMBR'] || row['Doc Number'] || row[3] || '-'),
+                        'Originating Master Name': String(row['Originating Master Name'] || row['ORMSTRNM'] || row['Vendor Name'] || row[2] || '-'),
+                        'TRX Date': row['TRX Date'] || row['TRXDATE'] || row['Doc Date'] || row[4] || '-',
+                        'Account Number': String(row['Account Number'] || row['ACTNUMST'] || row['Vendor ID'] || row[0] || '-'),
+                        'Account Description': String(row['Account Description'] || row['ACTDESCR'] || 'GL Ledger Record'),
+                        'Debit Amount': row['Debit Amount'] || row['DEBITAMT'] || (parseFloat(row['Amount'] || row[7] || 0) > 0 ? String(row['Amount'] || row[7]) : ''),
+                        'Credit Amount': row['Credit Amount'] || row['CRDTAMNT'] || (parseFloat(row['Amount'] || row[7] || 0) < 0 ? String(Math.abs(parseFloat(row['Amount'] || row[7]))) : ''),
+                        'Reference': String(row['Reference'] || row['REFRENCE'] || '-'),
+                        'Description': String(row['Description'] || row['DSCRIPTN'] || '-'),
+                        'Originating TRX Source': 'Power GP Cloud',
+                        'User Who Posted': row['User Who Posted'] || row['USWHPSTD'] || 'System'
+                    };
+                    window.appState.records.push(rec);
+                    window.appState.locations.add(entityCode);
+                    loadedCount++;
+                }
                 
-                'Department': row['Department'] || row['Dept'] || 'General',
-                'Journal Entry': String(row['Journal Entry'] || row['JRNENTRY'] || row['Voucher'] || row[1] || '-'),
-                'Invoice Number': String(row['Invoice Number'] || row['DOCNUMBR'] || row['Doc Number'] || row[3] || '-'),
-                'Originating Master Name': String(row['Originating Master Name'] || row['ORMSTRNM'] || row['Vendor Name'] || row[2] || '-'),
-                'TRX Date': row['TRX Date'] || row['TRXDATE'] || row['Doc Date'] || row[4] || '-',
-                'Account Number': String(row['Account Number'] || row['ACTNUMST'] || row['Vendor ID'] || row[0] || '-'),
-                'Account Description': String(row['Account Description'] || row['ACTDESCR'] || 'GL Ledger Record'),
-                'Debit Amount': row['Debit Amount'] || row['DEBITAMT'] || (parseFloat(row['Amount'] || row[7] || 0) > 0 ? String(row['Amount'] || row[7]) : ''),
-                'Credit Amount': row['Credit Amount'] || row['CRDTAMNT'] || (parseFloat(row['Amount'] || row[7] || 0) < 0 ? String(Math.abs(parseFloat(row['Amount'] || row[7]))) : ''),
-                'Reference': String(row['Reference'] || row['REFRENCE'] || '-'),
-                'Description': String(row['Description'] || row['DSCRIPTN'] || '-'),
-                'Originating TRX Source': 'Power GP Cloud',
-                'User Who Posted': row['User Who Posted'] || row['USWHPSTD'] || 'System'
-              };
-              window.appState.records.push(rec);
-              window.appState.locations.add(entityCode);
-              loadedCount++;
-            });
+                // Update UI and let the browser breathe
+                badge.textContent = `Syncing... ${loadedCount.toLocaleString()} Rows`;
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
           }
         }
 
@@ -1670,241 +1688,4 @@
 
       if (searchMode === 'omni' && omniQuery.trim()) {
         const q = omniQuery.trim().toLowerCase();
-        filtered = filtered.filter(r => window.GP_TARGET_FIELDS.some(f => String(r[f] || '').toLowerCase().includes(q)));
-      } else if (searchMode === 'single' && singleTargetVal.trim()) {
-        const q = singleTargetVal.trim().toLowerCase();
-        filtered = filtered.filter(r => String(r[singleTargetKey] || '').toLowerCase().includes(q));
-      } else if (searchMode === 'multi') {
-        const invQ = multiQuery.invoice.trim().toLowerCase();
-        const jeQ = multiQuery.je.trim().toLowerCase();
-        const vendorQ = multiQuery.vendor.trim().toLowerCase();
-        const accountQ = multiQuery.account.trim().toLowerCase();
-
-        filtered = filtered.filter(r => {
-          const matchInv = !invQ || String(r['Invoice Number'] || '').toLowerCase().includes(invQ);
-          const matchJe = !jeQ || String(r['Journal Entry'] || '').toLowerCase().includes(jeQ);
-          const matchVendor = !vendorQ || String(r['Originating Master Name'] || '').toLowerCase().includes(vendorQ);
-          const matchAccount = !accountQ || String(r['Account Number'] || '').toLowerCase().includes(accountQ);
-          return matchInv && matchJe && matchVendor && matchAccount;
-        });
-      }
-
-      window.appState.filteredRecords = filtered;
-      window.appState.currentPage = 1;
-      renderTable();
-      updateCounters();
-    }
-
-        function updateCounters() {
-      const statMatches = document.getElementById('stat-matches');
-      if (statMatches) statMatches.textContent = window.appState.filteredRecords.length.toLocaleString();
-      
-      const exportCount = document.getElementById('export-count');
-      if (exportCount) exportCount.textContent = window.appState.filteredRecords.length.toLocaleString();
-      
-      const start = window.appState.filteredRecords.length === 0 ? 0 : ((window.appState.currentPage - 1) * window.appState.pageSize) + 1;
-      const end = Math.min(window.appState.currentPage * window.appState.pageSize, window.appState.filteredRecords.length);
-      
-      const paginationInfo = document.getElementById('pagination-info');
-      if (paginationInfo) paginationInfo.textContent = `Showing ${start} to ${end} of ${window.appState.filteredRecords.length} records`;
-      
-      const paginationCurrent = document.getElementById('pagination-current-page');
-      if (paginationCurrent) paginationCurrent.textContent = window.appState.currentPage;
-    }
-
-    function renderTable() {
-      const tbody = document.getElementById('table-body');
-      const { currentPage, pageSize, filteredRecords, activeInvestigation } = window.appState;
-      const start = (currentPage - 1) * pageSize;
-      const pageSlice = filteredRecords.slice(start, start + pageSize);
-
-      if (filteredRecords.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="21" class="py-14 text-center text-slate-400">No matching records found in this entity.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = pageSlice.map((r, idx) => {
-        const stateColor = r._state === 'Accepted' ? 'text-emerald-600 bg-emerald-100' : (r._state === 'Unresolved' ? 'text-rose-600 bg-rose-100' : 'text-slate-600 bg-slate-100');
-        const trustBadge = `<span class="px-1.5 py-0.5 rounded border border-slate-200 bg-white text-[9px] text-slate-500 mr-1" title="Trust Level ${r._trustLevel}">Lv.${r._trustLevel || '?'}</span>`;
-        
-        let actionBtn = `<button class="p-1 text-slate-300 cursor-not-allowed" title="Start Case to Attach"><i data-lucide="minus" class="w-4 h-4"></i></button>`;
-        if (activeInvestigation) {
-            const isAttached = activeInvestigation.evidenceLog.some(log => log.recordId === r._id);
-            if (isAttached) {
-                actionBtn = `<button class="p-1 text-emerald-500 rounded bg-emerald-50" title="Attached"><i data-lucide="check-circle" class="w-4 h-4"></i></button>`;
-            } else {
-                actionBtn = `<button onclick="attachToCase('${r._id}')" class="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded transition" title="Attach to Case"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>`;
-            }
-        }
-
-        const rel = r._relationships || { hasLinks: false, evidenceCount: 0, corroboratingCount: 0 };
-        const corr = r._corroboration || { corroborationLevel: 'A', corroborationStatus: 'Detected', sourceCount: 1 };
-        const risk = r._risk || { riskScore: 0, riskClass: 'LOW' };
-        const auth = r._authority || { primaryCitation: 'ASC 205', topic: 'General Ledger' };
-        const contra = r._contradictions || { hasContradictions: false, count: 0 };
-
-        let linkDisplay = `<span class="text-slate-400 text-[10px]">Unlinked</span>`;
-        if (rel.hasLinks) {
-          linkDisplay = `
-            <button onclick="viewGraphLinks('${r._id}')" class="flex items-center gap-1 cursor-pointer">
-              ${rel.evidenceCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">${rel.evidenceCount} Evid</span>` : ''}
-              ${rel.corroboratingCount > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-300">${rel.corroboratingCount} Corrob</span>` : ''}
-            </button>
-          `;
-        }
-
-        let riskBadge = `<span class="px-1.5 py-0.5 rounded font-mono text-[9px] bg-slate-100 text-slate-600 border border-slate-200">${risk.riskScore}/100</span>`;
-        if (risk.riskClass === 'CRITICAL') {
-          riskBadge = `<span class="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-300">${risk.riskScore}/100 (CRIT)</span>`;
-        } else if (risk.riskClass === 'ELEVATED') {
-          riskBadge = `<span class="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300">${risk.riskScore}/100 (ELEV)</span>`;
-        }
-
-        const authBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="${auth.topic}">${auth.primaryCitation}</span>`;
-        const corrobBadge = `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-100 text-slate-700 border border-slate-200" title="Corroboration: ${corr.corroborationStatus}">Lvl ${corr.corroborationLevel} (${corr.sourceCount} Src)</span>`;
-
-        const contraBadge = contra.hasContradictions 
-          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">${contra.count} Contradiction${contra.count > 1 ? 's' : ''}</span>`
-          : `<span class="text-slate-400 text-[10px]">Clear</span>`;
-
-        return `
-        <tr class="hover:bg-sky-50/50 border-l-2 ${r._state === 'Unresolved' ? 'border-rose-400' : 'border-transparent'}">
-          <td class="py-2 px-3 text-center border-r border-slate-100">${actionBtn}</td>
-          <td class="py-2 px-3">${linkDisplay}</td>
-          <td class="py-2 px-3 text-center">${corrobBadge}</td>
-          <td class="py-2 px-3 text-center">${contraBadge}</td>
-          <td class="py-2 px-3 text-center">${riskBadge}</td>
-          <td class="py-2 px-3 text-center">${authBadge}</td>
-          <td class="py-2 px-3 text-[10px]">
-            <div class="flex flex-col gap-1">
-                <div>${trustBadge} <span class="px-1.5 py-0.5 rounded font-bold ${stateColor}">${r._state || 'Unknown'}</span></div>
-                <div class="text-slate-400 truncate max-w-[150px]" title="${r._sourceFile}">${r._sourceFile || 'Local'}</div>
-            </div>
-          </td>
-          <td class="py-2 px-3 text-[11px] font-semibold text-sky-800">${r._location}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r['Department'] || '-'}</td>
-          <td class="py-2 px-3 font-mono font-bold">${r['Journal Entry'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-sky-700 font-semibold">${r['Invoice Number'] || '-'}</td>
-          <td class="py-2 px-3 truncate max-w-[160px]">${r['Originating Master Name'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r['TRX Date'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-gp-700 text-[11px]">${r['Account Number'] || '-'}</td>
-          <td class="py-2 px-3 truncate max-w-[180px]">${r['Account Description'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-right">${r['Debit Amount'] ? '$'+parseFloat(r['Debit Amount']).toFixed(2) : '-'}</td>
-          <td class="py-2 px-3 font-mono text-right">${r['Credit Amount'] ? '$'+parseFloat(r['Credit Amount']).toFixed(2) : '-'}</td>
-          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Reference'] || '-'}</td>
-          <td class="py-2 px-3 text-[11px] truncate max-w-[140px]">${r['Description'] || '-'}</td>
-          <td class="py-2 px-3 text-[10px] text-slate-500">${r['Originating TRX Source'] || '-'}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r['User Who Posted'] || '-'}</td>
-        </tr>`
-      }).join('');
-      lucide.createIcons();
-    }
-
-    document.getElementById('global-search-input').addEventListener('input', (e) => {
-      window.appState.omniQuery = e.target.value;
-      setTimeout(executeSearch, 300);
-    });
-
-    document.getElementById('btn-export-results').addEventListener('click', () => {
-      if(window.appState.filteredRecords.length === 0) return alert('No records to export');
-      const csv = Papa.unparse(window.appState.filteredRecords.map(r => {
-        const out = { 'Entity': r._location, 'Materiality': r._materiality?.materialityLevel || 'IMMATERIAL', 'Forensic Risk': r._risk?.riskScore || 0, 'Governing Authority': r._authority?.primaryCitation || 'ASC 205', 'Evidence State': r._state, 'Trust Level': r._trustLevel, 'Connected Links': r._relationships?.evidenceCount || 0, 'Source File': r._sourceFile };
-        window.GP_TARGET_FIELDS.forEach(f => out[f] = r[f]);
-        return out;
-      }));
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `Evidence_Export_${window.appState.activeLocation}_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    });
-
-    document.getElementById('btn-pull-cloud').addEventListener('click', syncCloudLedgers);
-
-    document.getElementById('mode-omni').addEventListener('click', () => {
-      window.appState.searchMode = 'omni';
-      document.getElementById('container-omni-search').classList.remove('hidden');
-      document.getElementById('container-single-search').classList.add('hidden');
-      document.getElementById('container-multi-search').classList.add('hidden');
-      executeSearch();
-    });
-
-    document.getElementById('mode-single').addEventListener('click', () => {
-      window.appState.searchMode = 'single';
-      document.getElementById('container-omni-search').classList.add('hidden');
-      document.getElementById('container-single-search').classList.remove('hidden');
-      document.getElementById('container-multi-search').classList.add('hidden');
-      executeSearch();
-    });
-
-    document.getElementById('mode-multi').addEventListener('click', () => {
-      window.appState.searchMode = 'multi';
-      document.getElementById('container-omni-search').classList.add('hidden');
-      document.getElementById('container-single-search').classList.add('hidden');
-      document.getElementById('container-multi-search').classList.remove('hidden');
-      executeSearch();
-    });
-
-    document.getElementById('single-field-target-value').addEventListener('input', (e) => {
-      window.appState.singleTargetVal = e.target.value;
-      window.appState.singleTargetKey = document.getElementById('single-field-target-key').value;
-      setTimeout(executeSearch, 300);
-    });
-
-    document.getElementById('single-field-target-key').addEventListener('change', (e) => {
-      window.appState.singleTargetKey = e.target.value;
-      executeSearch();
-    });
-
-    const bindMultiInput = (id, key) => {
-      document.getElementById(id).addEventListener('input', (e) => {
-        window.appState.multiQuery[key] = e.target.value;
-        setTimeout(executeSearch, 300);
-      });
-    };
-
-    bindMultiInput('multi-input-invoice', 'invoice');
-    bindMultiInput('multi-input-je', 'je');
-    bindMultiInput('multi-input-vendor', 'vendor');
-    bindMultiInput('multi-input-account', 'account');
-
-    document.getElementById('btn-prev-page').addEventListener('click', () => {
-      if (window.appState.currentPage > 1) {
-        window.appState.currentPage--;
-        renderTable();
-        updateCounters();
-      }
-    });
-
-    document.getElementById('btn-next-page').addEventListener('click', () => {
-      const maxPage = Math.ceil(window.appState.filteredRecords.length / window.appState.pageSize);
-      if (window.appState.currentPage < maxPage) {
-        window.appState.currentPage++;
-        renderTable();
-        updateCounters();
-      }
-    });
-
-    document.getElementById('pagination-page-size').addEventListener('change', (e) => {
-      window.appState.pageSize = parseInt(e.target.value);
-      window.appState.currentPage = 1;
-      renderTable();
-      updateCounters();
-    });
-
-    document.getElementById('logoutBtn').addEventListener('click', () => { signOut(auth); });
-
-    onAuthStateChanged(auth, (user) => {
-      if (user && user.email) {
-        window.appState.user = user;
-        document.getElementById('userEmail').textContent = user.email;
-        loadAuditStaging();
-      } else {
-        window.location.href = 'index.html';
-      }
-    });
-
-    lucide.createIcons();
-  </script>
-</body>
-</html>
+        filtered = f
