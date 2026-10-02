@@ -282,8 +282,13 @@ export class IngestionController {
                 await new Promise(resolve => setTimeout(resolve, 10));
 
                 const t_parse_start = performance.now();
+                                // Read the workbook in chunks if needed, but arrayBuffer reading is blocking
+                // We'll yield to the event loop before and after reading
+                await new Promise(resolve => setTimeout(resolve, 0));
                 const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true, cellNF: false, cellText: false });
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                await new Promise(resolve => setTimeout(resolve, 0));
                 const raw2D = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
                 const t_parse_end = performance.now();
                 totalParseTime += (t_parse_end - t_parse_start);
@@ -294,53 +299,63 @@ export class IngestionController {
                 const MAX_RECORDS_PER_FILE = totalFiles < 3 ? 15000 : 5000;
                 const recordsToProcess = Math.min(MAX_RECORDS_PER_FILE, raw2D.length);
 
-                for (let r = 1; r < recordsToProcess; r++) {
-                    const row = raw2D[r];
-                    if (!row || row.length === 0) continue;
+                // Process records in chunks to prevent blocking the main thread
+                const CHUNK_SIZE = 1000;
+                for (let r = 1; r < recordsToProcess; r += CHUNK_SIZE) {
+                    const chunkEnd = Math.min(r + CHUNK_SIZE, recordsToProcess);
+                    
+                    for (let i = r; i < chunkEnd; i++) {
+                        const row = raw2D[i];
+                        if (!row || row.length === 0) continue;
 
-                    const rawRecord = {
-                        'Department': row[0],
-                        'Journal Entry': row[1],
-                        'Originating Master Name': row[2],
-                        'TRX Date': row[3],
-                        'Account Number': row[4],
-                        'Account Description': row[5],
-                        'Debit Amount': row[6],
-                        'Credit Amount': row[7],
-                        'Reference': row[8],
-                        'Description': row[9],
-                        'Originating TRX Source': row[10],
-                        'User Who Posted': row[11],
-                        row_id: `LH_ROW_${rowId++}`,
-                        _cross_foot_valid: true
-                    };
+                        const rawRecord = {
+                            'Department': row[0],
+                            'Journal Entry': row[1],
+                            'Originating Master Name': row[2],
+                            'TRX Date': row[3],
+                            'Account Number': row[4],
+                            'Account Description': row[5],
+                            'Debit Amount': row[6],
+                            'Credit Amount': row[7],
+                            'Reference': row[8],
+                            'Description': row[9],
+                            'Originating TRX Source': row[10],
+                            'User Who Posted': row[11],
+                            row_id: `LH_ROW_${rowId++}`,
+                            _cross_foot_valid: true
+                        };
 
-                    const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
-                    normalizedRecord.row_id = rawRecord.row_id;
-                    normalizedRecord.type = docType;
+                        const normalizedRecord = ExtractionEngine.extractFields(rawRecord, docType, entityMatch.short || "UNKNOWN");
+                        normalizedRecord.row_id = rawRecord.row_id;
+                        normalizedRecord.type = docType;
 
-                    const scores = ConfidenceEngine.calculateScores({
-                        sourceType: "NATIVE_EXPORT",
-                        parsedRecord: normalizedRecord
-                    });
+                        const scores = ConfidenceEngine.calculateScores({
+                            sourceType: "NATIVE_EXPORT",
+                            parsedRecord: normalizedRecord
+                        });
 
-                    const stampedRecord = ProvenanceEngine.stampRecord({
-                        sourceFile: fileRef.name,
-                        sourceSystem: "Firebase_Storage",
-                        sourceType: "NATIVE_EXPORT", 
-                        entityContext: entityMatch.short || "UNKNOWN", 
-                        processedBy: "Lighthouse Engine v3 (Selective Load)",
-                        ocrConfidence: scores.ocrConfidence,
-                        parsingConfidence: scores.parsingConfidence,
-                        extractedData: normalizedRecord
-                    });
+                        const stampedRecord = ProvenanceEngine.stampRecord({
+                            sourceFile: fileRef.name,
+                            sourceSystem: "Firebase_Storage",
+                            sourceType: "NATIVE_EXPORT", 
+                            entityContext: entityMatch.short || "UNKNOWN", 
+                            processedBy: "Lighthouse Engine v3 (Selective Load)",
+                            ocrConfidence: scores.ocrConfidence,
+                            parsingConfidence: scores.parsingConfidence,
+                            extractedData: normalizedRecord
+                        });
 
-                    batchRecords.push({
-                        _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
-                        _provenance: stampedRecord._provenance,
-                        data: stampedRecord.data,
-                        _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
-                    });
+                        batchRecords.push({
+                            _id: stampedRecord.data?.row_id || `REC_${Date.now()}_${Math.random()}`,
+                            _provenance: stampedRecord._provenance,
+                            data: stampedRecord.data,
+                            _evidenceState: EvidenceStateEngine.initializeState({ hasVariance: false })
+                        });
+                    }
+                    
+                    // Yield to the event loop after processing a chunk
+                    LoaderUI.updateForensicLoader('Records Parsed', fileProgressBase + (0.5 / totalFiles * 70) + ((r / recordsToProcess) * (30 / totalFiles)), `Parsing ${fileRef.name}... (${Math.round((r/recordsToProcess)*100)}%)`, { records: AppState.extractedData.length + batchRecords.length });
+                    await new Promise(resolve => setTimeout(resolve, 0));
                 }
 
                 const validation = ValidationEngine.validatePayload(batchRecords.map(b => b.data), docType);
