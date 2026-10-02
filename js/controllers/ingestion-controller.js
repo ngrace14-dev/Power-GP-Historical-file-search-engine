@@ -1,3 +1,4 @@
+export class IngestionController {
     static async handleFileUpload(event, AppState, params) {
         const { pdfjsLib, originalFileName, ClassificationEngine, ExtractionEngine, ConfidenceEngine, ProvenanceEngine, EvidenceStateEngine, ValidationEngine, RelationshipEngine, CorroborationEngine, MaterialityEngine, RiskEngine, AuthorityEngine, ChainOfCustody, LoaderUI, Logger, renderResults, parseLedgerText } = params;
         const file = event.target.files[0];
@@ -177,7 +178,6 @@
             renderResults(AppState.extractedData);
         }, 300);
     }
-export class IngestionController {
     static async fetchCloudCatalog(AppState, storage, ref, listAll, Logger) {
         if (AppState.cloudCatalog.length > 0) return;
 
