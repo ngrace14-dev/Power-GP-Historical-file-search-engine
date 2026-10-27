@@ -169,9 +169,10 @@
           </div>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left bg-white text-xs border-collapse">
-              <thead class="bg-slate-100 font-semibold border-b border-slate-200 text-slate-700">
+                            <thead class="bg-slate-100 font-semibold border-b border-slate-200 text-slate-700">
                 <tr>
                   <th class="p-2.5">Registered Account Email</th>
+                  <th class="p-2.5 text-center w-20">PCRP</th>
                   <th class="p-2.5 text-center w-20">Power GP</th>
                   <th class="p-2.5 text-center w-20">Lighthouse</th>
                   <th class="p-2.5 text-center w-20">Review Q</th>
@@ -246,16 +247,17 @@
     try { savedRegistered = JSON.parse(localStorage.getItem('rredco_registered_users') || '[]'); } catch(e){}
     window.REGISTERED_USERS = Array.from(new Set([...defaultRegistered, ...savedRegistered]));
 
-    // Updated initial Perms to include "review-queue"
-    let initialPerms = { "nicholas.grace@rredco.com": ["gp-ledger", "lighthouse", "review-queue", "fin-reporting", "asset-tracker", "system-logs"] };
+        // Updated initial Perms to include "pcrp"
+    let initialPerms = { "nicholas.grace@rredco.com": ["gp-ledger", "lighthouse", "review-queue", "pcrp", "fin-reporting", "asset-tracker", "system-logs"] };
     try {
       const storedP = localStorage.getItem('rredco_permissions');
       if (storedP) initialPerms = JSON.parse(storedP);
     } catch(e){}
     window.APP_PERMISSIONS = initialPerms;
 
-    // Updated to include the Review Queue card
+    // Updated to include PCRP
     window.AVAILABLE_APPS = [
+      { id: "pcrp", title: "Promotional Credit Recovery Platform", version: "v4.0", description: "Workbook-calibrated promotional credit recovery and reconciliation platform.", icon: "refresh-cw", url: "pcrp.html" },
       { id: "gp-ledger", title: "Power GP Historical Ledger", version: "v3.6", description: "Read-only multi-entity search engine for 17 corporate General Ledger exports.", icon: "database", url: "ledger.html" },
       { id: "lighthouse", title: "Lighthouse", version: "v1.0 (Live)", description: "Enterprise operations, analytics, and spatial OCR document digitizer.", icon: "compass", url: "lighthouse.html" },
       { id: "review-queue", title: "Human Review Queue", version: "v1.0 (Live)", description: "Governance Rule 8 Triage. Resolve cross-foot failures and override low-confidence extractions.", icon: "shield-alert", url: "review-queue.html" },
@@ -311,8 +313,9 @@
 
       grid.innerHTML = visibleApps.map(app => {
         const hasAccess = userPerms.includes(app.id);
-        const isLighthouse = app.id === 'lighthouse';
+                const isLighthouse = app.id === 'lighthouse';
         const isReviewQueue = app.id === 'review-queue';
+        const isPCRP = app.id === 'pcrp';
         
         let iconBgColor = 'bg-gp-600 text-white shadow-md shadow-gp-600/30';
         let badgeColor = 'bg-emerald-100 text-emerald-800';
@@ -326,6 +329,10 @@
             iconBgColor = 'bg-amber-500 text-white shadow-md shadow-amber-500/30';
             badgeColor = 'bg-amber-100 text-amber-800';
             btnColor = 'bg-amber-600 hover:bg-amber-500 shadow-amber-500/20';
+        } else if (isPCRP) {
+            iconBgColor = 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30';
+            badgeColor = 'bg-emerald-100 text-emerald-800';
+            btnColor = 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20';
         }
 
         return `
@@ -363,14 +370,14 @@
       const homeScreen = document.getElementById('home-screen');
       const pwdModal = document.getElementById('first-time-pwd-modal');
 
-      if (user && user.email) {
+            if (user && user.email) {
         window.appState.user = user;
         const emailLower = user.email.toLowerCase();
         if (!window.REGISTERED_USERS.includes(emailLower)) window.REGISTERED_USERS.push(emailLower);
         if (!window.APP_PERMISSIONS[emailLower]) {
           window.APP_PERMISSIONS[emailLower] = emailLower === ADMIN_EMAIL.toLowerCase() 
-            ? ["gp-ledger", "lighthouse", "review-queue", "fin-reporting", "asset-tracker", "system-logs"] 
-            : ["gp-ledger", "lighthouse"];
+            ? ["gp-ledger", "lighthouse", "review-queue", "pcrp", "fin-reporting", "asset-tracker", "system-logs"] 
+            : ["gp-ledger", "lighthouse", "pcrp"];
         }
         syncUserStores();
 
@@ -437,12 +444,13 @@
 
     function renderPermissionsTable() {
       document.getElementById('registered-users-count').textContent = `${window.REGISTERED_USERS.length} Registered Accounts`;
-      document.getElementById('permissions-table-body').innerHTML = window.REGISTERED_USERS.map(email => {
+            document.getElementById('permissions-table-body').innerHTML = window.REGISTERED_USERS.map(email => {
         const eL = email.toLowerCase();
-        const uP = window.APP_PERMISSIONS[eL] || ["gp-ledger", "lighthouse"];
+        const uP = window.APP_PERMISSIONS[eL] || ["gp-ledger", "lighthouse", "pcrp"];
         const isA = eL === ADMIN_EMAIL.toLowerCase();
         return `<tr class="hover:bg-slate-50">
           <td class="p-2.5 font-mono text-slate-800 font-semibold truncate max-w-[180px]">${email} ${isA ? `<span class="ml-1 px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px]">Admin</span>` : ''}</td>
+          <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('pcrp') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'pcrp', this.checked)" class="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('gp-ledger') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'gp-ledger', this.checked)" class="rounded text-gp-600 focus:ring-gp-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('lighthouse') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'lighthouse', this.checked)" class="rounded text-cyan-600 focus:ring-cyan-500 h-4 w-4"></td>
           <td class="p-2.5 text-center"><input type="checkbox" ${isA || uP.includes('review-queue') ? 'checked' : ''} ${isA ? 'disabled' : ''} onchange="window.toggleUserAppPerm('${eL}', 'review-queue', this.checked)" class="rounded text-amber-600 focus:ring-amber-500 h-4 w-4"></td>
@@ -464,11 +472,11 @@
       renderAppPortal();
     };
 
-    document.getElementById('btn-add-permission').addEventListener('click', () => {
+        document.getElementById('btn-add-permission').addEventListener('click', () => {
       const email = document.getElementById('dev-grant-email').value.trim().toLowerCase();
       if (!email || !email.includes('@')) return window.showToast('Enter a valid email address.', 'error');
       if (!window.REGISTERED_USERS.includes(email)) window.REGISTERED_USERS.push(email);
-      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = ["gp-ledger", "lighthouse"];
+      if (!window.APP_PERMISSIONS[email]) window.APP_PERMISSIONS[email] = ["gp-ledger", "lighthouse", "pcrp"];
       syncUserStores(); 
       renderPermissionsTable(); 
       renderAppPortal();

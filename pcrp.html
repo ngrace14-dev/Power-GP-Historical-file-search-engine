@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCRP | Promotional Credit Recovery Platform</title>
+  <link rel="icon" type="image/png" href="RREDCO_Logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            emerald: { 50: '#ecfdf5', 100: '#d1fae5', 500: '#10b981', 600: '#059669', 700: '#047857' },
+            slate: { 50: '#f8fafc', 100: '#f1f5f9', 800: '#1e293b', 900: '#0f172a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .sidebar-item-active {
+      background-color: #f1f5f9;
+      color: #059669;
+      border-right: 3px solid #059669;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex">
+
+  <!-- SIDEBAR -->
+  <aside class="w-64 bg-white border-r border-slate-200 flex flex-col sticky top-0 h-screen z-40">
+    <div class="p-6 border-b border-slate-100 flex items-center gap-3">
+      <img src="RREDCO_Logo.png" alt="Logo" class="h-8">
+      <div>
+        <h1 class="text-sm font-bold text-slate-900 leading-tight">PCRP</h1>
+        <p class="text-[10px] text-slate-500 font-medium">Recovery Platform v4.0</p>
+      </div>
+    </div>
+    
+    <nav class="flex-1 overflow-y-auto py-4">
+      <div class="px-4 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Main</div>
+      <a href="#" onclick="showSection('dashboard')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition sidebar-item-active" id="nav-dashboard">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Executive Dashboard
+      </a>
+      <a href="#" onclick="showSection('import')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-import">
+        <i data-lucide="upload-cloud" class="w-4 h-4"></i> Import Control Center
+      </a>
+      <a href="#" onclick="showSection('discovery')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-discovery">
+        <i data-lucide="search" class="w-4 h-4"></i> Discovery Engine
+      </a>
+      <a href="#" onclick="showSection('recovery')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-recovery">
+        <i data-lucide="list-checks" class="w-4 h-4"></i> Recovery Log
+      </a>
+      <a href="#" onclick="showSection('ledger')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-ledger">
+        <i data-lucide="book-open" class="w-4 h-4"></i> Master Ledger
+      </a>
+      
+      <div class="px-4 mt-6 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Governance</div>
+      <a href="#" onclick="showSection('validation')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-validation">
+        <i data-lucide="shield-check" class="w-4 h-4"></i> Workbook Validation
+      </a>
+      <a href="#" onclick="showSection('identity')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-identity">
+        <i data-lucide="fingerprint" class="w-4 h-4"></i> Identity Hub
+      </a>
+      <a href="#" onclick="showSection('archive')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-archive">
+        <i data-lucide="archive" class="w-4 h-4"></i> Forensic Archive
+      </a>
+      <a href="#" onclick="showSection('logs')" class="sidebar-item flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition" id="nav-logs">
+        <i data-lucide="terminal" class="w-4 h-4"></i> System Logs
+      </a>
+    </nav>
+
+    <div class="p-4 border-t border-slate-100">
+      <button onclick="window.location.href='index.html'" class="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> Portal Home
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="flex-1 flex flex-col min-h-screen">
+    
+    <!-- GLOBAL HEADER -->
+    <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
+          <select class="bg-transparent text-[11px] font-bold text-slate-600 px-2 outline-none border-none">
+            <option>All Sites</option>
+            <option>Los Angeles</option>
+            <option>San Francisco</option>
+          </select>
+          <div class="w-px h-4 bg-slate-300"></div>
+          <select class="bg-transparent text-[11px] font-bold text-slate-600 px-2 outline-none border-none">
+            <option>January</option>
+            <option>February</option>
+            <option selected>March</option>
+          </select>
+          <select class="bg-transparent text-[11px] font-bold text-slate-600 px-2 outline-none border-none">
+            <option>2024</option>
+            <option selected>2025</option>
+          </select>
+        </div>
+        
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="text" placeholder="Search Master Ledger..." class="pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs w-64 focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-4 pr-6 border-r border-slate-200">
+          <div class="text-right">
+            <div class="text-[10px] font-bold text-slate-400 uppercase">Workbook Status</div>
+            <div class="text-xs font-bold text-emerald-600 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Calibrated
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="text-center">
+              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Discovery</div>
+              <div class="text-xs font-bold">$1.2M</div>
+            </div>
+            <div class="text-center">
+              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Recovery</div>
+              <div class="text-xs font-bold">$842K</div>
+            </div>
+            <div class="text-center">
+              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Outstanding</div>
+              <div class="text-xs font-bold">$358K</div>
+            </div>
+            <div class="text-center">
+              <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Variance</div>
+              <div class="text-xs font-bold text-rose-500">-$12K</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div id="user-name" class="text-xs font-bold text-slate-800">Nicholas Grace</div>
+            <div class="text-[10px] text-slate-500">Administrator</div>
+          </div>
+          <div class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">NG</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- DYNAMIC WORKSPACE -->
+    <main class="flex-1 p-8" id="workspace-content">
+      
+      <!-- EXECUTIVE DASHBOARD (SKELETON) -->
+      <section id="section-dashboard" class="workspace-section">
+        <div class="flex justify-between items-end mb-8">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-900">Executive Dashboard</h2>
+            <p class="text-sm text-slate-500">Real-time recovery performance and risk assessment.</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-50 transition">Export Report</button>
+            <button class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition">Update Forecast</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Discovery YTD</div>
+            <div class="text-lg font-bold text-slate-900">$4,284,000</div>
+            <div class="text-[10px] text-emerald-600 font-bold mt-1">↑ 12% vs LY</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Recovery YTD</div>
+            <div class="text-lg font-bold text-emerald-600">$3,150,200</div>
+            <div class="text-[10px] text-emerald-600 font-bold mt-1">↑ 8% vs LY</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Outstanding</div>
+            <div class="text-lg font-bold text-rose-500">$1,133,800</div>
+            <div class="text-[10px] text-slate-400 font-medium mt-1">64 claims pending</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Recovery %</div>
+            <div class="text-lg font-bold text-slate-900">73.5%</div>
+            <div class="text-[10px] text-slate-400 font-medium mt-1">Target: 80%</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Recovery Velocity</div>
+            <div class="text-lg font-bold text-slate-900">14.2 Days</div>
+            <div class="text-[10px] text-emerald-600 font-bold mt-1">↓ 2.1 days</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Workbook Variance</div>
+            <div class="text-lg font-bold text-amber-500">0.04%</div>
+            <div class="text-[10px] text-slate-400 font-medium mt-1">Under tolerance</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-80 flex flex-col">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="font-bold text-slate-800">Discovery vs Recovery Trend</h3>
+              <select class="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded border-none">
+                <option>Last 6 Months</option>
+              </select>
+            </div>
+            <div class="flex-1 bg-slate-50 rounded-xl border border-dashed border-slate-300 flex items-center justify-center">
+              <span class="text-xs text-slate-400 font-mono italic">[Discovery vs Recovery Chart Placeholder]</span>
+            </div>
+          </div>
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-80 flex flex-col">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="font-bold text-slate-800">Outstanding Trend</h3>
+              <i data-lucide="line-chart" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <div class="flex-1 bg-slate-50 rounded-xl border border-dashed border-slate-300 flex items-center justify-center">
+              <span class="text-xs text-slate-400 font-mono italic">[Outstanding Trend Chart Placeholder]</span>
+            </div>
+          </div>
+          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-80 flex flex-col">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="font-bold text-slate-800">Top Risk Vendors</h3>
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
+            </div>
+            <div class="flex-1 bg-slate-50 rounded-xl border border-dashed border-slate-300 flex items-center justify-center">
+              <span class="text-xs text-slate-400 font-mono italic">[Top Risk Vendors Chart Placeholder]</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- IMPORT CONTROL CENTER -->
+      <section id="section-import" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">Import Control Center</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Treez Imports</h4>
+            <div class="space-y-3">
+              <div class="flex justify-between text-xs"><span>Sales Ledger</span> <span class="font-bold text-emerald-600">Sync OK</span></div>
+              <div class="flex justify-between text-xs"><span>Inv Journal</span> <span class="font-bold text-emerald-600">Sync OK</span></div>
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Sage Imports</h4>
+            <div class="space-y-3">
+              <div class="flex justify-between text-xs"><span>AP Export</span> <span class="font-bold text-emerald-600">Sync OK</span></div>
+              <div class="flex justify-between text-xs"><span>GL Detail</span> <span class="font-bold text-amber-500">Waiting...</span></div>
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Import Batches</h4>
+            <div class="text-xl font-bold text-slate-900">124</div>
+            <div class="text-[10px] text-slate-400 font-medium">Processed this month</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Queue Health</h4>
+            <div class="text-xl font-bold text-slate-900">99.8%</div>
+            <div class="text-[10px] text-slate-400 font-medium">4 active workers</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Failed Imports</h4>
+            <div class="text-xl font-bold text-rose-500">0</div>
+            <div class="text-[10px] text-slate-400 font-medium">Last 24 hours</div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 font-bold border-b border-slate-200 text-slate-600">
+              <tr>
+                <th class="p-4">Batch ID</th>
+                <th class="p-4">Source</th>
+                <th class="p-4">Records</th>
+                <th class="p-4">Status</th>
+                <th class="p-4">Timestamp</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono text-slate-500">
+              <tr><td class="p-4 text-slate-900 font-bold">#BATCH-9281</td><td class="p-4">Treez API</td><td class="p-4">12,482</td><td class="p-4 text-emerald-600">Success</td><td class="p-4">2025-03-05 08:00</td></tr>
+              <tr><td class="p-4 text-slate-900 font-bold">#BATCH-9280</td><td class="p-4">Sage CSV</td><td class="p-4">4,201</td><td class="p-4 text-emerald-600">Success</td><td class="p-4">2025-03-05 07:45</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- DISCOVERY ENGINE -->
+      <section id="section-discovery" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">Discovery Engine</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white p-8 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+              <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                <i data-lucide="upload" class="w-8 h-8"></i>
+              </div>
+              <h3 class="font-bold text-slate-800">Upload Discovery Workbook</h3>
+              <p class="text-xs text-slate-500 mb-6">Drop your calibrated Excel workbook here to begin claims extraction.</p>
+              <button class="px-6 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md">Select File</button>
+            </div>
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h4 class="font-bold text-slate-800 mb-4">Active Discovery Claims</h4>
+              <div class="bg-slate-50 border border-dashed border-slate-300 rounded-lg p-10 flex flex-col items-center justify-center">
+                 <span class="text-xs text-slate-400 font-mono italic">[Active Claims Grid Placeholder]</span>
+              </div>
+            </div>
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <h4 class="font-bold text-slate-800 mb-4">Batch History</h4>
+              <div class="space-y-2">
+                <div class="flex justify-between items-center p-3 bg-slate-50 rounded border border-slate-100">
+                  <div class="text-xs font-bold">BATCH_20250305_A</div>
+                  <div class="text-[10px] text-slate-400 font-mono">1,042 claims extracted</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-6">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <h4 class="font-bold text-slate-800 mb-4">Workbook Status</h4>
+              <div class="p-3 bg-emerald-50 rounded border border-emerald-100 flex items-center gap-3">
+                <div class="w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center"><i data-lucide="check" class="w-4 h-4"></i></div>
+                <div>
+                  <div class="text-[10px] font-bold text-emerald-800 uppercase">Calibrated</div>
+                  <div class="text-[9px] text-emerald-600 font-medium">Ready for extraction</div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <h4 class="font-bold text-slate-800 mb-4">Discovery Health</h4>
+              <div class="space-y-4">
+                <div>
+                  <div class="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>CALIBRATION</span> <span>100%</span></div>
+                  <div class="w-full bg-slate-100 h-1.5 rounded-full"><div class="bg-emerald-500 h-full rounded-full w-full"></div></div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-[10px] font-bold text-slate-500 mb-1"><span>IDENTITY MATCH</span> <span>94%</span></div>
+                  <div class="w-full bg-slate-100 h-1.5 rounded-full"><div class="bg-emerald-500 h-full rounded-full" style="width: 94%"></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 p-6 rounded-xl">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600"></i>
+                <h4 class="font-bold text-amber-900 text-sm">Identity Warnings</h4>
+              </div>
+              <p class="text-[11px] text-amber-800 mb-4">4 vendors in the current discovery set are not mapped in Identity Hub.</p>
+              <button class="w-full py-2 bg-amber-600 text-white rounded text-xs font-bold">Review Mapping</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RECOVERY LOG -->
+      <section id="section-recovery" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">Recovery Log</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h4 class="font-bold text-slate-800">Recovery Feed</h4>
+              <div class="flex gap-2">
+                 <input type="text" placeholder="Search Memos..." class="px-3 py-1 bg-slate-50 border border-slate-200 rounded text-xs">
+                 <button class="px-3 py-1 bg-slate-800 text-white rounded text-xs font-bold">Filter</button>
+              </div>
+            </div>
+            <div class="p-8 flex flex-col items-center justify-center min-h-[300px]">
+               <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-4">
+                  <i data-lucide="list-checks" class="w-6 h-6"></i>
+               </div>
+               <p class="text-xs text-slate-400 font-mono italic">Recovery log is currently empty for the selected period.</p>
+            </div>
+          </div>
+          <div class="space-y-6">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <h4 class="font-bold text-slate-800 mb-4">Settlement Feed</h4>
+              <div class="space-y-3">
+                <div class="p-3 bg-slate-50 rounded border border-slate-100 flex justify-between items-center">
+                  <div>
+                    <div class="text-[10px] font-bold text-slate-900">SETTLE_92102</div>
+                    <div class="text-[9px] text-slate-400">March 04, 2025</div>
+                  </div>
+                  <div class="text-xs font-bold text-emerald-600">+$12,000</div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-rose-50 border border-rose-100 p-6 rounded-xl">
+              <h4 class="font-bold text-rose-900 mb-2 text-sm">Unmatched Recoveries</h4>
+              <p class="text-[11px] text-rose-800 mb-4">2 bank entries could not be matched to a discovery claim.</p>
+              <button class="w-full py-2 bg-rose-600 text-white rounded text-xs font-bold">Reconcile Now</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MASTER LEDGER -->
+      <section id="section-ledger" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">Master Ledger</h2>
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 font-bold border-b border-slate-200 text-slate-600">
+              <tr>
+                <th class="p-4">Vendor</th>
+                <th class="p-4">Store</th>
+                <th class="p-4 text-right">Generated</th>
+                <th class="p-4 text-right">Recovered</th>
+                <th class="p-4 text-right">Outstanding</th>
+                <th class="p-4 text-center">Aging</th>
+                <th class="p-4">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono text-slate-500">
+              <tr>
+                <td class="p-4 text-slate-900 font-bold">WYLD CANNABIS</td>
+                <td class="p-4">RREDCO SF</td>
+                <td class="p-4 text-right font-bold">$12,450.00</td>
+                <td class="p-4 text-right font-bold text-emerald-600">$10,000.00</td>
+                <td class="p-4 text-right font-bold text-rose-500">$2,450.00</td>
+                <td class="p-4 text-center">14 Days</td>
+                <td class="p-4"><span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold uppercase">Partial</span></td>
+              </tr>
+              <tr>
+                <td class="p-4 text-slate-900 font-bold">KIVA CONFECTIONS</td>
+                <td class="p-4">RREDCO LA</td>
+                <td class="p-4 text-right font-bold">$8,200.00</td>
+                <td class="p-4 text-right font-bold text-emerald-600">$8,200.00</td>
+                <td class="p-4 text-right font-bold">$0.00</td>
+                <td class="p-4 text-center">3 Days</td>
+                <td class="p-4"><span class="px-2 py-0.5 bg-emerald-600 text-white rounded-full text-[10px] font-bold uppercase">Recovered</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- WORKBOOK VALIDATION -->
+      <section id="section-validation" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">Workbook Validation</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-64">
+             <h4 class="font-bold text-slate-800 mb-4">Calibration Matrix</h4>
+             <div class="flex-1 bg-slate-50 rounded-lg border border-dashed border-slate-300 flex items-center justify-center h-40">
+                <span class="text-xs text-slate-400 font-mono italic">[Matrix Visualization Placeholder]</span>
+             </div>
+          </div>
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-64">
+             <h4 class="font-bold text-slate-800 mb-4">Variance Waterfall</h4>
+             <div class="flex-1 bg-slate-50 rounded-lg border border-dashed border-slate-300 flex items-center justify-center h-40">
+                <span class="text-xs text-slate-400 font-mono italic">[Waterfall Chart Placeholder]</span>
+             </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
+          <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+            <h4 class="font-bold text-slate-800">Vendor Variance Grid</h4>
+          </div>
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 font-bold border-b border-slate-200 text-slate-600">
+              <tr>
+                <th class="p-4">Vendor</th>
+                <th class="p-4 text-right">Workbook Value</th>
+                <th class="p-4 text-right">PCRP Calculated</th>
+                <th class="p-4 text-right">Variance</th>
+                <th class="p-4">Resolution</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono text-slate-500">
+              <tr>
+                <td class="p-4 text-slate-900 font-bold">WYLD CANNABIS</td>
+                <td class="p-4 text-right">$12,450.00</td>
+                <td class="p-4 text-right">$12,450.00</td>
+                <td class="p-4 text-right text-emerald-600">$0.00</td>
+                <td class="p-4"><span class="text-[10px] font-bold text-emerald-600">MATCHED</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h4 class="font-bold text-slate-800 mb-4">Workbook vs PCRP Comparison</h4>
+          <div class="bg-slate-50 border border-dashed border-slate-300 rounded-lg p-10 flex flex-col items-center justify-center">
+             <span class="text-xs text-slate-400 font-mono italic">[Side-by-Side Comparison Placeholder]</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- IDENTITY HUB -->
+      <section id="section-identity" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">Identity Hub</h2>
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <div class="flex justify-between items-center mb-6">
+            <h4 class="font-bold text-slate-800">Master Identity Mapping</h4>
+            <button class="px-4 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold">Add New Mapping</button>
+          </div>
+          <div class="bg-slate-50 border border-dashed border-slate-300 rounded-lg p-20 flex flex-col items-center justify-center">
+             <i data-lucide="fingerprint" class="w-10 h-10 text-slate-300 mb-4"></i>
+             <p class="text-xs text-slate-400 font-mono italic">Identity assets are being synchronized from Lighthouse Core...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FORENSIC ARCHIVE -->
+      <section id="section-archive" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">Forensic Archive</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+           <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <h4 class="font-bold text-slate-800 mb-4">Snapshots</h4>
+              <div class="space-y-2">
+                 <div class="p-2 hover:bg-slate-50 rounded border border-slate-100 text-xs flex justify-between cursor-pointer">
+                    <span class="font-bold">FEB-2025_FINAL</span>
+                    <span class="text-slate-400">02/28/25</span>
+                 </div>
+                 <div class="p-2 hover:bg-slate-50 rounded border border-slate-100 text-xs flex justify-between cursor-pointer">
+                    <span class="font-bold">JAN-2025_FINAL</span>
+                    <span class="text-slate-400">01/31/25</span>
+                 </div>
+              </div>
+           </div>
+           <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <h4 class="font-bold text-slate-800 mb-4">Month-End Closures</h4>
+              <div class="space-y-2">
+                <div class="flex items-center gap-2 text-xs font-medium text-slate-600">
+                  <i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i> FEB 2025 Closed
+                </div>
+                <div class="flex items-center gap-2 text-xs font-medium text-slate-600">
+                  <i data-lucide="check-circle" class="w-4 h-4 text-emerald-500"></i> JAN 2025 Closed
+                </div>
+              </div>
+           </div>
+           <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <h4 class="font-bold text-slate-800 mb-4">Historical Ledger</h4>
+              <button class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold transition">Access Archive Vault</button>
+           </div>
+        </div>
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h4 class="font-bold text-slate-800 mb-4">Historical Audit Trail</h4>
+          <div class="bg-slate-50 border border-dashed border-slate-300 rounded-lg p-20 flex flex-col items-center justify-center">
+            <p class="text-xs text-slate-400 font-mono italic">Audit log archive visualization placeholder.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SYSTEM LOGS -->
+      <section id="section-logs" class="workspace-section hidden">
+        <h2 class="text-2xl font-bold text-slate-900 mb-8">System Logs</h2>
+        <div class="bg-slate-900 rounded-xl p-6 font-mono text-[11px] text-emerald-400 overflow-y-auto max-h-[600px] border border-slate-800">
+           <div class="mb-1"><span class="text-slate-500">[2025-03-05 08:12:04]</span> <span class="text-white">AUTH:</span> Session established for nicholas.grace@rredco.com</div>
+           <div class="mb-1"><span class="text-slate-500">[2025-03-05 08:12:10]</span> <span class="text-emerald-500">SYNC:</span> Discovery Engine synchronized with Master Ledger</div>
+           <div class="mb-1"><span class="text-slate-500">[2025-03-05 08:12:15]</span> <span class="text-sky-500">DATA:</span> Fetched 1,240 records from Treez Sales Ledger</div>
+           <div class="mb-1"><span class="text-slate-500">[2025-03-05 08:15:33]</span> <span class="text-amber-500">WARN:</span> Identity mismatch detected for Vendor ID: V-9281</div>
+           <div class="animate-pulse">_</div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="p-6 text-[10px] text-slate-400 font-mono flex justify-between border-t border-slate-100 bg-white">
+      <div>PCRP CORE VERSION 4.0.21-STABLE</div>
+      <div>ENCRYPTION: AES-256-GCM ACTIVE</div>
+    </footer>
+  </div>
+
+  <script>
+    function showSection(id) {
+      // Update Sidebar UI
+      document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.remove('sidebar-item-active');
+      });
+      document.getElementById('nav-' + id).classList.add('sidebar-item-active');
+
+      // Update Workspace Sections
+      document.querySelectorAll('.workspace-section').forEach(section => {
+        section.classList.add('hidden');
+      });
+      document.getElementById('section-' + id).classList.remove('hidden');
+
+      // Refresh Icons
+      lucide.createIcons();
+    }
+
+    // Initialize Lucide Icons
+    lucide.createIcons();
+  </script>
+</body>
+</html>
